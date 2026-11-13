@@ -58,7 +58,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <div class="w">
 <header>
 <svg viewBox="0 0 48 48" aria-hidden="true" style="width:30px"><path d="M24 2 28.5 19.5 46 24 28.5 28.5 24 46 19.5 28.5 2 24 19.5 19.5Z" fill="#FFB84D"/><circle cx="24" cy="24" r="3.2" fill="#0A0F1E"/></svg>
-<h1>ZORYA</h1><span class="chip">Демо-дані</span>
+<h1>ZORYA</h1><span class="chip">ДЕМО · БЕЗ ОРДЕРІВ</span>
 <button class="b" id="pb" aria-label="Профіль" style="padding:0 12px"><svg viewBox="0 0 24 24" style="width:22px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
 <button class="b" id="mb" aria-label="Меню" aria-expanded="false" style="padding:0 12px"><svg viewBox="0 0 24 24" style="width:22px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </header>
@@ -103,7 +103,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 </section>
 
 <section id="v-ex" class="s" hidden>
-<div class="card"><h2>Біржі з підключенням по API</h2><div id="exl"></div><p class="mu" style="margin-top:10px">У демо ключі не потрібні й не зберігаються. Кількість пар і ліміти плеча демонстраційні, у реальній версії їх треба брати з API біржі. Ключ API створюється без права виведення, а кошти лишаються на біржі.</p></div>
+<div class="card"><h2>Біржі (демо-режим)</h2><div id="exl"></div><p class="mu" style="margin-top:10px">Зараз це лише демонстраційні перемикачі: реального з’єднання з біржами немає, API-ключі не вводяться й не використовуються, ордери не надсилаються. Кількість пар і ліміти плеча умовні. Перед створенням реальної версії потрібні офіційні API бірж, захищене зберігання ключів і окреме тестування.</p></div>
 </section>
 
 <section id="v-pf" class="s" hidden>
@@ -291,7 +291,7 @@ function chart(v){if(v.length<2)return'<p class="mu">Недостатньо уг
 return`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Крива капіталу"><path d="M0 ${Y(0)}H${W}" stroke="#24304D"/><path d="M${P.join('L')}V${H}H0Z" fill="#FFB84D" fill-opacity=".12"/><path d="M${P.join('L')}" fill="none" stroke="#FFB84D" stroke-width="2.5" stroke-linejoin="round"/></svg>`}
 let PF=ld('zpf',{n:'',nt:[1,1,0],tf:0});
 let tt;function toast(m){const e=$('#ts');e.textContent=m;e.hidden=false;clearTimeout(tt);tt=setTimeout(()=>e.hidden=true,3500)}
-function tick(){for(const k in D){const cs=D[k];cs.push(nextC(PAIRS[k],Math.random));
+function tick(){const active=[...new Set(bots.filter(x=>x.on).map(x=>x.g.pair))];for(const k of active){const cs=D[k];cs.push(nextC(PAIRS[k],Math.random));
 bots.filter(x=>x.g.pair===k&&x.on).forEach(x=>{const tf=x.g.tf,len=cs.length;if(len%tf)return;const a=agg(cs.slice(Math.max(0,len-300*tf)),tf),e=entry(a,x.g),n0=x.b.tr.length,o0=x.b.pos?x.b.pos.n:0;
 x.b.step(len/tf-1,a[a.length-1],e[a.length-1],len-tf);const v=bv(x);x.pk=Math.max(x.pk,v);x.dd=Math.min(x.dd,v-x.pk);const t=x.b.tr;
 if(t.length>n0&&PF.nt[0])toast(ttl(x)+': угода закрита, '+f(t[t.length-1].pnl)+' USDT');else if(o0&&x.b.pos&&x.b.pos.n>o0&&PF.nt[1])toast(ttl(x)+': ордер '+x.b.pos.n+' з '+x.g.orders)})}

@@ -2,9 +2,9 @@ name: Validate ZORYA
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
@@ -19,18 +19,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Extract inline JavaScript
+      - name: Check HTML mirrors and extract JavaScript
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
 
-          html = Path("Zorya — торгові боти.html").read_text(encoding="utf-8")
-          scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
-          if len(scripts) != 1:
-              raise SystemExit(f"Expected exactly one inline script, found {len(scripts)}")
-          Path("/tmp/zorya-inline.js").write_text(scripts[0], encoding="utf-8")
+          files = ["index.html", "Zorya — торгові боти.html"]
+          contents = {name: Path(name).read_text(encoding="utf-8") for name in files}
+
+          if contents[files[0]] != contents[files[1]]:
+              raise SystemExit("HTML mirrors differ. Keep index.html and the named HTML file identical.")
+
+          for index, name in enumerate(files):
+              scripts = re.findall(r"<script>(.*?)</script>", contents[name], flags=re.S)
+              if len(scripts) != 1:
+                  raise SystemExit(f"{name}: expected exactly one inline script, found {len(scripts)}")
+              Path(f"/tmp/zorya-{index}.js").write_text(scripts[0], encoding="utf-8")
           PY
       - name: Check JavaScript syntax
-        run: node --check /tmp/zorya-inline.js
+        run: |
+          node --check /tmp/zorya-0.js
+          node --check /tmp/zorya-1.js

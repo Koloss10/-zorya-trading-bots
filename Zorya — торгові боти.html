@@ -67,13 +67,13 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <div class="k" id="kp"></div>
 <div class="card"><h2>Обрані боти Автомайстра</h2><p class="mu" id="tops" style="margin-bottom:10px"></p><div class="pg" id="fav"></div><div class="row" style="margin-top:10px"><button class="b" id="topr">Оновити зараз</button></div></div>
 <div class="card"><h2>Авто-майстер</h2><p class="mu" style="margin-bottom:10px">Вкажіть біржу, пару й суму: майстер підбере таймфрейм, індикатори, DCA-сітку, плече, TP та SL, порахує депозит зі страховкою й одразу проведе бектест.</p><button class="b p" id="awg">Відкрити майстер</button></div>
-<div class="card"><h2>Готові боти</h2><div class="pg" id="pr"></div><p class="mu" style="margin-top:10px">Показники: бектест на 1 році демо-історії.</p></div>
+<div class="card"><h2>Готові боти</h2><div class="pg" id="pr"></div><p class="mu" style="margin-top:10px">Показники: бектест на синтетичних демо-цінах, а не на реальній біржовій історії.</p></div>
 <div class="card"><h2>Крива капіталу</h2><div id="ch"></div><p class="mu" style="margin-top:8px">Демо-стрічка: нова годинна свічка кожні 1,5 с. Ціни генеруються у браузері, ордери не відправляються.</p></div>
 <div class="card"><h2>Мої боти</h2><div id="bl"></div><div class="row" style="margin-top:12px"><button class="b d" id="ks">Аварійна зупинка</button></div></div>
 </section>
 
 <section id="v-aw" class="s" hidden>
-<div class="card"><h2>Авто-майстер ботів</h2><p class="mu" style="margin-bottom:12px">Введіть біржу, пару та суму. Майстер перебере стратегії (RSI, Bollinger, CCI, MACD, Stochastic, EMA, патерни, Fibonacci, рівні, TA-рейтинг), таймфрейми, напрямок, плече, сітку DCA, мартингейл, TP та SL, а далі перевірить найкращі варіанти на даних, які не брали участі в підборі.</p><div class="fg" id="awf"></div><button class="b p" id="awb">Підібрати й перевірити</button></div>
+<div class="card"><h2>Авто-майстер ботів</h2><p class="mu" style="margin-bottom:12px">Введіть біржу, пару та суму. Майстер перебере стратегії (RSI, Bollinger, CCI, MACD, Stochastic, EMA, патерни, Fibonacci, рівні, TA-рейтинг), таймфрейми, напрямок, плече, сітку DCA, мартингейл, TP та SL, а далі перевірить найкращі варіанти на окремому відрізку синтетичних демо-цін.</p><div class="fg" id="awf"></div><button class="b p" id="awb">Підібрати й перевірити</button></div>
 <div id="awr" class="s"></div>
 </section>
 
@@ -327,7 +327,7 @@ function fill(g,ex){g={...DEF,...g};$('#fp').value=g.pair;if(ex&&cx.includes(ex)
 const MODES=[{step:.025,orders:4,mult:1.15,tp:.006,sl:.06},{step:.015,orders:5,mult:1.3,tp:.01,sl:.05},{step:.01,orders:7,mult:1.6,tp:.015,sl:.08}];
 $$('[data-m]').forEach(b=>b.onclick=()=>{const c=cfg();fill({...c.g,...MODES[+b.dataset.m]},c.ex);pv()});
 function pv(){const c=cfg(),m=$('#flh'),e=bad(c);const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
-m.textContent=`Макс. плече для ${c.g.pair} на ${c.ex||'біржі'}: ${mx}×. Фундаментальний бал пари (демо): ${PAIRS[c.g.pair].f}/100.`+(c.g.lev>1&&c.g.fut?` Ліквідація приблизно за ${((1/c.g.lev-.005)*100).toFixed(1)}% проти позиції.`:'');
+m.textContent=`Макс. плече для ${c.g.pair} на ${c.ex||'біржі'}: ${mx}×. Умовний демо-бал пари: ${PAIRS[c.g.pair].f}/100.`+(c.g.lev>1&&c.g.fut?` Ліквідація приблизно за ${((1/c.g.lev-.005)*100).toFixed(1)}% проти позиції.`:'');
 if(e){$('#gs').textContent=e;return}
 const v=$('#gv');v._p=c.g.pair;v._g=c.g;if(!v._d)mkChart(v,()=>({pair:v._p,lv:()=>lines(v._g,null,v._p)}));else v._d();
 const A=lv(c.g,D[c.g.pair][D[c.g.pair].length-1].c);$('#gs').textContent=`Сітка: ${n2(c.g.base*ladder(c.g),0)} USDT маржі, позиція до ${n2(A.L.reduce((a,l)=>a+l.s,0),0)} USDT. Лінії показано від поточної ціни.`}
@@ -355,11 +355,11 @@ function awShow(i){const E=AW.r[i],c=AW.c,g=E.g,s=E.sf,t=E.st,need=E.need;
 const sx=E.sx.map(r=>`<tr><td>${r.n}</td><td>${r.dca}</td><td class="mono ${cls(r.mn)}">${f(r.mn,0)}</td><td>${r.liq?'ліквідація':r.sl?'SL':'—'}</td></tr>`).join('');
 $('#awr').innerHTML=`<div class="card"><h2>Підібрана конфігурація</h2><div class="row" style="margin-bottom:12px">${AW.r.map((_,j)=>`<button class="b tg" data-v="${j}" aria-pressed="${j===i}">Варіант ${j+1}</button>`).join('')}</div>`
 +KV('Стратегія',g.name)+KV('Сигнали входу',g.sg.map(k=>SGN[k]).join(', ')+', мін. '+g.k)+KV('Таймфрейм, напрямок',tfl(g.tf)+', '+dir(g))+KV('Плече',g.lev+'× (макс. '+maxLev(g.pair,g.ex)+'×)')
-+KV('Ордерів DCA',g.orders)+KV('Перший ордер',n2(g.base,2)+' USDT')+KV('Мартингейл (множник ордера)',g.mult)+KV('Крок, множник кроку',(g.step*100).toFixed(1)+'%, '+g.smul)+KV('Take-Profit, Trailing',(g.tp*100).toFixed(1)+'%, '+(g.trail?(g.trail*100).toFixed(1)+'%':'вимк.'))+KV('Stop-Loss',(g.sl*100).toFixed(0)+'%')+KV('Фундаментальний бал пари (демо)',E.fund+'/100')+`</div>
++KV('Ордерів DCA',g.orders)+KV('Перший ордер',n2(g.base,2)+' USDT')+KV('Мартингейл (множник ордера)',g.mult)+KV('Крок, множник кроку',(g.step*100).toFixed(1)+'%, '+g.smul)+KV('Take-Profit, Trailing',(g.tp*100).toFixed(1)+'%, '+(g.trail?(g.trail*100).toFixed(1)+'%':'вимк.'))+KV('Stop-Loss',(g.sl*100).toFixed(0)+'%')+KV('Умовний демо-бал пари',E.fund+'/100')+`</div>
 <div class="card"><h2>Депозит і страховка</h2>${KV('Маржа сітки ордерів',n2(E.M,0)+' USDT')}${KV('Страховий запас',n2(E.reserve,0)+' USDT')}${KV('Оптимальний депозит',n2(need,0)+' USDT')}${c.amt>0?KV('Ваш депозит',n2(c.amt,0)+' USDT, '+(c.amt>=need?'достатньо':'бракує '+n2(need-c.amt,0)+' USDT')):'<p class="mu" style="margin-top:6px">Розрахунок для першого ордера 10 USDT. Для іншого розміру збільшіть усе пропорційно.</p>'}<p class="mu" style="margin-top:6px">Страховий запас: більше з двох значень, 1,5 від найгіршої історичної просадки або найгірший збиток у стрес-сценаріях.</p></div>
 <div class="card"><h2>Бектест, ${perl(c.per)}</h2><div class="k">${K('Угод',s.n)}${K('Win rate',s.wr.toFixed(0)+'%')}${K('PnL з відкритою позицією',f(s.pnl),cls(s.pnl))}${K('Дохідність на депозит',f(s.roi,1)+'%',cls(s.roi))}${K('Макс. просадка',f(s.dd,0)+' ('+f(s.ddp,1)+'%)',cls(s.dd))}${K('Профіт-фактор',pf(s))}</div><div style="margin:14px 0">${chart(s.cur)}</div><p class="mu">Перевірка на останніх 30% періоду, які не брали участі в підборі: угод ${t.n}, PnL ${f(t.pnl,0)} USDT${t.n<5?' (замало угод для висновків)':''}.</p></div>
 <div class="card"><h2>Стрес-сценарії</h2><div class="sc"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Результат</th></tr>${sx}</table></div></div>
-<div class="card"><div class="row"><button class="b p" data-a="a">Додати paper-бота</button><button class="b" data-a="o">Відкрити в конструкторі</button><button class="b" data-a="f">В обрані</button></div><p class="mu" style="margin-top:10px">Підбір виконано на демо-історії, яка м’якша за реальний ринок. Кращий бектест не гарантує прибуток.</p></div>`}
+<div class="card"><div class="row"><button class="b p" data-a="a">Додати paper-бота</button><button class="b" data-a="o">Відкрити в конструкторі</button><button class="b" data-a="f">В обрані</button></div><p class="mu" style="margin-top:10px">Підбір виконано на синтетичних демо-цінах, які не є реальною біржовою історією та не відтворюють усіх ризиків ринку. Кращий бектест не гарантує прибуток.</p></div>`}
 $('#awb').onclick=()=>{let p=$('#awp').value.trim().toUpperCase();if(!p.includes('/'))p+='/USDT';const c={pair:p,ex:$('#awe').value,amt:+$('#awa').value||0,per:+$('#awr2').value,tf:+$('#awt').value,dr:+$('#awd').value,fut:+$('#awm').value,lev:+$('#awl').value},o=$('#awr');
 if(!PAIRS[p]||!c.ex||!listed(p,c.ex))return o.innerHTML='<p class="dn">Оберіть пару зі списку, яка торгується на вибраній біржі.</p>';
 if(c.dr<0&&!c.fut)return o.innerHTML='<p class="dn">Short доступний лише на Futures.</p>';
@@ -408,7 +408,7 @@ const o=cx.map(e=>`<option>${e}</option>`).join('');['#fe','#awe'].forEach(q=>{c
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);exl();pv()};
 
 /* ---------- профіль ---------- */
-const NT=['Закрита угода','Новий DCA-ордер','Сповіщення в Telegram'];
+const NT=['Закрита угода','Новий DCA-ордер','Telegram-сповіщення (не підключено)'];
 function pfr(){$('#pfn').value=PF.n;$('#pft').innerHTML=NT.map((t,i)=>`<div class="bot"><div>${t}</div><button class="b tg" aria-pressed="${!!PF.nt[i]}" data-i="${i}">${PF.nt[i]?'Увімкнено':'Вимкнено'}</button></div>`).join('')+`<div class="bot"><div>Двофакторний вхід<div class="mu">Перемикач у демо</div></div><button class="b tg" aria-pressed="${!!PF.tf}" data-i="t">${PF.tf?'Увімкнено':'Вимкнено'}</button></div>`}
 $('#pft').onclick=e=>{const t=e.target.closest('button');if(!t)return;const i=t.dataset.i;if(i==='t')PF.tf=PF.tf?0:1;else PF.nt[+i]=PF.nt[+i]?0:1;sv('zpf',PF);pfr()};
 $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF)};

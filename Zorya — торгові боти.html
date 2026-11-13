@@ -171,7 +171,7 @@ if(!S.length||(g.fm&&f&&f.f<g.fm))return o;for(let i=w;i<n;i++){let c=0;for(cons
 class Bot{constructor(g){this.g=g;this.pos=null;this.tr=[];this.cd=0;this.cum=0}
 eqv(r){const g=this.g,p=this.pos;if(!p)return this.cum;const v=p.q*r.c;return this.cum+p.real+g.d*(v-p.cost)-g.fee*(v+p.cost)}
 step(i,r,en,h=i){const g=this.g,d=g.d,p=this.pos,L=g.lev||1,fv=x=>d>0?r.h>=x:r.l<=x,ad=x=>d>0?r.l<=x:r.h>=x;
-if(!p){if(en&&i>=this.cd)this.pos={q:g.base*L/r.c,cost:g.base*L,n:1,last:r.c,first:r.c,peak:r.c,real:0,t1:0};return}
+if(!p){if(en&&i>=this.cd)this.pos={q:g.base*L/r.o,cost:g.base*L,n:1,last:r.o,first:r.o,peak:r.o,real:0,t1:0};return}
 let avg,x=0,lq=0,sl,stop=0,filled=0;
 for(;;){avg=p.cost/p.q;sl=p.t1&&p.be?p.be:avg*(1-d*g.sl);lq=0;
 if(L>1){const q=avg*(1-d*Math.max(1/L-.005,0));if(d>0?q>sl:q<sl){sl=q;lq=1}}
@@ -183,7 +183,7 @@ if(fv(t)){if(g.s1>0&&!p.t1){const v=p.q*g.s1*t,c=p.cost*g.s1;p.real+=d*(v-c)-g.f
 else if(g.trail){p.peak=d>0?Math.max(p.peak,r.h):Math.min(p.peak,r.l);const st=p.peak*(1-d*g.trail);if(ad(st))x=st}
 else x=t}}
 if(x){let pnl;if(lq)pnl=p.real-p.cost/L-g.fee*p.cost;else{const v=p.q*x;pnl=p.real+d*(v-p.cost)-g.fee*(v+p.cost)}this.cum+=pnl;this.tr.push({i:h,pnl,n:p.n,liq:lq,sl:stop&&!lq});this.pos=null;this.cd=i+g.cd+1}}}
-function run(A,e,g,off=0,keep=0,dep=0){const b=new Bot(g),tf=g.tf||1,M=dep?g.base*ladder(g):0,eq=keep?[]:null;let pk=0,dd=0,v=0,broke=0;for(let i=0;i<A.length;i++){const ok=!dep||dep+v>=M;if(!ok)broke=1;b.step(i,A[i],e[i]&&ok,off+i*tf);v=b.eqv(A[i]);if(v>pk)pk=v;if(v-pk<dd)dd=v-pk;if(keep)eq.push(v)}return{b,dd,last:v,eq,broke,pk}}
+function run(A,e,g,off=0,keep=0,dep=0){const b=new Bot(g),tf=g.tf||1,M=dep?g.base*ladder(g):0,eq=keep?[]:null;let pk=0,dd=0,v=0,broke=0;for(let i=0;i<A.length;i++){const ok=!dep||dep+v>=M;if(!ok)broke=1;b.step(i,A[i],i>0&&e[i-1]&&ok,off+i*tf);v=b.eqv(A[i]);if(v>pk)pk=v;if(v-pk<dd)dd=v-pk;if(keep)eq.push(v)}return{b,dd,last:v,eq,broke,pk}}
 function summ(R,dep){const tr=R.b.tr;let w=0,gp=0,gl=0,o=0;for(const t of tr){if(t.pnl>0){w++;gp+=t.pnl}else gl-=t.pnl;o+=t.n}const n=tr.length,s=R.eq?Math.ceil(R.eq.length/240):1;
 return{n,wr:n?w/n*100:0,pnl:R.last,real:R.b.cum,unr:R.last-R.b.cum,dd:R.dd,ddp:R.dd/dep*100,roi:R.last/dep*100,pf:gl?gp/gl:gp?Infinity:0,avg:n?R.b.cum/n:0,ao:n?o/n:0,liq:tr.filter(t=>t.liq).length,broke:R.broke,cur:R.eq?R.eq.filter((_,i)=>i%s===0):[]}}
 const ladder=g=>{let u=0;for(let k=0;k<g.orders;k++)u+=g.mult**k;return u};
@@ -293,7 +293,7 @@ let PF=ld('zpf',{n:'',nt:[1,1,0],tf:0});
 let tt;function toast(m){const e=$('#ts');e.textContent=m;e.hidden=false;clearTimeout(tt);tt=setTimeout(()=>e.hidden=true,3500)}
 function tick(){const active=[...new Set(bots.filter(x=>x.on).map(x=>x.g.pair))];for(const k of active){const cs=D[k];cs.push(nextC(PAIRS[k],Math.random));
 bots.filter(x=>x.g.pair===k&&x.on).forEach(x=>{const tf=x.g.tf,len=cs.length;if(len%tf)return;const a=agg(cs.slice(Math.max(0,len-300*tf)),tf),e=entry(a,x.g),n0=x.b.tr.length,o0=x.b.pos?x.b.pos.n:0;
-x.b.step(len/tf-1,a[a.length-1],e[a.length-1],len-tf);const v=bv(x);x.pk=Math.max(x.pk,v);x.dd=Math.min(x.dd,v-x.pk);const t=x.b.tr;
+x.b.step(len/tf-1,a[a.length-1],e.length>1&&e[e.length-2],len-tf);const v=bv(x);x.pk=Math.max(x.pk,v);x.dd=Math.min(x.dd,v-x.pk);const t=x.b.tr;
 if(t.length>n0&&PF.nt[0])toast(ttl(x)+': угода закрита, '+f(t[t.length-1].pnl)+' USDT');else if(o0&&x.b.pos&&x.b.pos.n>o0&&PF.nt[1])toast(ttl(x)+': ордер '+x.b.pos.n+' з '+x.g.orders)})}
 upd()}
 $('#bl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=bots.find(b=>b.id===+t.dataset.id),a=t.dataset.a;

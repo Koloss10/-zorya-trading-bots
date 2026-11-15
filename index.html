@@ -61,7 +61,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .section-head h2{margin-bottom:3px}
 .top-filter{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin-bottom:12px}
-.top-filter label{min-width:0}
+.top-filter label{min-width:0}.top-filter label small{font-size:11px;color:var(--mu);line-height:1.2}
 .top-filter input,.top-filter select{font-size:14px}
 .top-foot{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:4px 0 10px}
 .demo-note{font-size:11px;color:var(--mu)}
@@ -123,7 +123,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <div class="top-filter">
 <label>Період<select id="topPeriod"><option value="day">День</option><option value="week">Тиждень</option><option value="month">Місяць</option><option value="year" selected>Рік</option></select></label>
 <label>Сортувати за<select id="topMetric"><option value="pnl">PnL, USDT</option><option value="roi">Дохідність, %</option></select></label>
-<label>Мій капітал, USDT<input id="topCapital" type="number" min="0" step="50" value="0"></label>
+<label>Доступний капітал, USDT<input id="topCapital" type="number" min="0" step="50" value="0"><small>0 — без обмеження</small></label>
 <label>Мін. кількість угод<input id="topTrades" type="number" min="0" step="1" value="0"></label>
 <label>Макс. просадка, %<input id="topDrawdown" type="number" min="0" max="100" step="1" value="100"></label>
 <label>Ризик<select id="topRisk"><option value="">Будь-який</option><option value="low">Низький</option><option value="medium">Середній</option><option value="high">Високий</option></select></label>
@@ -140,7 +140,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <section class="bot-group"><div class="group-title">Працюють <span id="activeCount" class="group-count">0</span></div><div id="blActive"></div></section>
 <section class="bot-group"><div class="group-title">Призупинені <span id="pausedCount" class="group-count">0</span></div><div id="blPaused"></div></section>
 </div></div><div class="row" style="margin-top:12px"><button class="b d" id="ks">Аварійна зупинка</button></div></div>
-</section></section>
+</section>
 
 <section id="v-aw" class="s" hidden>
 <div class="card"><h2>Авто-майстер ботів</h2><p class="mu" style="margin-bottom:12px">Введіть біржу, пару та суму. Майстер перебере стратегії (RSI, Bollinger, CCI, MACD, Stochastic, EMA, патерни, Fibonacci, рівні, TA-рейтинг), таймфрейми, напрямок, плече, сітку DCA, мартингейл, TP та SL, а далі перевірить найкращі варіанти на окремому відрізку синтетичних демо-цін.</p><div class="fg" id="awf"></div><button class="b p" id="awb">Підібрати й перевірити</button></div>

@@ -26,11 +26,14 @@ jobs:
           from pathlib import Path
           import re
 
-          html = Path("Zorya — торгові боти.html").read_text(encoding="utf-8")
-          scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
-          if len(scripts) != 1:
-              raise SystemExit(f"Expected exactly one inline script, found {len(scripts)}")
-          Path("/tmp/zorya-inline.js").write_text(scripts[0], encoding="utf-8")
+          for name, out in [("Zorya — торгові боти.html", "zorya"), ("orbix.html", "orbix")]:
+              html = Path(name).read_text(encoding="utf-8")
+              scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
+              if len(scripts) != 1:
+                  raise SystemExit(f"{name}: expected exactly one inline script, found {len(scripts)}")
+              Path(f"/tmp/{out}-inline.js").write_text(scripts[0], encoding="utf-8")
           PY
       - name: Check JavaScript syntax
-        run: node --check /tmp/zorya-inline.js
+        run: |
+          node --check /tmp/zorya-inline.js
+          node --check /tmp/orbix-inline.js

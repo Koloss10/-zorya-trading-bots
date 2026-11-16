@@ -38,3 +38,5 @@ jobs:
         run: |
           node --check /tmp/zorya-inline.js
           node --check /tmp/orbix-inline.js
+      - name: Run trading engine tests
+        run: node --test tests/engine.test.js

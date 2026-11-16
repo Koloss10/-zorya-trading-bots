@@ -1097,7 +1097,7 @@ $('#tnc').onclick=async e=>{const xb=e.target.closest('[data-tnx]');if(xb&&!TN.b
 if(a==='save'){const k=$('#tn-k').value.trim(),s=$('#tn-s').value.trim();if(!k||!s){tnm('Вставте обидва ключі: API Key і Secret Key.');return}tnm('Зберігаю на сервері…');const r=await SB.rpc('ex_save',{p_key:k,p_secret:s,p_exchange:TN.ex});if(r.error)throw new Error(tnMsg(r.error.message));await tnLoad();TN.bal=await tnCall({action:'check'});await tnLoad();TN.msg='Ключі збережено й перевірено: '+TNX[TN.ex].n+' працює.';tnR();lst()}
 else if(a==='check'){tnm('Перевіряю…');TN.bal=await tnCall({action:'check'});await tnLoad();TN.msg=TN.bal.canTrade?'Ключі працюють, торгівля дозволена.':'Ключі працюють, але торгівля для ключа вимкнена.';tnR()}
 else if(a==='del'){if(!confirm('Видалити ключі '+TNX[TN.ex].n+' з сервера?'))return;const r=await SB.rpc('ex_delete',{p_exchange:TN.ex});if(r.error)throw new Error(tnMsg(r.error.message));await tnLoad();TN.bal=null;TN.pos=null;if(!Object.keys(TN.cs).length)bots.forEach(x=>x.tn=false);sbots();TN.msg='Ключі видалено.';tnR();lst()}
-else if(a==='buy'||a==='sell'){const n=+$('#tn-n').value;tnm('Надсилаю ордер…');const r=await tnCall({action:'order',symbol:$('#tn-p').value,side:a==='buy'?'BUY':'SELL',notional:n,leverage:+$('#tn-l').value});const o=r.order;TN.pos=(await tnCall({action:'positions'})).positions;TN.msg=`Виконано: ${o.side==='BUY'?'купівля':'продаж'} ${o.qty} ${o.symbol} за ${px(o.price)}.`;tnR()}
+else if(a==='buy'||a==='sell'){const n=+$('#tn-n').value;tnm('Надсилаю ордер…');const r=await tnCall({action:'order',symbol:$('#tn-p').value,side:a==='buy'?'BUY':'SELL',notional:n,leverage:+$('#tn-l').value});const o=r.order;TN.pos=(await tnCall({action:'positions'})).positions;TN.msg=`Виконано: ${o.side==='BUY'?'купівля':'продаж'} ${o.qty} ${o.symbol} за ${o.approx?'≈':''}${px(o.price)}.`;tnR()}
 else if(a==='close'){tnm('Закриваю позицію…');const r=await tnCall({action:'close',symbol:$('#tn-p').value});TN.pos=(await tnCall({action:'positions'})).positions;TN.msg=r.closed?`Позицію закрито за ${px(r.order.price)}.`:'Позиції за цією парою немає.';tnR()}
 else if(a==='pos'){tnm('Завантажую…');TN.pos=(await tnCall({action:'positions'})).positions;TN.msg='';tnR()}
 }catch(er){tnm('Помилка: '+er.message)}finally{TN.busy=0;$$('#tnc [data-tn]').forEach(x=>x.disabled=false)}};
@@ -1105,7 +1105,7 @@ else if(a==='pos'){tnm('Завантажую…');TN.pos=(await tnCall({action:'
 function tnMirror(x,kind,notional){if(!x.tn||!x.g.fut||!CLOUD.u||!TN.c)return;const symbol=sym(x.g.pair),side=x.g.d>0?'BUY':'SELL';
 const job=kind==='close'?{action:'close',symbol}:{action:'order',symbol,side,notional:+(+notional).toFixed(2),...(kind==='open'?{leverage:x.g.lev||1}:{})};
 const log=m=>{FEED.unshift({t:now(),m:TNX[TN.ex].s+' '+x.g.pair+': '+m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()};
-TN.q=TN.q.then(()=>tnCall(job)).then(r=>log(kind==='close'?(r.closed?'позицію закрито за '+px(r.order.price):'позиції не було'):(kind==='open'?'вхід ':'докупівля ')+r.order.qty+' за '+px(r.order.price))).catch(e=>log('помилка — '+e.message))}
+TN.q=TN.q.then(()=>tnCall(job)).then(r=>log(kind==='close'?(r.closed?'позицію закрито за '+px(r.order.price):'позиції не було'):(kind==='open'?'вхід ':'докупівля ')+r.order.qty+' за '+(r.order.approx?'≈':'')+px(r.order.price))).catch(e=>log('помилка — '+e.message))}
 /* ---------- старт ---------- */
 applyTheme();mnuR();
 $('#home-aw').hidden=true;$('#home-eq').hidden=true;SET.brand='orbix';$('#brl').closest('.card').hidden=true;applyTheme();mnuR();

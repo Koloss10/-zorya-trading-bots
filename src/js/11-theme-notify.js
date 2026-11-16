@@ -31,7 +31,8 @@ let TG={st:null,loaded:0,err:''};
 const TGM={'invalid token format':'Токен має вигляд 123456789:AA… (його видає @BotFather).','invalid chat id':'Chat ID — число (напр. 123456789 або -100…) або @назва_каналу.','mfa required':'Спершу підтвердьте вхід кодом з Google Authenticator.','not authenticated':'Увійдіть в акаунт.','telegram not configured':'Спершу збережіть токен на сервері.','telegram not configured or 2FA code required':'Спершу збережіть токен на сервері або підтвердьте вхід кодом 2FA.'};
 /* пояснення відмов Telegram українською */
 const tgMsg=m=>TGM[m]||(/chat not found/i.test(m)?'Telegram не знає цього чату. Відкрийте свого бота в Telegram, натисніть «Start» і напишіть йому будь-що, потім натисніть тут «Знайти мій чат» — Orbix сам підставить правильний Chat ID.'
-:/terminated by other getUpdates|webhook is active|Conflict/i.test(m)?'Бот уже підключений до іншого сервісу (webhook). Створіть окремого бота для Orbix у @BotFather.'
+:/terminated by other getUpdates/i.test(m)?'Telegram отримав два запити одночасно. Зачекайте кілька секунд і натисніть ще раз. Якщо повторюється — цей бот запущений ще в іншій програмі: створіть окремого бота для Orbix у @BotFather.'
+:/webhook is active/i.test(m)?'Бот уже підключений до іншого сервісу (webhook). Створіть окремого бота для Orbix у @BotFather.'
 :/bot can't initiate conversation|bot can.t initiate/i.test(m)?'Бот не може написати першим. Відкрийте свого бота в Telegram і натисніть «Start».'
 :/blocked by the user/i.test(m)?'Ви заблокували бота в Telegram. Розблокуйте його й натисніть «Start».'
 :/Unauthorized|401/i.test(m)?'Telegram не приймає токен: він неправильний або відкликаний. Скопіюйте токен у @BotFather ще раз і збережіть на сервері.'

@@ -681,9 +681,9 @@ if(a==='j'){const j=t.closest('.bc').querySelectorAll('.gr')[1];j.hidden=!j.hidd
 if(a==='c'){fill(x.g,x.ex);go('bd');return}
 if(a==='srv'){srvToggle(x);return}
 if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на демо-рахунку біржі'+(x.srv?' — сервером, цілодобово':' (поки застосунок відкритий)'):'Тестнет для бота вимкнено');return}
-if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;bots=bots.filter(b=>b!==x)}else setOn(x,!x.on);sbots();lst()}
+if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;if(srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);bots=bots.filter(b=>b!==x)}else{setOn(x,!x.on);if(!x.on&&srvLive(x))toast('Бот '+x.g.pair+' на паузі: сервер зніме його лімітні докупівлі на біржі (до 5 хв). Відкрита позиція лишиться зі своїм стопом.')}sbots();lst()}
 $('#bl').onclick=botClick;$('#bl2').onclick=botClick;
-const killAll=()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;bots.forEach(x=>setOn(x,false));sbots();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR()};
+const killAll=()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;const L=bots.filter(srvLive);if(L.length&&confirm(FLATQ('ботів ('+L.map(x=>x.g.pair).join(', ')+')')))L.forEach(srvFlat);bots.forEach(x=>setOn(x,false));sbots();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR()};
 $('#ks').onclick=killAll;$('#ks2').onclick=killAll;$('#nb2').onclick=()=>go('bd');$('#bq').oninput=lst;
 
 /* ---------- форма конструктора ---------- */
@@ -1069,9 +1069,16 @@ if(u){if(ev!=='TOKEN_REFRESHED'||CLOUD.pend)setTimeout(()=>gate(u).catch(cloudFa
    проганяє той самий рушій і зберігає стан у bot_state, події — у bot_events. Браузер лише показує цей стан
    і не дублює угод та сповіщень такого бота. */
 let SRV={busy:0,seen:new Set(),t:null};
+/* чи веде сервер угоди цього бота на демо-біржі */
+const srvLive=x=>!!(x.srv&&x.tn&&x.g.fut&&x.rid&&CLOUD.u&&SB);
+/* зняти лімітні ордери пари й закрити позицію бота на демо-біржі (видалення, зупинка, повернення в браузер) */
+async function srvFlat(x){const ex=x.srvEx||'bybit',nm=ex==='bybit'?'Bybit Demo':'Binance Testnet';try{const r=await SB.functions.invoke('exchange',{body:{exchange:ex,action:'flat',symbol:sym(x.g.pair)}});let d=r.data;if(r.error){try{d=await r.error.context.json()}catch(e){}throw new Error(d&&d.error||r.error.message)}
+FEED.unshift({t:now(),m:nm+': '+x.g.pair+' — '+(d&&d.closed?'позицію закрито, ордери знято':'позиції не було, ордери знято')})}catch(e){FEED.unshift({t:now(),m:nm+': не вдалося закрити '+x.g.pair+' — '+e.message+'. Перевірте позицію на біржі вручну.'});toast('Не вдалося закрити позицію '+x.g.pair+' на біржі: '+e.message)}sv('zfeed',FEED);feedR()}
+const FLATQ=p=>'Закрити також позицію та лімітні ордери '+p+' на демо-біржі?\n\nОК — закрити зараз.\nСкасувати — лишити: позиція залишиться на біржі зі своїм стопом, сервер нею більше не керуватиме.';
 function srvToggle(x){if(!CLOUD.u)return toast('Увійдіть в акаунт, щоб запустити бота на сервері.');if(!x.rid){cloudQ();return toast('Зачекайте кілька секунд: бот ще синхронізується з хмарою.')}
 if(!x.srv&&x.b.pos&&!confirm('У бота '+x.g.pair+' зараз відкрита позиція в браузері. Сервер почне з нуля — ця позиція (і її копія на демо-біржі, якщо увімкнено «Тестнет») далі не супроводжуватиметься. Перенести бота на сервер?'))return;
-x.srv=!x.srv;x.srvEx=TN.ex||'bybit';if(!x.srv){x.srvSt=0;x.srvAt=null}sbots();lst();
+if(x.srv&&srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);
+x.srv=!x.srv;if(x.srv)x.srvEx=TN.ex||'bybit';else{x.srvSt=0;x.srvAt=null}sbots();lst();
 toast(x.srv?'Бот '+x.g.pair+' переходить на сервер (до 5 хвилин). Сервер торгує з цього моменту, навіть коли застосунок закритий.':'Бот '+x.g.pair+' знову працює лише в браузері.')}
 async function srvLoad(){if(!SB||!CLOUD.u||SRV.busy)return;const L=bots.filter(x=>x.srv&&x.rid);if(!L.length)return;SRV.busy=1;try{
 const ids=L.map(x=>x.rid),s=await SB.from('bot_state').select('bot_id,state,updated_at').in('bot_id',ids);

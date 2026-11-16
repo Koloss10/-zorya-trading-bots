@@ -7,7 +7,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { botConfig, INTERVAL, processBot } from "./core.js";
 import { binance, bybit } from "./exchanges.ts";
-import { handleBot } from "./mirror.js";
+import { handleBot, park } from "./mirror.js";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const BYIV: Record<string, string> = { "1h": "60", "4h": "240", "12h": "720", "1d": "D", "1w": "W" };
@@ -50,8 +50,19 @@ Deno.serve(async (req) => {
   const { data: ok } = await admin.rpc("runner_check", { p_token: req.headers.get("x-runner-secret") ?? "" });
   if (ok !== true) return json({ error: "forbidden" }, 403);
   const started = Date.now();
-  const { data: rows, error } = await admin.rpc("runner_bots");
+  // серверні боти: ті, що працюють (обробляються рушієм), і ті, що на паузі (знімаються їхні ордери на біржі)
+  const { data: all, error } = await admin.from("bots").select("id,user_id,config,status").in("status", ["running", "paused"]).eq("config->>_srv", "true");
   if (error) return json({ error: error.message }, 500);
+  const ids = (all ?? []).map((b: any) => b.id);
+  // стани й їхні версії для збереження з перевіркою (compare-and-swap): паралельний запуск не продублює ордери
+  const ver = new Map<string, string>(), stOf = new Map<string, any>();
+  if (ids.length) {
+    const { data: vs, error: ve } = await admin.from("bot_state").select("bot_id,state,updated_at").in("bot_id", ids);
+    if (ve) return json({ error: ve.message }, 500);
+    for (const v of vs ?? []) { ver.set(v.bot_id, v.updated_at); stOf.set(v.bot_id, v.state); }
+  }
+  for (const b of all ?? []) (b as any).state = stOf.get(b.id) ?? null;
+  const rows = (all ?? []).filter((b: any) => b.status === "running"), paused = (all ?? []).filter((b: any) => b.status === "paused");
 
   const mcache = new Map<string, Promise<any>>(), keys = new Map<string, Promise<any>>(), tgs = new Map<string, Promise<any>>();
   const log = (bot: any, level: string, message: string, data: unknown = null) =>
@@ -77,14 +88,6 @@ Deno.serve(async (req) => {
     if (!c._tn || !(c.fut ?? 1) || typeof c.pair !== "string") continue;
     const k = `${bot.user_id}|${c._ex === "binance" ? "binance" : "bybit"}|${c.pair}`;
     if (!owner.has(k) || String(bot.id) < owner.get(k)!) owner.set(k, bot.id); // стабільний вибір: найменший id
-  }
-  // версії станів для збереження з перевіркою (compare-and-swap): паралельний запуск не продублює ордери
-  const ids = (rows ?? []).map((b: any) => b.id);
-  const ver = new Map<string, string>();
-  if (ids.length) {
-    const { data: vs, error: ve } = await admin.from("bot_state").select("bot_id,updated_at").in("bot_id", ids);
-    if (ve) return json({ error: ve.message }, 500);
-    for (const v of vs ?? []) ver.set(v.bot_id, v.updated_at);
   }
   const saver = (bot: any) => async (state: unknown) => {
     const at = new Date().toISOString(), old = ver.get(bot.id);
@@ -133,5 +136,30 @@ Deno.serve(async (req) => {
       await log(bot, "error", `Сервер: ${(e as Error).message}`);
     }
   }
-  return json({ ok: true, bots: rows?.length ?? 0, processed: done, events: evCount, ms: Date.now() - started });
+  // боти на паузі, яких сервер уже вів із «Тестнет»: один раз зняти їхні лімітні докупівлі на біржі
+  let parked = 0;
+  for (const bot of paused) {
+    if (Date.now() - started > 110e3) break;
+    try {
+      const cfg = bot.config || {}, st = bot.state;
+      if (!st || st.fl?.parked || !cfg._tn || !(cfg.fut ?? 1) || typeof cfg.pair !== "string") continue;
+      const exName = cfg._ex === "binance" ? "binance" : "bybit", symbol = cfg.pair.replace("/", "");
+      const busy = owner.has(`${bot.user_id}|${exName}|${cfg.pair}`); // на цій парі вже працює інший бот — його ордери не чіпаємо
+      const ex = await exFor(bot.user_id, exName);
+      const msg = ex?.native ? await park(ex, { symbol, botId: bot.id }) : null;
+      if (!(await saver(bot)({ ...st, pend: [], fl: { ...(st.fl || {}), parked: 1 } }))) continue;
+      parked++;
+      if (msg && !busy) {
+        await log(bot, "warn", msg);
+        try {
+          const t = await tgFor(bot.user_id);
+          if (t?.token && t?.chat_id) await fetch(`https://api.telegram.org/bot${t.token}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: t.chat_id, text: `Orbix (сервер): ${cfg.pair} — ${msg}`, disable_web_page_preview: true }) });
+        } catch (_e) { /* сповіщення не критичні */ }
+      }
+    } catch (e) {
+      console.warn("runner park failed", bot.id, (e as Error).message);
+      await log(bot, "error", `Сервер (пауза): ${(e as Error).message}`);
+    }
+  }
+  return json({ ok: true, bots: rows?.length ?? 0, processed: done, events: evCount, paused: paused.length, parked, ms: Date.now() - started });
 });

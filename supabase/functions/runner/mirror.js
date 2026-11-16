@@ -147,6 +147,15 @@ export async function sync(ex, { g, symbol, botId, fl = {} }) {
   return `Bybit Demo: позиції немає (закрито біржею за TP/SL) — знято ${mine.length} ордер(ів) бота`;
 }
 
+/* бот на паузі (рідний режим): зняти його лімітні докупівлі; позиція лишається на біржі зі своїм стопом */
+export async function park(ex, { symbol, botId }) {
+  const mine = (await ex.openOrders(symbol)).filter((o) => String(o.link || "").startsWith("ox" + hex(botId)));
+  for (const o of mine) await ex.cancel(symbol, o.link);
+  const p = (await ex.positions(symbol))[0];
+  if (!mine.length && !p) return null;
+  return `Bybit Demo: бот на паузі — знято ${mine.length} лімітн. докупівель` + (p ? `; позиція ${symbol} лишається на біржі${p.sl ? ` зі стопом ${p.sl}` : " БЕЗ стопу — перевірте її вручну"}` : "");
+}
+
 /**
  * Обробка бота після прогону рушія.
  * deps: save(state) → true, якщо стан збережено й ніхто інший його не змінив; log(level, text, data); notify(text);
@@ -155,6 +164,7 @@ export async function sync(ex, { g, symbol, botId, fl = {} }) {
 export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, log, notify, now = Date.now() }) {
   const pend = [...(Array.isArray(bot.state?.pend) ? bot.state.pend : []), ...(mirror ? actionsFor(r.events, bot.id, native) : [])];
   const fl = { ...(bot.state?.fl || {}) }, fl0 = JSON.stringify(fl);
+  delete fl.parked; // бот знову працює
   const st = { ...r.state, pend, fl };
   if (!(await save(st))) { await log("warn", "Стан не збережено (паралельний запуск або помилка бази) — біржу не чіпаю, повторю наступного разу"); return { saved: false }; }
   for (const ev of r.events) {

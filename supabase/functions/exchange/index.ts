@@ -3,7 +3,7 @@
 //   exchange = "binance" → Binance Futures Testnet: https://testnet.binancefuture.com
 // Ключі API зберігаються в Supabase Vault і не потрапляють у браузер.
 // Адреси бірж зашиті (exchanges.ts): ця функція фізично не може надіслати ордер на реальний рахунок.
-// POST /functions/v1/exchange { exchange, action: "check" | "balance" | "positions" | "order" | "close", ... }
+// POST /functions/v1/exchange { exchange, action: "check" | "balance" | "positions" | "order" | "close" | "flat", ... }
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { binance, bybit, closePosition, ExErr, marketNotional, SYM } from "./exchanges.ts";
 
@@ -55,6 +55,11 @@ Deno.serve(async (req) => {
         const lev = Math.round(+body?.leverage || 0);
         if (lev && (lev < 1 || lev > 20)) return json({ error: "leverage 1..20" }, 400);
         return json({ ok: true, order: await marketNotional(ex, symbol, side, notional, lev) });
+      }
+      if (action === "flat") { // зняти лімітні ордери пари й закрити позицію (зупинка або видалення серверного бота)
+        if ("cancelAll" in ex) await ex.cancelAll(symbol);
+        const o = await closePosition(ex, symbol);
+        return json({ ok: true, closed: !!o, order: o });
       }
       if (action === "close") {
         const o = await closePosition(ex, symbol);

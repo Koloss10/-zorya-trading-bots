@@ -4,7 +4,7 @@ let SB=null;try{if(window.supabase&&window.supabase.createClient)SB=window.supab
 const CLOUD={u:null,known:new Set(),ok:0,err:''};
 const TFC={1:'1h',4:'4h',12:'12h',24:'1d',168:'1w'},RISK={low:'низький',medium:'середній',high:'високий'};
 const cloudFail=e=>{CLOUD.err=(e&&e.message)||String(e);accR()};
-const brow=x=>({user_id:CLOUD.u.id,name:ttl(x),strategy_type:'dca',exchange:x.ex,symbol:x.g.pair,timeframe:TFC[x.g.tf]||x.g.tf+'h',side:x.g.d<0?'short':'long',mode:'paper',status:x.on?'running':'paused',base_order_size:x.g.base,max_budget:x.g.base*ladder(x.g),config:{...x.g,_t0:x.t0,_sp:x.sp},started_at:new Date(x.t0).toISOString(),preset_id:x.pid||null});
+const brow=x=>({user_id:CLOUD.u.id,name:ttl(x),strategy_type:'dca',exchange:x.ex,symbol:x.g.pair,timeframe:TFC[x.g.tf]||x.g.tf+'h',side:x.g.d<0?'short':'long',mode:'paper',status:x.on?'running':'paused',base_order_size:x.g.base,max_budget:x.g.base*ladder(x.g),config:{...x.g,_t0:x.t0,_sp:x.sp,_tn:!!x.tn},started_at:new Date(x.t0).toISOString(),preset_id:x.pid||null});
 let csT=null,csQ=Promise.resolve();
 function cloudQ(){if(!CLOUD.u)return;clearTimeout(csT);csT=setTimeout(()=>{csQ=csQ.then(cloudSave)},400)}
 async function cloudSave(onlyNew){if(!CLOUD.u||!SB)return;try{
@@ -103,12 +103,12 @@ reset(){if(!confirm('Скинути блокування? Дані цього б
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(L.get()&&hiddenAt&&Date.now()-hiddenAt>5*6e4)L.show()});return L})();
 $('#lkb').onclick=()=>LOCK.unlock();$('#lkr').onclick=()=>LOCK.reset();LOCK.show();
 
-async function cloudIn(u){CLOUD.u=u;TG={st:null,loaded:0,err:''};CLOUD.err='';accR();
+async function cloudIn(u){CLOUD.u=u;TN.loaded=0;tnLoad().then(()=>{lst();if(CUR==='pf')tnR()}).catch(()=>{});TG={st:null,loaded:0,err:''};CLOUD.err='';accR();
 if(ld('zuid','')!==u.id)bots=bots.filter(x=>!x.rid);sv('zuid',u.id);
 await (csQ=csQ.then(()=>cloudSave(1)));if(CLOUD.err)return;
 const r=await SB.from('bots').select('id,exchange,status,config,preset_id,started_at').order('created_at');if(r.error)return cloudFail(r.error);
 for(const row of r.data){const c=row.config||{};if(c.pair&&PAIRS[c.pair])try{await need(dk(c),hrsFor(c._t0,c.tf))}catch(e){}}
-bots=[];for(const row of r.data){const{_t0,_sp,...g}=row.config||{};if(!g.pair||!PAIRS[g.pair]||!ready(dk(g)))continue;const x=mk(g,row.exchange,row.status==='running',{t0:_t0||Date.parse(row.started_at||'')||0,sp:_sp});x.rid=row.id;x.pid=row.preset_id;x._h=JSON.stringify(brow(x))}
+bots=[];for(const row of r.data){const{_t0,_sp,_tn,...g}=row.config||{};if(!g.pair||!PAIRS[g.pair]||!ready(dk(g)))continue;const x=mk(g,row.exchange,row.status==='running',{t0:_t0||Date.parse(row.started_at||'')||0,sp:_sp,tn:_tn});x.rid=row.id;x.pid=row.preset_id;x._h=JSON.stringify(brow(x))}
 CLOUD.known=new Set(r.data.map(x=>x.id));sloc();lst();
 const b=await SB.from('backtests').select('id,exchange,config,results,created_at').order('created_at',{ascending:false}).limit(12);
 if(!b.error){BT=b.data.filter(x=>x.config&&PAIRS[x.config.pair]).map(x=>{const s=x.results||{};return{rid:x.id,ex:x.exchange,g:x.config,per:s.per||8760,dep:s.dep||1000,n:s.n||0,wr:s.wr||0,pnl:s.pnl||0,roi:s.roi||0,dd:s.dd||0,t:Date.parse(x.created_at)}});sv('zbt',BT)}
@@ -117,7 +117,7 @@ if(!fv.error){const have=new Set(fv.data.map(x=>x.preset_id)),up=[...FAVP].filte
 const p=await SB.from('profiles').select('display_name,avatar').eq('id',u.id).single();
 if(!p.error&&p.data){if(p.data.display_name)PF.n=p.data.display_name;else if(PF.n)nameQ();sv('zpf',PF);const a=avFrom(p.data.avatar);if(a){AV=a;try{localStorage.setItem('zav',JSON.stringify(AV))}catch(e){}}else if(AV.img||AV.k!=='orbit')avQ();if(CUR==='pf')avR();mnuR()}
 CLOUD.ok=Date.now();accR();if(CUR==='bs')bsl();if(CUR==='pf')pfr();toast('Увійшли: дані синхронізовано')}
-function cloudOut(){TG={st:null,loaded:0,err:''};if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
+function cloudOut(){TN={c:null,loaded:0,bal:null,pos:null,msg:'',busy:0,q:Promise.resolve()};TG={st:null,loaded:0,err:''};if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
 function cloudStart(){accR();presLoad().catch(()=>{}).finally(()=>{if(!SB)return;
 SB.auth.onAuthStateChange((ev,s)=>{const u=s&&s.user;if(ev==='PASSWORD_RECOVERY'){CLOUD.rec=1;setTimeout(()=>go('pf'),0)}
 if(u){if(ev!=='TOKEN_REFRESHED'||CLOUD.pend)setTimeout(()=>gate(u).catch(cloudFail),0)}else if(CLOUD.u||CLOUD.pend||CLOUD.rec){CLOUD.pend=null;CLOUD.rec=0;setTimeout(cloudOut,0)}})})}

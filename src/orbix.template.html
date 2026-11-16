@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbix — торгові боти</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;display=swap">
+<style>/*@css*/</style>
+</head>
+<body>
+<div class="w" id="wrap">
+<header>
+<button class="brand" id="brand" aria-label="На головну"><span id="logo"></span><h1 id="bname"></h1></button>
+<span class="chip" id="chip">Демо</span>
+<button class="b" id="mb" aria-label="Меню" aria-expanded="false" style="padding:0 12px"><svg viewBox="0 0 24 24" style="width:22px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+</header>
+
+<section id="v-ov" class="s">
+<div id="hero"></div>
+<div class="card" id="home-top"><div class="hd"><h2>Топ Боти</h2><button class="b ib" id="tfb" aria-label="Фільтри топ-ботів" aria-expanded="false" aria-controls="tfp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg></button><button class="b ib" id="topr" aria-label="Перерахувати топ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div><p class="mu" id="tops" style="margin-bottom:10px"></p>
+<div class="fp" id="tfp" hidden><div class="fl" id="tfl"></div></div>
+<div class="rail" id="fav" tabindex="0" role="region" aria-label="Топ боти, гортайте вбік"></div></div>
+<div class="card" id="home-favp"><h2>Обрані Боти</h2><div class="rail" id="favp" tabindex="0" role="region" aria-label="Обрані боти, гортайте вбік"></div></div>
+<div class="card" id="home-bots"><h2>Мої боти</h2><div id="bl"></div><div class="row" style="margin-top:12px"><button class="b d" id="ks">Аварійна зупинка всіх</button></div></div>
+<div class="card" id="home-eq"><h2>Крива капіталу</h2><div id="ch"></div></div>
+<div class="card" id="home-feed"><h2>Останні події</h2><div class="feed" id="feed"></div></div>
+<div class="card" id="home-aw"><h2>Авто-майстер</h2><p class="mu" style="margin-bottom:10px">Вкажіть біржу, пару й суму: майстер підбере таймфрейм, індикатори, DCA-сітку, плече, TP та SL, порахує депозит зі страховкою й одразу проведе бектест.</p><button class="b p" id="awg">Відкрити майстер</button></div>
+</section>
+
+<section id="v-bots" class="s" hidden>
+<div class="card"><h2>Мої боти</h2><input class="srch" id="bq" placeholder="Пошук за парою" autocomplete="off"><div id="bl2"></div><div class="row" style="margin-top:12px"><button class="b p" id="nb2">Новий бот</button><button class="b d" id="ks2">Аварійна зупинка всіх</button></div></div>
+</section>
+
+<section id="v-mk" class="s" hidden>
+<div class="card"><h2>Ринок</h2><input class="srch" id="mq" list="pl" placeholder="Пара, напр. ETH/USDT" autocomplete="off"><div class="row" id="mkm" style="margin-bottom:8px"><button class="b sm tg" data-mm="F">Ф'ючерси USDⓈ-M</button><button class="b sm tg" data-mm="S">Спот</button></div><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
+<div class="card"><h2>Усі пари</h2><div id="mkl"></div></div>
+</section>
+
+<section id="v-aw" class="s" hidden>
+<div class="card"><h2>Авто-майстер ботів</h2><p class="mu" style="margin-bottom:12px">Введіть біржу, пару та суму. Майстер перебере стратегії (RSI, Bollinger, CCI, MACD, Stochastic, EMA, патерни, Fibonacci, рівні, TA-рейтинг), таймфрейми, напрямок, плече, сітку DCA, мартингейл, TP та SL, а далі перевірить найкращі варіанти на даних, які не брали участі в підборі.</p><div class="fg" id="awf"></div><button class="b p" id="awb">Підібрати й перевірити</button></div>
+<div id="awr" class="s"></div>
+</section>
+
+<section id="v-bd" class="s" hidden>
+<div class="card"><h2>Налаштування бота</h2>
+<div class="row" style="margin-bottom:12px"><button class="b" data-m="0">Консервативний</button><button class="b" data-m="1">Помірний</button><button class="b" data-m="2">Агресивний</button></div>
+<label style="margin-bottom:12px">Готова стратегія<select id="fst"></select></label>
+<h3>Сигнали входу</h3><div class="sgr" id="fsg"></div>
+<div class="fg" id="fg"></div>
+<p class="mu" id="flh" style="margin-bottom:12px"></p>
+<div class="row"><button class="b p" id="bt">Запустити бектест</button><button class="b" id="ad">Додати paper-бота</button><button class="b" id="sxb">Стрес-тест</button></div></div>
+<div class="card"><h2>Графік і сітка ордерів</h2><div id="gv"></div><p class="mu" id="gs" style="margin-top:8px"></p></div>
+<div class="card"><h2>Результат бектесту</h2><div id="res"><p class="mu">Задайте параметри й запустіть бектест на історії обраної пари.</p></div></div>
+</section>
+
+<section id="v-bs" class="s" hidden><div class="card"><h2>Історія бектестів</h2><div id="bsh"></div></div></section>
+
+<section id="v-jr" class="s" hidden><div class="card"><h2>Журнал угод</h2><div class="fl" id="jfl"></div><div class="sc"><table id="jt"></table></div></div></section>
+
+<section id="v-st" class="s" hidden>
+<div class="k" id="sk"></div>
+<div class="card"><h2>Статистика ботів</h2><div class="sc"><table id="stt"></table></div></div>
+<div class="card"><h2>PnL за ботами</h2><div id="sb"></div></div>
+</section>
+
+<section id="v-sx" class="s" hidden>
+<div class="card"><h2>Стрес-тест бота</h2><p class="mu" style="margin-bottom:12px">Бот відкриває позицію, після чого ринок різко падає, повільно сповзає, стрибає вгору або стає надмірно волатильним. Видно, скільки ордерів докупається, наскільки просідає капітал і чи є ліквідація.</p><label style="margin-bottom:12px">Бот<select id="sxs"></select></label><button class="b p" id="sxo">Запустити сценарії</button><div id="sxt" style="margin-top:14px"></div></div>
+<div class="card"><h2>Швидкодія платформи</h2><button class="b" id="pfb">Запустити тест швидкодії</button><div id="pft2" style="margin-top:12px"></div></div>
+</section>
+
+<section id="v-set" class="s" hidden>
+<div class="card"><h2>Тема оформлення</h2><div class="th" id="thl"></div></div>
+<div class="card"><h2>Назва та логотип</h2><div class="br" id="brl"></div><p class="mu" style="margin-top:10px">Перед використанням назви перевірте вільність домену й торгової марки.</p></div>
+<div class="card"><h2>Звук і сповіщення</h2><div id="snd"></div></div>
+<div class="card"><h2>Дані</h2><p class="mu" style="margin-bottom:10px">Без входу боти й бектести зберігаються в цьому браузері. Після входу в акаунт (Профіль) вони зберігаються в хмарі Orbix і доступні з будь-якого пристрою. Тема, звук і месенджери завжди лишаються на цьому пристрої.</p><div class="row"><button class="b" id="exp">Експорт налаштувань</button><button class="b d" id="rs">Скинути демо</button></div></div>
+</section>
+
+<section id="v-pf" class="s" hidden>
+<div class="card" id="pfme"><h2>Мій профіль</h2><div class="pfh"><span id="pfav"></span><label style="flex:1">Нік профілю<input id="pfn" type="text" maxlength="40" autocomplete="off" placeholder="Трейдер"></label></div>
+<h3>Картинка профілю</h3><div class="avg" id="avl" role="group" aria-label="Оберіть логотип профілю"></div>
+<div class="row"><button class="b" id="avu">Завантажити своє фото чи логотип</button><button class="b d" id="avx" hidden>Прибрати фото</button><input type="file" id="avf" accept="image/*" hidden></div><p class="mu" id="avm" style="margin-top:8px"></p>
+<div id="pfs" style="margin-top:12px"></div></div>
+<div class="card" id="acc"></div>
+<div class="card"><h2>Біржі та ключі API</h2><div id="exl"></div><p class="mu" style="margin-top:10px">У демо ключі не потрібні й не зберігаються. Кількість пар і ліміти плеча демонстраційні, у реальній версії їх треба брати з API біржі. Ключ API створюється без права виведення, а кошти лишаються на біржі.</p></div>
+<div class="card"><h2>Месенджери</h2><p class="mu" style="margin-bottom:10px">Повідомлення про відкриття ордера, докупівлю, закриття угоди, стоп і помилки. Telegram надсилає сервер Orbix: токен бота зберігається в зашифрованому сховищі, браузер його не бачить. Для WhatsApp, Viber і Signal потрібен окремий сервер, тому тут вони працюють у демо.</p><div id="msg"></div></div>
+<div class="card"><h2>Безпека</h2><div id="sec"></div></div>
+</section>
+
+<section id="v-help" class="s" hidden>
+<div class="card"><h2>Довідка</h2><div id="help"></div></div>
+</section>
+</div>
+
+<nav id="tab" aria-label="Розділи" hidden></nav>
+<div id="ts" role="status" hidden></div>
+<div id="lk" hidden role="dialog" aria-modal="true" aria-labelledby="lkt"><div class="lkb"><span class="av" style="width:72px;height:72px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h2 id="lkt" style="margin:14px 0 6px">Orbix заблоковано</h2><p class="mu" style="margin-bottom:16px">Підтвердіть, що це ви: відбиток пальця, Face ID або PIN пристрою.</p><button class="b p" id="lkb">Розблокувати</button><p class="dn" id="lkm" style="margin-top:10px"></p><button class="b sm" id="lkr" style="margin-top:18px">Не вдається розблокувати</button></div></div>
+<div id="sh" hidden></div>
+<nav id="mn" aria-label="Меню" hidden></nav>
+<datalist id="pl"></datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>/*@vendor*/</script>
+<script>/*@app*/</script>
+</body>
+</html>

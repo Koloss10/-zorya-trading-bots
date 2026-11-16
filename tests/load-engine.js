@@ -1,14 +1,13 @@
-// Витягує торговий рушій з orbix.html і виконує його в ізольованому контексті Node,
-// щоб тести перевіряли саме той код, який працює в браузері.
+// Завантажує торговий рушій з модулів src/js і виконує його в ізольованому контексті Node.
+// CI окремо перевіряє, що orbix.html зібрано саме з цих модулів (node tools/build.js --check).
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
-function loadEngine(file = path.join(__dirname, '..', 'orbix.html')) {
-  const html = fs.readFileSync(file, 'utf8');
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-  const app = scripts[scripts.length - 1];
-  const end = app.indexOf('/* ===== інтерфейс');
-  if (end < 0) throw new Error('не знайдено межу рушія /* ===== інтерфейс');
-  const code = app.slice(0, end) + `
+// Рушій — модулі src/js/01…05 (дані, індикатори, торгова логіка, walk-forward), без інтерфейсу.
+function loadEngine() {
+  const dir = path.join(__dirname, '..', 'src', 'js');
+  const mods = fs.readdirSync(dir).filter(f => /^0\d-.*\.js$/.test(f)).sort();
+  if (!mods.length) throw new Error('не знайдено модулів рушія в src/js');
+  const code = mods.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('') + `
 ;({Bot,run,summ,ladder,lv,entry,normG,rnd,wfo,wfPlan,wfFold,wfSum,searchWin,lbT,SIG,agg,aggC,ema,rsi,bbands,cci,stoch,macdH,auto,evalC,stress,DEF,PAIRS,DT,MD,STR,
   bt:typeof bt==='function'?bt:null,aggT:typeof aggT==='function'?aggT:null,closedTf:typeof closedTf==='function'?closedTf:null,
   replay:typeof replay==='function'?replay:null})`;

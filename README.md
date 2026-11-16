@@ -65,6 +65,10 @@ GitHub Pages вмикається в Settings → Pages → Source: *Deploy from
 
 Ордери на біржу не надсилаються: усі боти працюють у paper-режимі.
 
+### Розробка
+
+`orbix.html` збирається з модулів у [`src/`](src/README.md): `node tools/build.js`. Редагуйте модулі, а не сам `orbix.html` — CI перевіряє, що файл зібрано з `src/`.
+
 ### Тести рушія
 
 `node --test tests/engine.test.js` — незалежні тести розрахунків (PnL, комісії мейкер/тейкер, правила біржі (крок ціни й кількості, мінімальний ордер), DCA, TP/SL, Multi-TP, трейлінг, ліквідація за mark price, funding, відсутність зазирання в майбутнє, вирівнювання свічок, межі й відсутність витоку даних у walk-forward). Звіт аудиту: [docs/engine-audit.md](docs/engine-audit.md).

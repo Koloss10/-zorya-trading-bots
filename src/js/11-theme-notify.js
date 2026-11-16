@@ -1,0 +1,46 @@
+/* ---------- теми та бренд ---------- */
+const THEMES={
+tech:{n:'Техно (графіт + ціан)',v:{'--bg':'#0B0D12','--pan':'#12151D','--pan2':'#0F1218','--ln':'#222838','--tx':'#E6E9F0','--mu':'#8A93A6','--ac':'#22D3EE','--ac2':'#8B5CF6','--up':'#34D399','--dn':'#FB7185','--warn':'#FBBF24','--actx':'#06111A','--glow1':'rgba(34,211,238,.10)','--glow2':'rgba(139,92,246,.12)','--r':'16px'}},
+cyber:{n:'Кіберпанк (неон)',v:{'--bg':'#07060C','--pan':'#110E1C','--pan2':'#0C0A14','--ln':'#2A2140','--tx':'#F3E9FF','--mu':'#9A8DB8','--ac':'#FF2BD6','--ac2':'#00F0FF','--up':'#39FF88','--dn':'#FF3D5A','--warn':'#FFE23D','--actx':'#1A0514','--glow1':'rgba(255,43,214,.14)','--glow2':'rgba(0,240,255,.14)','--r':'10px'}},
+matrix:{n:'Матриця (зелений термінал)',v:{'--bg':'#040806','--pan':'#0A120D','--pan2':'#070E09','--ln':'#163A22','--tx':'#D8F5E0','--mu':'#6FA383','--ac':'#2BFF6A','--ac2':'#19C26B','--up':'#4DFF88','--dn':'#FF5C5C','--warn':'#E3FF4D','--actx':'#03140A','--glow1':'rgba(43,255,106,.10)','--glow2':'rgba(25,194,107,.08)','--r':'8px'}},
+midnight:{n:'Північ (синій, як у бірж)',v:{'--bg':'#0B1220','--pan':'#121C2E','--pan2':'#0E1627','--ln':'#203049','--tx':'#E7EEF8','--mu':'#8EA0BC','--ac':'#F0B90B','--ac2':'#3B82F6','--up':'#0ECB81','--dn':'#F6465D','--warn':'#F0B90B','--actx':'#1A1400','--glow1':'rgba(240,185,11,.08)','--glow2':'rgba(59,130,246,.12)','--r':'14px'}},
+light:{n:'Світла (денна)',v:{'--bg':'#F3F5FA','--pan':'#FFFFFF','--pan2':'#F7F8FC','--ln':'#DEE3EE','--tx':'#121826','--mu':'#5B667E','--ac':'#0EA5E9','--ac2':'#7C3AED','--up':'#059669','--dn':'#E11D48','--warn':'#D97706','--actx':'#FFFFFF','--glow1':'rgba(14,165,233,.12)','--glow2':'rgba(124,58,237,.10)','--r':'16px'}}};
+const BRANDS={
+orbix:{n:'ORBIX',t:'Орбіта: ринок обертається навколо вашої стратегії',svg:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--ac)"/><stop offset="1" stop-color="var(--ac2)"/></linearGradient></defs><circle cx="24" cy="24" r="19" fill="none" stroke="url(#lg1)" stroke-width="3" stroke-dasharray="86 34" stroke-linecap="round" transform="rotate(-30 24 24)"/><circle cx="24" cy="24" r="8" fill="none" stroke="var(--tx)" stroke-width="2.5"/><circle cx="24" cy="24" r="2.6" fill="var(--ac)"/><circle cx="40" cy="12" r="3.2" fill="var(--ac2)"/></svg>'},
+kvantix:{n:'KVANTIX',t:'Квант: точні кроки сітки замість емоцій',svg:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--ac2)"/><stop offset="1" stop-color="var(--ac)"/></linearGradient></defs><path d="M24 3 42 13.5v21L24 45 6 34.5v-21Z" fill="none" stroke="url(#lg2)" stroke-width="3" stroke-linejoin="round"/><path d="M14 30 20 20l5 7 4-5 5 8" fill="none" stroke="var(--tx)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="30" r="2.4" fill="var(--ac)"/></svg>'},
+nexora:{n:'NEXORA',t:'Нексус: усі біржі й боти в одній точці',svg:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--ac)"/><stop offset="1" stop-color="var(--ac2)"/></linearGradient></defs><rect x="6" y="6" width="36" height="36" rx="11" fill="none" stroke="url(#lg3)" stroke-width="3"/><path d="M15 32V16l18 16V16" fill="none" stroke="var(--tx)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="33" cy="32" r="2.6" fill="var(--ac)"/></svg>'}};
+let SET=ld('zset',{theme:'tech',brand:'orbix',snd:1,vib:1,toast:1,push:0,ev:{open:1,dca:1,close:1,sl:1,err:1}});
+function applyTheme(){const t=THEMES[SET.theme]||THEMES.tech,r=document.documentElement;for(const k in t.v)r.style.setProperty(k,t.v[k]);if(SET.theme==='light')r.setAttribute('data-light','');else r.removeAttribute('data-light');
+const b=BRANDS[SET.brand]||BRANDS.orbix;$('#logo').innerHTML=b.svg;$('#bname').textContent=b.n;document.title=b.n.charAt(0)+b.n.slice(1).toLowerCase()+' — торгові боти';$$('.chv').forEach(c=>c._d&&c._d())}
+const TH=()=>{const s=getComputedStyle(document.documentElement),g=k=>s.getPropertyValue(k).trim()||'#888';return{up:g('--up'),dn:g('--dn'),ac:g('--ac'),ac2:g('--ac2'),mu:g('--mu'),ln:g('--ln'),tx:g('--tx'),pan:g('--pan2'),warn:g('--warn')}};
+
+/* ---------- звук, сповіщення, події, месенджери ---------- */
+let AC=null;function beep(kind){if(!SET.snd)return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();const seq={open:[[660,.08]],dca:[[520,.07],[520,.07]],win:[[660,.08],[880,.12]],loss:[[440,.1],[330,.16]],err:[[220,.2]]}[kind]||[[600,.08]];let t=AC.currentTime;for(const[fr,d]of seq){const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.value=fr;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.25,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(AC.destination);o.start(t);o.stop(t+d+.02);t+=d+.04}}catch(e){}}
+let tt;function toast(m){if(!SET.toast)return;const e=$('#ts');e.textContent=m;e.hidden=false;clearTimeout(tt);tt=setTimeout(()=>e.hidden=true,3500)}
+let FEED=ld('zfeed',[]);
+function feedR(){const el=$('#feed');if(el)el.innerHTML=FEED.length?FEED.slice(0,12).map(e=>`<div><time>${e.t}</time><span>${esc(e.m)}</span></div>`).join(''):'<p class="mu">Подій ще немає.</p>'}
+let MS=ld('zms',{tg:{on:0,token:'',chat:'',tpl:'normal'},wa:{on:0,to:'',tpl:'normal'},vb:{on:0,to:'',tpl:'normal'},sg:{on:0,to:'',tpl:'normal'}});
+const MSN={tg:'Telegram',wa:'WhatsApp',vb:'Viber',sg:'Signal'},EVN={open:'Відкрито позицію',dca:'DCA-ордер',close:'Угоду закрито',sl:'Stop-Loss або ліквідація',err:'Помилка'};
+function msgText(ev,x,tpl,d){const g=x.g,p=x.b.pos,b=BRANDS[SET.brand].n,hd=`${b}: ${ttl(x)} на ${x.ex}`;
+const line={open:`відкрито позицію по ${px(d.price||0)}`,dca:`DCA-ордер ${p?p.n:d.n} з ${g.orders} по ${px(d.price||0)}`,close:`угоду закрито, PnL ${f(d.pnl)} USDT`,sl:`${d.liq?'ліквідація':'спрацював Stop-Loss'}, PnL ${f(d.pnl)} USDT`,err:`помилка: ${d.text||''}`}[ev];
+if(tpl==='short')return `${g.pair} ${dir(g)}: ${line}`;
+let s=`${hd}\n${line}`;if(tpl==='normal')return s+(p?`\nОрдерів ${p.n} з ${g.orders}, середня ${px(p.cost/p.q)}`:'');
+const avg=p?p.cost/p.q:(d.price||lastC(dk(g)).c);return s+`\nСередня ціна ${px(avg)}, TP ${px(avg*(1+g.d*g.tp))}, SL ${px(avg*(1-g.d*g.sl))}\nОрдерів ${p?p.n:'—'} з ${g.orders}, маржа сітки ${n2(g.base*ladder(g),0)} USDT\nУгод у бота ${x.b.tr.length}, реалізований PnL ${f(x.b.cum)} USDT\n${now()}`}
+/* Telegram: надсилає сервер (Edge Function tg-notify), токен — у Supabase Vault, у браузер не повертається */
+let TG={st:null,loaded:0,err:''};
+const TGM={'invalid token format':'Токен має вигляд 123456789:AA… (його видає @BotFather).','invalid chat id':'Chat ID — число (напр. 123456789 або -100…) або @назва_каналу.','mfa required':'Спершу підтвердьте вхід кодом з Google Authenticator.','not authenticated':'Увійдіть в акаунт.','telegram not configured':'Спершу збережіть токен на сервері.','telegram not configured or 2FA code required':'Спершу збережіть токен на сервері або підтвердьте вхід кодом 2FA.'};
+/* пояснення відмов Telegram українською */
+const tgMsg=m=>TGM[m]||(/chat not found/i.test(m)?'Telegram не знає цього чату. Відкрийте свого бота в Telegram і натисніть «Start» (або надішліть йому будь-що), а також перевірте Chat ID: ваш особистий ID покаже @userinfobot.'
+:/bot can't initiate conversation|bot can.t initiate/i.test(m)?'Бот не може написати першим. Відкрийте свого бота в Telegram і натисніть «Start».'
+:/blocked by the user/i.test(m)?'Ви заблокували бота в Telegram. Розблокуйте його й натисніть «Start».'
+:/Unauthorized|401/i.test(m)?'Telegram не приймає токен: він неправильний або відкликаний. Скопіюйте токен у @BotFather ще раз і збережіть на сервері.'
+:/user is deactivated|chat_id is empty|PEER_ID_INVALID/i.test(m)?'Неправильний Chat ID. Ваш особистий ID покаже @userinfobot.'
+:/Not Found|404/.test(m)?'Серверна функція Telegram ще не встановлена.':'Telegram: '+m);
+async function tgLoad(){if(!SB||!CLOUD.u){TG={st:null,loaded:1,err:''};return}const r=await SB.rpc('tg_status');TG={st:r.error?null:r.data,loaded:1,err:r.error?r.error.message:''}}
+async function tgSend(text){if(!SB||!CLOUD.u)throw new Error('Увійдіть в акаунт.');const r=await SB.functions.invoke('tg-notify',{body:{text}});
+if(r.error){let m=r.error.message;try{const j=await r.error.context.json();m=j.error||m}catch(e){}throw new Error(tgMsg(m))}return r.data}
+function notify(ev,x,d){const m=msgText(ev,x,'short',d);FEED.unshift({t:now(),m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR();if(!SET.ev[ev])return;toast(m);beep(ev==='close'?(d.pnl>0?'win':'loss'):ev);
+if(SET.vib&&navigator.vibrate)try{navigator.vibrate(ev==='sl'?[80,60,80]:40)}catch(e){}
+if(SET.push&&'Notification'in window&&Notification.permission==='granted')try{new Notification(BRANDS[SET.brand].n,{body:m})}catch(e){}
+for(const k in MS){const c=MS[k];if(!c.on||!(c.ev||SET.ev)[ev])continue;const text=msgText(ev,x,c.tpl,d);if(k==='tg'){if(CLOUD.u&&TG.st)tgSend(text).catch(e=>{FEED.unshift({t:now(),m:'Telegram: '+e.message});sv('zfeed',FEED);feedR()})}else{FEED.unshift({t:now(),m:`${MSN[k]} (демо): `+(text.split('\n')[1]||text)});sv('zfeed',FEED)}}}
+

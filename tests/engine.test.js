@@ -233,3 +233,52 @@ test('Walk-forward: підсумок узгоджений з кроками', ()
   assert.ok(['стабільна', 'сумнівна', 'нестабільна', 'мало'].includes(r.verdict));
   if (r.oos <= 0) assert.equal(r.verdict === 'стабільна', false, 'збиткова перевірка не може бути «стабільною»');
 });
+
+// ---------- Правила біржі (exchange filters) ----------
+const FB = { tick: 0.1, step: 0.001, minQty: 0.001, minN: 100 }; // як BTCUSDT на ф'ючерсах Binance
+
+test('rnd(): округлення до кроку без похибок плаваючої коми', () => {
+  assert.equal(E.rnd(0.0123456, 0.001, 'floor'), 0.012); assert.equal(E.rnd(98.04, 0.1, 'floor'), 98);
+  assert.equal(E.rnd(101.01, 0.1, 'ceil'), 101.1); assert.equal(E.rnd(0.3, 0.1, 'floor'), 0.3, '0.3/0.1 не стає 2.999');
+  assert.equal(E.rnd(5, 0, 'floor'), 5, 'без кроку значення не змінюється');
+});
+
+test('Кількість округлюється вниз до кроку біржі, вартість рахується від неї', () => {
+  // 150 USDT по 70000 → 0.0021428… → 0.002 BTC = 140 USDT
+  const b = new E.Bot(G({ base: 150, fee: 0 }), null, FB); b.step(0, C(0, 70000, 70000, 70000, 70000), true);
+  assert.equal(b.pos.q, 0.002); near(b.pos.cost, 140);
+});
+
+test('Ордер менший за мінімум біржі не відкривається', () => {
+  // 90 USDT < мін. 100 USDT
+  const b = new E.Bot(G({ base: 90 }), null, FB); b.step(0, C(0, 70000, 70000, 70000, 70000), true);
+  assert.equal(b.pos, null);
+  // після округлення 0.0014 → 0.001 BTC = 70 USDT < 100 → теж не відкривається
+  const b2 = new E.Bot(G({ base: 105 }), null, FB); b2.step(0, C(0, 70000, 70000, 70000, 70000), true);
+  assert.equal(b2.pos, null);
+});
+
+test('DCA і TP за кроком ціни: купівля нижче — вниз, TP — вгору', () => {
+  // крок 0.1: DCA = 100·(1−0.0213) = 97.87 → 97.8; TP від середньої вгору до 0.1
+  const F = { tick: 0.1, step: 0.01, minQty: 0.01, minN: 5 };
+  const g = G({ orders: 2, mult: 1, step: 0.0213, base: 100, fee: 0 });
+  const b = new E.Bot(g, null, F); [C(0, 100, 100, 100, 100), C(1, 100, 100, 97.5, 98)].forEach((r, i) => b.step(i, r, i === 0));
+  assert.equal(b.pos.f[1].p, 97.8);
+  const avg = b.pos.cost / b.pos.q, tp = Math.ceil(avg * 1.01 / 0.1 - 1e-9) * 0.1;
+  b.step(2, C(2, 98, 100, 97.9, 99.5), false); near(b.tr[0].f.at(-1).p, +tp.toFixed(1), 1e-9);
+});
+
+test('DCA-ордер, якого біржа не прийме, не виконується, решта логіки працює', () => {
+  // мінімум 150 USDT: перший ордер 200 проходить, другий (200·0.5 = 100) — ні
+  const F = { tick: 0.01, step: 0.0001, minQty: 0.0001, minN: 150 };
+  const b = new E.Bot(G({ base: 200, orders: 3, mult: 0.5, fee: 0 }), null, F);
+  [C(0, 100, 100, 100, 100), C(1, 100, 100, 97, 97.5)].forEach((r, i) => b.step(i, r, i === 0));
+  assert.equal(b.pos.n, 1, 'докупівлі пропущено'); assert.ok(b.pos.dx);
+});
+
+test('Сітка на графіку (lv) з правилами біржі збігається з виконанням', () => {
+  const F = { tick: 0.01, step: 0.001, minQty: 0.001, minN: 5 };
+  const g = G({ orders: 4, mult: 1.5, step: 0.015, smul: 1.3, sl: 0.2 }), L = E.lv(g, 100, F).L.map(x => x.p);
+  const b = new E.Bot(g, null, F); [C(0, 100, 100, 100, 100), C(1, 100, 100, 93.5, 95)].forEach((r, i) => b.step(i, r, i === 0));
+  assert.deepEqual(b.pos.f.map(x => x.p), L);
+});

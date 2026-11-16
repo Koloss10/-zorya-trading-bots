@@ -207,7 +207,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <div id="pfs" style="margin-top:12px"></div></div>
 <div class="card" id="acc"></div>
 <div class="card"><h2>Біржі та ключі API</h2><div id="exl"></div><p class="mu" style="margin-top:10px">У демо ключі не потрібні й не зберігаються. Кількість пар і ліміти плеча демонстраційні, у реальній версії їх треба брати з API біржі. Ключ API створюється без права виведення, а кошти лишаються на біржі.</p></div>
-<div class="card"><h2>Месенджери</h2><p class="mu" style="margin-bottom:10px">Повідомлення про відкриття ордера, докупівлю, закриття угоди, стоп і помилки. Telegram надсилає прямо з браузера; для WhatsApp, Viber і Signal потрібен сервер, тому тут вони працюють у демо.</p><div id="msg"></div></div>
+<div class="card"><h2>Месенджери</h2><p class="mu" style="margin-bottom:10px">Повідомлення про відкриття ордера, докупівлю, закриття угоди, стоп і помилки. Telegram надсилає сервер Orbix: токен бота зберігається в зашифрованому сховищі, браузер його не бачить. Для WhatsApp, Viber і Signal потрібен окремий сервер, тому тут вони працюють у демо.</p><div id="msg"></div></div>
 <div class="card"><h2>Безпека</h2><div id="sec"></div></div>
 </section>
 
@@ -503,11 +503,17 @@ const line={open:`відкрито позицію по ${px(d.price||0)}`,dca:`D
 if(tpl==='short')return `${g.pair} ${dir(g)}: ${line}`;
 let s=`${hd}\n${line}`;if(tpl==='normal')return s+(p?`\nОрдерів ${p.n} з ${g.orders}, середня ${px(p.cost/p.q)}`:'');
 const avg=p?p.cost/p.q:(d.price||lastC(dk(g)).c);return s+`\nСередня ціна ${px(avg)}, TP ${px(avg*(1+g.d*g.tp))}, SL ${px(avg*(1-g.d*g.sl))}\nОрдерів ${p?p.n:'—'} з ${g.orders}, маржа сітки ${n2(g.base*ladder(g),0)} USDT\nУгод у бота ${x.b.tr.length}, реалізований PnL ${f(x.b.cum)} USDT\n${now()}`}
-async function tgSend(token,chat,text){const r=await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendMessage`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:chat,text})});const j=await r.json().catch(()=>({}));if(!j.ok)throw new Error(j.description||('HTTP '+r.status));return j}
+/* Telegram: надсилає сервер (Edge Function tg-notify), токен — у Supabase Vault, у браузер не повертається */
+let TG={st:null,loaded:0,err:''};
+const TGM={'invalid token format':'Токен має вигляд 123456789:AA… (його видає @BotFather).','invalid chat id':'Chat ID — число (напр. 123456789 або -100…) або @назва_каналу.','mfa required':'Спершу підтвердьте вхід кодом з Google Authenticator.','not authenticated':'Увійдіть в акаунт.','telegram not configured':'Спершу збережіть токен на сервері.','telegram not configured or 2FA code required':'Спершу збережіть токен на сервері або підтвердьте вхід кодом 2FA.'};
+const tgMsg=m=>TGM[m]||(/Not Found|404/.test(m)?'Серверна функція Telegram ще не встановлена.':m);
+async function tgLoad(){if(!SB||!CLOUD.u){TG={st:null,loaded:1,err:''};return}const r=await SB.rpc('tg_status');TG={st:r.error?null:r.data,loaded:1,err:r.error?r.error.message:''}}
+async function tgSend(text){if(!SB||!CLOUD.u)throw new Error('Увійдіть в акаунт.');const r=await SB.functions.invoke('tg-notify',{body:{text}});
+if(r.error){let m=r.error.message;try{const j=await r.error.context.json();m=j.error||m}catch(e){}throw new Error(tgMsg(m))}return r.data}
 function notify(ev,x,d){const m=msgText(ev,x,'short',d);FEED.unshift({t:now(),m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR();if(!SET.ev[ev])return;toast(m);beep(ev==='close'?(d.pnl>0?'win':'loss'):ev);
 if(SET.vib&&navigator.vibrate)try{navigator.vibrate(ev==='sl'?[80,60,80]:40)}catch(e){}
 if(SET.push&&'Notification'in window&&Notification.permission==='granted')try{new Notification(BRANDS[SET.brand].n,{body:m})}catch(e){}
-for(const k in MS){const c=MS[k];if(!c.on||!(c.ev||SET.ev)[ev])continue;const text=msgText(ev,x,c.tpl,d);if(k==='tg'&&c.token&&c.chat)tgSend(c.token,c.chat,text).catch(e=>{FEED.unshift({t:now(),m:'Telegram: '+e.message});sv('zfeed',FEED);feedR()});else{FEED.unshift({t:now(),m:`${MSN[k]} (демо): `+(text.split('\n')[1]||text)});sv('zfeed',FEED)}}}
+for(const k in MS){const c=MS[k];if(!c.on||!(c.ev||SET.ev)[ev])continue;const text=msgText(ev,x,c.tpl,d);if(k==='tg'){if(CLOUD.u&&TG.st)tgSend(text).catch(e=>{FEED.unshift({t:now(),m:'Telegram: '+e.message});sv('zfeed',FEED);feedR()})}else{FEED.unshift({t:now(),m:`${MSN[k]} (демо): `+(text.split('\n')[1]||text)});sv('zfeed',FEED)}}}
 
 /* ---------- графік у стилі біржового термінала (canvas) ---------- */
 function cm(A,k,fn){const c=A._c||(A._c={});return c[k]&&c[k].n===A.length?c[k].v:(c[k]={n:A.length,v:fn()}).v}
@@ -852,19 +858,28 @@ let PF=ld('zpf',{n:'',tf:0,wl:1});
 function pfr(){$('#pfn').value=PF.n;avR();const inv=bots.reduce((a,x)=>a+x.g.base*ladder(x.g),0);$('#pfs').innerHTML=`<div class="k">${K('Ботів',bots.length)}${K('У ботах, USDT',n2(inv,0))}${K('Бірж',cx.length)}${K('Угод',bots.reduce((a,x)=>a+x.b.tr.length,0))}</div>`;
 $('#exl').innerHTML=Object.keys(EXS).map(e=>{const c=cx.includes(e);return`<div class="sw"><div>${e}<div class="mu">${c?'Підключено (демо)':'Не підключено'} · пар: ${EXS[e][1]}, плече до ${EXS[e][0]}×</div></div><button class="b sm ${c?'d':'p'}" data-e="${e}">${c?'Відключити':'Підключити'}</button></div>`}).join('');
 const o=cx.map(e=>`<option>${e}</option>`).join('');['#fe','#awe'].forEach(q=>{const s=$(q),v=s.value;s.innerHTML=o;if(cx.includes(v))s.value=v});
+const tgF=()=>!CLOUD.u?'<p class="mu" style="grid-column:1/-1;margin:0">Увійдіть в акаунт Orbix, щоб підключити Telegram: токен бота зберігається на сервері в зашифрованому сховищі, а не в браузері.</p>'
+:`<label>Токен бота (від @BotFather)<input id="tg-tok" type="password" autocomplete="off" placeholder="${TG.st?'збережено …'+esc(TG.st.hint)+'; вставте новий, щоб замінити':'123456789:AA…'}" value="${esc(MS.tg.token||'')}"></label><label>Chat ID<input id="tg-chat" type="text" autocomplete="off" placeholder="123456789, -100… або @канал" value="${esc(TG.st?TG.st.chat_id:(MS.tg.chat||''))}"></label>
+<div class="row" style="grid-column:1/-1"><button class="b sm p" data-tg="save">Зберегти на сервері</button>${TG.st?'<button class="b sm d" data-tg="clear">Видалити з сервера</button>':''}</div>
+<p class="mu" style="grid-column:1/-1;margin:0">${TG.st?'Підключено: токен …'+esc(TG.st.hint)+', chat '+esc(TG.st.chat_id)+'. Токен зберігається на сервері й у браузер не повертається.':TG.err?esc(tgMsg(TG.err)):'Токен не підключено.'}</p>${MS.tg.token?'<p class="dn" style="grid-column:1/-1;margin:0">Старий токен ще лежить у цьому браузері. Натисніть «Зберегти на сервері», і звідси його буде видалено.</p>':''}`;
+if(CLOUD.u&&!TG.loaded)tgLoad().then(()=>{if(CUR==='pf')pfr()}).catch(()=>{});
 const F=(k,id,l,ph)=>`<label>${l}<input id="${k}-${id}" type="text" autocomplete="off" placeholder="${ph}" value="${esc(MS[k][id]||'')}"></label>`;
 $('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div class="bc ${c.on?'on':'off'}"><div class="bh"><b>${n}</b><span class="st" style="margin-left:auto">${c.on?'Увімкнено':'Вимкнено'}</span></div>
-<div class="fg" style="margin-bottom:8px">${k==='tg'?F(k,'token','Токен бота (від @BotFather)','123456:ABC…')+F(k,'chat','Chat ID','-100…'):F(k,'to',k==='vb'?'ID чату або номер':'Номер телефону','+380…')}${sel(k+'-tpl','Формат повідомлень',[['short','Короткий'],['normal','Звичайний'],['detailed','Детальний']],c.tpl)}</div>
+<div class="fg" style="margin-bottom:8px">${k==='tg'?tgF():F(k,'to',k==='vb'?'ID чату або номер':'Номер телефону','+380…')}${sel(k+'-tpl','Формат повідомлень',[['short','Короткий'],['normal','Звичайний'],['detailed','Детальний']],c.tpl)}</div>
 <h3>Події</h3><div class="sgr">${Object.entries(EVN).map(([e,l])=>`<label class="ck"><input type="checkbox" data-ms="${k}" data-ev="${e}"${(c.ev||SET.ev)[e]?' checked':''}>${l}</label>`).join('')}</div>
 <div class="ac"><button class="b sm ${c.on?'d':'p'}" data-ms-on="${k}">${c.on?'Вимкнути':'Увімкнути'}</button><button class="b sm" data-ms-t="${k}">Надіслати тест</button></div><pre class="mu" id="${k}-pv" style="white-space:pre-wrap;font:400 12px Inter,sans-serif;margin:6px 0 0"></pre></div>`}).join('');
 secR();secLoad().catch(()=>{});accR()}
 $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF);mnuR();nameQ()};
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);pfr();tfilter()};
 $('#msg').oninput=$('#msg').onchange=e=>{const t=e.target;const m=t.id&&t.id.match(/^(tg|wa|vb|sg)-(token|chat|to|tpl)$/);if(m){MS[m[1]][m[2]]=t.value.trim();sv('zms',MS)}if(t.dataset.ms){const c=MS[t.dataset.ms];c.ev=c.ev||{...SET.ev};c.ev[t.dataset.ev]=t.checked?1:0;sv('zms',MS)}};
-$('#msg').onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.msOn||b.dataset.msT,c=MS[k];
+$('#msg').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
+if(b.dataset.tg){const pv=$('#tg-pv');try{if(b.dataset.tg==='save'){const tok=$('#tg-tok').value.trim(),ch=$('#tg-chat').value.trim();if(!tok){pv.textContent=TG.st?'Щоб змінити Chat ID, вставте токен ще раз.':'Вставте токен бота від @BotFather.';return}
+pv.textContent='Зберігаю на сервері…';const r=await SB.rpc('tg_save',{p_token:tok,p_chat:ch});if(r.error)throw new Error(tgMsg(r.error.message));MS.tg.token='';MS.tg.chat='';sv('zms',MS);await tgLoad();pfr();toast('Telegram підключено, токен збережено на сервері')}
+else{if(!confirm('Видалити токен Telegram з сервера?'))return;const r=await SB.rpc('tg_clear');if(r.error)throw new Error(tgMsg(r.error.message));await tgLoad();pfr();toast('Токен Telegram видалено')}}catch(er){pv.textContent='Помилка: '+er.message}return}
+const k=b.dataset.msOn||b.dataset.msT,c=MS[k];
 if(b.dataset.msOn){c.on=c.on?0:1;sv('zms',MS);pfr();return}
 const x=bots[0]||{g:{...DEF,pair:'BTC/USDT'},ex:cx[0]||'Binance',b:new Bot({...DEF,pair:'BTC/USDT'})},text=msgText('close',x,c.tpl,{pnl:4.96}),pv=$('#'+k+'-pv');pv.textContent='Попередній перегляд:\n'+text;
-if(k==='tg'){if(!c.token||!c.chat)return pv.textContent+='\n\nВкажіть токен і Chat ID.';pv.textContent+='\n\nНадсилаю…';tgSend(c.token,c.chat,text).then(()=>pv.textContent+=' надіслано.').catch(e=>pv.textContent+=' помилка: '+e.message)}else pv.textContent+=`\n\n${MSN[k]} у браузері не надсилає: потрібен сервер (бекенд із API ${MSN[k]}). У демо подія лише записується в журнал.`};
+if(k==='tg'){if(!CLOUD.u)return pv.textContent+='\n\nУвійдіть в акаунт, щоб підключити Telegram.';if(!TG.st)return pv.textContent+='\n\nСпершу збережіть токен і Chat ID на сервері.';pv.textContent+='\n\nНадсилаю через сервер…';tgSend(text).then(()=>pv.textContent+=' надіслано.').catch(e=>pv.textContent+=' помилка: '+e.message)}else pv.textContent+=`\n\n${MSN[k]} у браузері не надсилає: потрібен сервер (бекенд із API ${MSN[k]}). У демо подія лише записується в журнал.`};
 /* аватар профілю: 10 логотипів або власне фото (зберігається на цьому пристрої) */
 const AVS=[['orbit','Орбіта','<circle cx="12" cy="12" r="7.5" stroke-dasharray="30 10"/><circle cx="12" cy="12" r="2.4"/><circle cx="19" cy="6" r="1.2"/>'],
 ['bull','Бик','<path d="M4 6c0 3 2 5 4 5M20 6c0 3-2 5-4 5M8 11h8l-1 6a3 3 0 0 1-6 0z"/><path d="M10.5 15h.01M13.5 15h.01"/>'],
@@ -1013,7 +1028,7 @@ reset(){if(!confirm('Скинути блокування? Дані цього б
 document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(L.get()&&hiddenAt&&Date.now()-hiddenAt>5*6e4)L.show()});return L})();
 $('#lkb').onclick=()=>LOCK.unlock();$('#lkr').onclick=()=>LOCK.reset();LOCK.show();
 
-async function cloudIn(u){CLOUD.u=u;CLOUD.err='';accR();
+async function cloudIn(u){CLOUD.u=u;TG={st:null,loaded:0,err:''};CLOUD.err='';accR();
 if(ld('zuid','')!==u.id)bots=bots.filter(x=>!x.rid);sv('zuid',u.id);
 await (csQ=csQ.then(()=>cloudSave(1)));if(CLOUD.err)return;
 const r=await SB.from('bots').select('id,exchange,status,config,preset_id,started_at').order('created_at');if(r.error)return cloudFail(r.error);
@@ -1027,7 +1042,7 @@ if(!fv.error){const have=new Set(fv.data.map(x=>x.preset_id)),up=[...FAVP].filte
 const p=await SB.from('profiles').select('display_name,avatar').eq('id',u.id).single();
 if(!p.error&&p.data){if(p.data.display_name)PF.n=p.data.display_name;else if(PF.n)nameQ();sv('zpf',PF);const a=avFrom(p.data.avatar);if(a){AV=a;try{localStorage.setItem('zav',JSON.stringify(AV))}catch(e){}}else if(AV.img||AV.k!=='orbit')avQ();if(CUR==='pf')avR();mnuR()}
 CLOUD.ok=Date.now();accR();if(CUR==='bs')bsl();if(CUR==='pf')pfr();toast('Увійшли: дані синхронізовано')}
-function cloudOut(){if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
+function cloudOut(){TG={st:null,loaded:0,err:''};if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
 function cloudStart(){accR();presLoad().catch(()=>{}).finally(()=>{if(!SB)return;
 SB.auth.onAuthStateChange((ev,s)=>{const u=s&&s.user;if(ev==='PASSWORD_RECOVERY'){CLOUD.rec=1;setTimeout(()=>go('pf'),0)}
 if(u){if(ev!=='TOKEN_REFRESHED'||CLOUD.pend)setTimeout(()=>gate(u).catch(cloudFail),0)}else if(CLOUD.u||CLOUD.pend||CLOUD.rec){CLOUD.pend=null;CLOUD.rec=0;setTimeout(cloudOut,0)}})})}

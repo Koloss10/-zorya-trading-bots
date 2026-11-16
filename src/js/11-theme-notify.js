@@ -30,13 +30,16 @@ const avg=p?p.cost/p.q:(d.price||lastC(dk(g)).c);return s+`\nСередня ці
 let TG={st:null,loaded:0,err:''};
 const TGM={'invalid token format':'Токен має вигляд 123456789:AA… (його видає @BotFather).','invalid chat id':'Chat ID — число (напр. 123456789 або -100…) або @назва_каналу.','mfa required':'Спершу підтвердьте вхід кодом з Google Authenticator.','not authenticated':'Увійдіть в акаунт.','telegram not configured':'Спершу збережіть токен на сервері.','telegram not configured or 2FA code required':'Спершу збережіть токен на сервері або підтвердьте вхід кодом 2FA.'};
 /* пояснення відмов Telegram українською */
-const tgMsg=m=>TGM[m]||(/chat not found/i.test(m)?'Telegram не знає цього чату. Відкрийте свого бота в Telegram і натисніть «Start» (або надішліть йому будь-що), а також перевірте Chat ID: ваш особистий ID покаже @userinfobot.'
+const tgMsg=m=>TGM[m]||(/chat not found/i.test(m)?'Telegram не знає цього чату. Відкрийте свого бота в Telegram, натисніть «Start» і напишіть йому будь-що, потім натисніть тут «Знайти мій чат» — Orbix сам підставить правильний Chat ID.'
+:/terminated by other getUpdates|webhook is active|Conflict/i.test(m)?'Бот уже підключений до іншого сервісу (webhook). Створіть окремого бота для Orbix у @BotFather.'
 :/bot can't initiate conversation|bot can.t initiate/i.test(m)?'Бот не може написати першим. Відкрийте свого бота в Telegram і натисніть «Start».'
 :/blocked by the user/i.test(m)?'Ви заблокували бота в Telegram. Розблокуйте його й натисніть «Start».'
 :/Unauthorized|401/i.test(m)?'Telegram не приймає токен: він неправильний або відкликаний. Скопіюйте токен у @BotFather ще раз і збережіть на сервері.'
 :/user is deactivated|chat_id is empty|PEER_ID_INVALID/i.test(m)?'Неправильний Chat ID. Ваш особистий ID покаже @userinfobot.'
 :/Not Found|404/.test(m)?'Серверна функція Telegram ще не встановлена.':'Telegram: '+m);
 async function tgLoad(){if(!SB||!CLOUD.u){TG={st:null,loaded:1,err:''};return}const r=await SB.rpc('tg_status');TG={st:r.error?null:r.data,loaded:1,err:r.error?r.error.message:''}}
+async function tgCall(body){if(!SB||!CLOUD.u)throw new Error('Увійдіть в акаунт.');const r=await SB.functions.invoke('tg-notify',{body});
+if(r.error){let m=r.error.message;try{const j=await r.error.context.json();m=j.error||m}catch(e){}throw new Error(tgMsg(m))}return r.data}
 async function tgSend(text){if(!SB||!CLOUD.u)throw new Error('Увійдіть в акаунт.');const r=await SB.functions.invoke('tg-notify',{body:{text}});
 if(r.error){let m=r.error.message;try{const j=await r.error.context.json();m=j.error||m}catch(e){}throw new Error(tgMsg(m))}return r.data}
 function notify(ev,x,d){const m=msgText(ev,x,'short',d);FEED.unshift({t:now(),m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR();if(!SET.ev[ev])return;toast(m);beep(ev==='close'?(d.pnl>0?'win':'loss'):ev);

@@ -16,7 +16,7 @@ $('#exl').innerHTML=Object.keys(EXS).map(e=>{const c=cx.includes(e);return`<div 
 const o=cx.map(e=>`<option>${e}</option>`).join('');['#fe','#awe'].forEach(q=>{const s=$(q),v=s.value;s.innerHTML=o;if(cx.includes(v))s.value=v});
 const tgF=()=>!CLOUD.u?'<p class="mu" style="grid-column:1/-1;margin:0">Увійдіть в акаунт Orbix, щоб підключити Telegram: токен бота зберігається на сервері в зашифрованому сховищі, а не в браузері.</p>'
 :`<label>Токен бота (від @BotFather)<input id="tg-tok" type="password" autocomplete="off" placeholder="${TG.st?'збережено …'+esc(TG.st.hint)+'; вставте новий, щоб замінити':'123456789:AA…'}" value="${esc(MS.tg.token||'')}"></label><label>Chat ID<input id="tg-chat" type="text" autocomplete="off" placeholder="123456789, -100… або @канал" value="${esc(TG.st?TG.st.chat_id:(MS.tg.chat||''))}"></label>
-<div class="row" style="grid-column:1/-1"><button class="b sm p" data-tg="save">Зберегти на сервері</button>${TG.st?'<button class="b sm d" data-tg="clear">Видалити з сервера</button>':''}</div>
+<div class="row" style="grid-column:1/-1"><button class="b sm p" data-tg="save">Зберегти на сервері</button>${TG.st?'<button class="b sm" data-tg="detect">Знайти мій чат</button><button class="b sm d" data-tg="clear">Видалити з сервера</button>':''}</div>
 <p class="mu" style="grid-column:1/-1;margin:0">${TG.st?'Підключено: токен …'+esc(TG.st.hint)+', chat '+esc(TG.st.chat_id)+'. Токен зберігається на сервері й у браузер не повертається.':TG.err?esc(tgMsg(TG.err)):'Токен не підключено.'}</p>${MS.tg.token?'<p class="dn" style="grid-column:1/-1;margin:0">Старий токен ще лежить у цьому браузері. Натисніть «Зберегти на сервері», і звідси його буде видалено.</p>':''}`;
 if(CLOUD.u&&!TG.loaded)tgLoad().then(()=>{if(CUR==='pf')pfr()}).catch(()=>{});
 const F=(k,id,l,ph)=>`<label>${l}<input id="${k}-${id}" type="text" autocomplete="off" placeholder="${ph}" value="${esc(MS[k][id]||'')}"></label>`;
@@ -31,6 +31,10 @@ $('#msg').oninput=$('#msg').onchange=e=>{const t=e.target;const m=t.id&&t.id.mat
 $('#msg').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
 if(b.dataset.tg){const pv=$('#tg-pv');try{if(b.dataset.tg==='save'){const tok=$('#tg-tok').value.trim(),ch=$('#tg-chat').value.trim();if(!tok){pv.textContent=TG.st?'Щоб змінити Chat ID, вставте токен ще раз.':'Вставте токен бота від @BotFather.';return}
 pv.textContent='Зберігаю на сервері…';const r=await SB.rpc('tg_save',{p_token:tok,p_chat:ch});if(r.error)throw new Error(tgMsg(r.error.message));MS.tg.token='';MS.tg.chat='';sv('zms',MS);await tgLoad();pfr();toast('Telegram підключено, токен збережено на сервері')}
+else if(b.dataset.tg==='detect'){pv.textContent='Шукаю чати, які писали вашому боту…';const d=await tgCall({action:'detect'});const L=(d&&d.chats)||[];
+if(!L.length){pv.textContent='Бот ще не отримав жодного повідомлення. Відкрийте свого бота в Telegram, натисніть «Start», напишіть будь-що й натисніть «Знайти мій чат» ще раз.';return}
+pv.innerHTML='Оберіть свій чат:<div class="row" style="margin-top:8px">'+L.map(c=>`<button class="b sm p" data-tg="use" data-tgc="${esc(c.id)}">${esc(c.title||c.id)}${c.type==='private'?'':' · '+esc(c.type)}</button>`).join('')+'</div>'}
+else if(b.dataset.tg==='use'){pv.textContent='Підключаю…';const d=await tgCall({action:'use',chat:b.dataset.tgc});await tgLoad();pfr();toast(d&&d.sent?'Telegram підключено: перевірте повідомлення від бота':'Чат збережено');}
 else{if(!confirm('Видалити токен Telegram з сервера?'))return;const r=await SB.rpc('tg_clear');if(r.error)throw new Error(tgMsg(r.error.message));await tgLoad();pfr();toast('Токен Telegram видалено')}}catch(er){pv.textContent='Помилка: '+er.message}return}
 const k=b.dataset.msOn||b.dataset.msT,c=MS[k];
 if(b.dataset.msOn){c.on=c.on?0:1;sv('zms',MS);pfr();return}

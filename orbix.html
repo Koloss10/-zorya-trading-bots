@@ -399,6 +399,36 @@ function evalC(o,c){const g=o.g,M=g.base*ladder(g),d0=c.amt>0?c.amt:2*M,Rf=run(o
 return{g,sf,st,sx,M,dep,reserve,need,fund:PAIRS[g.pair].f}}
 
 
+
+/* ---------- Walk-forward: перевірка самого процесу підбору ----------
+   Період ділиться на кроки. На кожному кроці параметри підбираються на вікні навчання (1/3 періоду),
+   а найкраща конфігурація перевіряється на наступному вікні, якого підбір не бачив; потім усе зсувається.
+   Тестові вікна йдуть одне за одним без перекриття й разом покривають останні 2/3 періоду. */
+function sampleG(R,g0,c,LV){const orders=3+(R()*6|0),mult=pick(R,[1,1.1,1.2,1.3,1.5,1.7]),lev=pick(R,LV),U=ladder({orders,mult}),base=c.amt>0?c.amt/U:10;if(base<5)return null;
+return{g:{...g0,orders,mult,lev,base,step:pick(R,[.008,.012,.016,.022,.03]),smul:pick(R,[1,1.2,1.5]),tp:pick(R,[.005,.008,.012,.018]),sl:pick(R,[.04,.06,.08,.1]),trail:pick(R,[0,.005,.01])},dep:c.amt>0?c.amt:2*base*U}}
+/* найкраща конфігурація на вікні [tS, tE): використовуються лише свічки, що закрились до tE */
+function searchWin(c,tS,tE,salt,o={}){const H=hist(dk(c)),R=rng((c.amt|0)*7+c.pair.length*7919+salt*101+13),mxL=c.fut===0?1:maxLev(c.pair,c.ex),LV=c.lev?[Math.min(c.lev,mxL)]:[1,2,3].filter(x=>x<=mxL);let top=null;
+for(const tf of c.tf?[c.tf]:[1,4,12,24,168]){const A=aggC(H,tf),W=tfMs(tf),i0=lbT(A,tS);let i1=i0;while(i1<A.length&&A[i1].t+W<=tE)i1++;if(i1-i0<60)continue;
+for(const[name,sg,kk]of STR)for(const d of c.dr?[c.dr]:[1,-1]){if(d<0&&c.fut===0)continue;const g0=normG({...DEF,pair:c.pair,ex:c.ex,sg,k:kk,d,tf,rm:pick(R,[30,35,40]),fut:c.fut,name}),e=entry(A,g0);
+for(let j=0;j<(o.ns||8);j++){const q=sampleG(R,g0,c,LV);if(!q)continue;const Rn=run(A.slice(i0,i1),e.slice(i0,i1),q.g,0,0,q.dep),s=summ(Rn,q.dep);if(s.n<(o.mn||5))continue;
+const sc=s.roi+2*s.ddp-(s.liq?500:0)-(s.broke?500:0);if(!top||sc>top.sc)top={g:q.g,dep:q.dep,sc,s}}}}return top}
+/* межі кроків walk-forward */
+function wfPlan(c,o={}){const H=hist(dk(c));if(!H.length)return null;const folds=o.folds||8,end=H[H.length-1].t+H1,start=Math.max(H[0].t,end-c.per*H1),span=Math.floor((end-start)/H1),trH=Math.floor(span/3),teH=Math.floor((span-trH)/folds);
+if(teH<24)return null;const P=[];for(let f=0;f<folds;f++){const trS=start+f*teH*H1,trE=trS+trH*H1,teE=f===folds-1?end:trE+teH*H1;P.push({f,trS,trE,teE})}return{P,trH,teH,folds}}
+/* один крок: підбір на навчанні, перевірка на тесті */
+function wfFold(c,p,o={}){const b=searchWin(c,p.trS,p.trE,p.f,o);if(!b)return{...p,none:1,pnl:0,roi:0,n:0,dd:0,ddp:0};
+const H=hist(dk(c)),g=b.g,A=aggC(H,g.tf),W=tfMs(g.tf),j0=lbT(A,p.trE);let j1=j0;while(j1<A.length&&A[j1].t+W<=p.teE)j1++;
+const e=entry(A,g),s=summ(run(A.slice(j0,j1),e.slice(j0,j1),g,0,0,b.dep),b.dep);
+return{...p,g,dep:b.dep,is:{roi:b.s.roi,n:b.s.n,ddp:b.s.ddp},pnl:s.pnl,roi:s.roi,n:s.n,dd:s.dd,ddp:s.ddp,liq:s.liq}}
+/* підсумок: частка прибуткових тестів, сумарна дохідність тестів, WFE = темп тестів / темп навчання */
+function wfSum(F,plan){const D2=F.filter(x=>!x.none),n=D2.length,pos=D2.filter(x=>x.pnl>0).length,oos=D2.reduce((a,x)=>a+x.roi,0);
+const hrs=x=>(x.teE-x.trE)/H1,isR=n?D2.reduce((a,x)=>a+x.is.roi,0)/n/plan.trH:0,ooR=n?D2.reduce((a,x)=>a+x.roi/hrs(x),0)/n:0,wfe=isR>0?ooR/isR:null;
+const worst=n?Math.min(...D2.map(x=>x.roi)):0,liq=D2.reduce((a,x)=>a+(x.liq||0),0);
+const verdict=n<3?'мало':oos>0&&pos/n>=.6&&wfe!=null&&wfe>=.5&&!liq?'стабільна':oos<=0||pos/n<.4?'нестабільна':'сумнівна';
+return{F,n,pos,folds:F.length,oos,wfe,worst,liq,verdict,trH:plan.trH,teH:plan.teH}}
+function wfo(c,o={}){const plan=wfPlan(c,o);if(!plan)return null;return wfSum(plan.P.map(p=>wfFold(c,p,o)),plan)}
+
+
 /* ===== інтерфейс ===== */
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const f=(x,d=2)=>(x>0?'+':x<0?'−':'')+Math.abs(x).toLocaleString('uk-UA',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -658,6 +688,19 @@ const gone=BT.splice(i,1)[0];sv('zbt',BT);bsl();if(CLOUD.u&&gone&&gone.rid)SB.fr
 const AWP=[[168,'1 тиждень'],[720,'1 місяць'],[4380,'6 місяців'],[8760,'1 рік'],[26208,'3 роки']];
 $('#awf').innerHTML=sel('awe','Біржа',[])+`<label>Пара<input id="awp" list="pl" value="BTC/USDT" autocomplete="off"></label>`+'<label>Депозит, USDT (0 = підібрати)<input id="awa" type="number" inputmode="decimal" step="any" value="1000"></label>'+sel('awr2','Період бектесту',AWP,8760)+sel('awt','Таймфрейм свічок',[[0,'Авто (1г, 4г, 12г, 1д, 1т)'],...TFS])+sel('awd','Напрямок',[[0,'Авто'],[1,'Long'],[-1,'Short']])+sel('awm','Ринок',[[1,'Futures'],[0,'Spot']])+sel('awl','Плече',[[0,'Авто (1–3×)'],[1,'1×'],[2,'2×'],[3,'3×'],[5,'5×'],[10,'10×']]);
 let AW={r:[],c:null},awi=0;
+/* walk-forward у фоні: крок за кроком, щоб не блокувати екран */
+function awWF(c){const tok=AW.tok={},plan=wfPlan(c);if(!plan){AW.wf={err:'Замало історії для walk-forward перевірки: потрібно щонайменше кілька тижнів даних.'};wfR();return}
+const F=[];let i=0;const step=()=>{if(AW.tok!==tok)return;if(i>=plan.P.length){AW.wf=wfSum(F,plan);AW.wfp='';wfR();return}
+AW.wfp=`Перевіряю крок ${i+1} з ${plan.P.length}…`;wfR();setTimeout(()=>{if(AW.tok!==tok)return;try{F.push(wfFold(c,plan.P[i++]))}catch(e){AW.wf={err:'Помилка розрахунку: '+e.message};wfR();return}step()},15)};step()}
+function wfR(){const el=$('#awwf');if(el)el.innerHTML=wfHtml(AW.wf,AW.wfp)}
+const WFV={'стабільна':['up','Стабільна','Підбір дає прибуток на даних, яких не бачив, у більшості кроків.'],'сумнівна':['','Сумнівна','Частина кроків у мінусі або результати поза підбором помітно гірші за навчання. Запускайте з меншою сумою й стежте.'],'нестабільна':['dn','Нестабільна','Поза навчальними даними підбір на цій парі не заробляє. Запускати такого бота не варто.'],'мало':['','Замало даних','Замало кроків з угодами, щоб зробити висновок.']};
+const dd2=t=>new Date(t).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'});
+function wfHtml(r,prog){const head='<h2>Walk-forward перевірка</h2>',ex=`<p class="mu" style="margin-top:10px">Перевіряється не одна конфігурація, а сам спосіб підбору. Період ділиться на кроки: параметри підбираються на вікні навчання, а найкращий варіант торгує наступне вікно, якого підбір не бачив. Потім усе зсувається вперед. WFE — відношення темпу прибутку на тестах до темпу на навчанні: від 0,5 і вище вважається нормою.</p>`;
+if(!r)return head+`<p class="mu">${prog||'Готую перевірку…'}</p>`+ex;if(r.err)return head+`<p class="dn">${esc(r.err)}</p>`;
+const v=WFV[r.verdict]||WFV['мало'];
+return head+`<p style="margin:0 0 10px"><b class="${v[0]}">${v[1]}.</b> <span class="mu">${v[2]}</span></p><div class="k">${K('Кроків у плюсі',r.pos+' з '+r.n,r.pos/Math.max(1,r.n)>=.6?'up':r.pos/Math.max(1,r.n)<.4?'dn':'')}${K('Дохідність тестів, сума',f(r.oos,1)+'%',cls(r.oos))}${K('Найгірший крок',f(r.worst,1)+'%',cls(r.worst))}${K('WFE',r.wfe==null?'—':n2(r.wfe,2),r.wfe!=null&&r.wfe>=.5?'up':r.wfe!=null&&r.wfe<0?'dn':'')}</div>
+<p class="mu" style="margin-top:10px">Навчання ${n2(r.trH/24,0)} дн., кожен тест ≈ ${n2(r.teH/24,0)} дн.${r.liq?` Ліквідацій на тестах: ${r.liq}.`:''}</p>
+<div class="sc"><table><tr><th>Тест</th><th>Підібрано</th><th>Угод</th><th>Навчання</th><th>Тест</th><th>Просадка</th></tr>${r.F.map(x=>`<tr><td class="mono">${dd2(x.trE)}–${dd2(x.teE-1)}</td><td>${x.none?'<span class="mu">нічого не знайдено</span>':esc(x.g.name.split(':')[0])+'<div class="mu">'+tfl(x.g.tf)+', '+dir(x.g)+', '+x.g.lev+'×</div>'}</td><td>${x.n}</td><td class="mono ${x.none?'':cls(x.is.roi)}">${x.none?'—':f(x.is.roi,1)+'%'}</td><td class="mono ${cls(x.roi)}">${x.none?'—':f(x.roi,1)+'%'}</td><td class="mono ${cls(x.ddp)}">${x.none?'—':f(x.ddp,1)+'%'}</td></tr>`).join('')}</table></div>`+ex}
 function awShow(i){const E=AW.r[i],c=AW.c,g=E.g,s=E.sf,t=E.st,need=E.need;
 const sx=E.sx.map(r=>`<tr><td>${r.n}</td><td>${r.dca}</td><td class="mono ${cls(r.mn)}">${f(r.mn,0)}</td><td>${r.liq?'ліквідація':r.sl?'SL':'—'}</td></tr>`).join('');
 $('#awr').innerHTML=`<div class="card"><h2>Підібрана конфігурація</h2><div class="row" style="margin-bottom:12px">${AW.r.map((_,j)=>`<button class="b tg" data-v="${j}" aria-pressed="${j===i}">Варіант ${j+1}</button>`).join('')}</div>`
@@ -665,6 +708,7 @@ $('#awr').innerHTML=`<div class="card"><h2>Підібрана конфігура
 +KV('Ордерів DCA',g.orders)+KV('Перший ордер',n2(g.base,2)+' USDT')+KV('Мартингейл (множник ордера)',g.mult)+KV('Крок, множник кроку',(g.step*100).toFixed(1)+'%, '+g.smul)+KV('Take-Profit, Trailing',(g.tp*100).toFixed(1)+'%, '+(g.trail?(g.trail*100).toFixed(1)+'%':'вимк.'))+KV('Stop-Loss',(g.sl*100).toFixed(0)+'%')+KV('Фундаментальний бал пари (демо)',E.fund+'/100')+`</div>
 <div class="card"><h2>Депозит і страховка</h2>${KV('Маржа сітки ордерів',n2(E.M,0)+' USDT')}${KV('Страховий запас',n2(E.reserve,0)+' USDT')}${KV('Оптимальний депозит',n2(need,0)+' USDT')}${c.amt>0?KV('Ваш депозит',n2(c.amt,0)+' USDT, '+(c.amt>=need?'достатньо':'бракує '+n2(need-c.amt,0)+' USDT')):'<p class="mu" style="margin-top:6px">Розрахунок для першого ордера 10 USDT. Для іншого розміру збільшіть усе пропорційно.</p>'}<p class="mu" style="margin-top:6px">Страховий запас: більше з двох значень, 1,5 від найгіршої історичної просадки або найгірший збиток у стрес-сценаріях.</p></div>
 <div class="card"><h2>Бектест, ${perl(c.per)}</h2><p class="mu" style="margin-bottom:8px">Період включає 70% даних, на яких підбирались параметри, тому цифри завищені. Чесна оцінка — перевірка поза підбором нижче.</p><div class="k">${K('Угод',s.n)}${K('Win rate',s.wr.toFixed(0)+'%')}${K('PnL з відкритою позицією',f(s.pnl),cls(s.pnl))}${K('Дохідність на депозит',f(s.roi,1)+'%',cls(s.roi))}${K('Макс. просадка',f(s.dd,0)+' ('+f(s.ddp,1)+'%)',cls(s.dd))}${K('Профіт-фактор',pf(s))}</div><div style="margin:14px 0">${chart(s.cur)}</div><p class="mu">Перевірка на останніх 30% періоду, які не брали участі в підборі: угод ${t.n}, PnL ${f(t.pnl,0)} USDT${t.n<5?' (замало угод для висновків)':''}.</p></div>
+<div class="card" id="awwf">${wfHtml(AW.wf,AW.wfp)}</div>
 <div class="card"><h2>Стрес-сценарії</h2><div class="sc"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Результат</th></tr>${sx}</table></div></div>
 <div class="card"><div class="row"><button class="b p" data-a="a">Додати paper-бота</button><button class="b" data-a="o">Відкрити в конструкторі</button><button class="b" data-a="f">У топові</button></div><p class="mu" style="margin-top:10px">Підбір виконано на ${hsrc()}. Кращий бектест не гарантує прибуток.</p></div>`}
 function awRun(c){const o=$('#awr');if(!PAIRS[c.pair]||!c.ex||!listed(c.pair,c.ex))return o.innerHTML='<p class="dn">Оберіть пару зі списку, яка торгується на вибраній біржі.</p>';
@@ -672,14 +716,14 @@ if(c.dr<0&&!c.fut)return o.innerHTML='<p class="dn">Short доступний л�
 if(c.tf&&Math.floor(c.per/c.tf)<60)return o.innerHTML='<p class="dn">Для цього таймфрейму період замалий: потрібно щонайменше 60 свічок.</p>';
 withData(dk(c),o,()=>{o.innerHTML='<p class="mu">Підбираю конфігурацію…</p>';
 setTimeout(()=>{try{const t=auto(c,0);if(!t.length)return o.innerHTML='<p class="dn">Не знайшлося конфігурації з достатньою кількістю угод. Спробуйте більший період, більшу суму (мінімальний ордер 5 USDT) або інший таймфрейм.</p>';
-AW={r:t.map(x=>evalC(x,c)),c};awi=0;awShow(0)}catch(e){o.innerHTML='<p class="dn">Помилка розрахунку: '+e.message+'</p>'}},30)},c.per+300)}
+AW={r:t.map(x=>evalC(x,c)),c,wf:null,wfp:''};awi=0;awShow(0);awWF(c)}catch(e){o.innerHTML='<p class="dn">Помилка розрахунку: '+e.message+'</p>'}},30)},c.per+300)}
 $('#awb').onclick=()=>{let p=$('#awp').value.trim().toUpperCase();if(!p.includes('/'))p+='/USDT';awRun({pair:p,ex:$('#awe').value,amt:+$('#awa').value||0,per:+$('#awr2').value,tf:+$('#awt').value,dr:+$('#awd').value,fut:+$('#awm').value,lev:+$('#awl').value})};
 $('#awr').onclick=e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.v!=null){awi=+t.dataset.v;awShow(awi);return}
 const E=AW.r[awi],c=AW.c;if(t.dataset.a==='a'){withData(dk(E.g),null,()=>{mk(E.g,c.ex);sbots();lst();go(VARIANT===2?'bots':'ov')})}else if(t.dataset.a==='f'){addFav(E,c.ex);t.textContent='Додано в топові'}else{fill(E.g,c.ex);$('#fper').value=c.per;$('#fdp').value=Math.round(c.amt||E.need);go('bd')}};
 $('#awg').onclick=()=>go('aw');
 
 /* ---------- топові боти: щонеділі перераховує Автомайстер ---------- */
-let TOP=ld('ztop',{ts:0,at:0,list:[]}),topBusy=0;if(!TOP.v||TOP.v<4)TOP={ts:0,at:0,list:[],v:4};
+let TOP=ld('ztop',{ts:0,at:0,list:[]}),topBusy=0;if(!TOP.v||TOP.v<5)TOP={ts:0,at:0,list:[],v:5};
 const TPER=[[24,'День'],[168,'Тиждень'],[720,'Місяць'],[8760,'Рік']];
 let TF=ld('ztf',{per:8760,by:'roi',dep:0,d:0,tf:0,dd:0,ex:''});
 const lastSun=()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return +d};
@@ -687,11 +731,13 @@ const fmtd=t=>new Date(t).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-dig
 function pstats(g,dep){const p={};for(const[per]of TPER){const s=summ(bt(g,per,dep,0),dep);p[per]={pnl:s.pnl,roi:s.roi,n:s.n,wr:s.wr,ddp:s.ddp}}return p}
 function pack(E,ex){return{ex,g:E.g,need:E.need,M:E.M,res:E.reserve,troi:E.st.roi,tdd:E.st.ddp,tn:E.st.n,fund:E.fund,liq:E.sf.liq,p:pstats(E.g,E.need)}}
 function addFav(E,ex){TOP.list=[pack(E,ex),...TOP.list.filter(x=>x.g.pair!==E.g.pair||x.g.tf!==E.g.tf||x.g.d!==E.g.d||x.g.name!==E.g.name)].slice(0,40);sv('ztop',TOP);favs()}
-function topJob(force){const ws=lastSun();if(topBusy||MD.mode==='init'||(!force&&TOP.ts>=ws&&TOP.m===MD.mode))return;topBusy=1;const pairs=PK.slice(0,12),res=[];let i=0;favs();
+function topJob(force){const ws=lastSun();if(topBusy||MD.mode==='init'||(!force&&TOP.ts>=ws&&TOP.m===MD.mode))return;topBusy=1;const pairs=PK.slice(0,12),res=[];let i=0,skipped=0;favs();
 const step=async()=>{if(i>=pairs.length){/* рейтинг — лише за перевіркою поза підбором (останні 30% періоду), щоб не винагороджувати підгонку */
-res.sort((a,b)=>(b.troi+(b.tdd||0))-(a.troi+(a.tdd||0)));TOP={ts:ws,at:Date.now(),list:res.slice(0,30),v:4,m:MD.mode};sv('ztop',TOP);topBusy=0;favs();seed();return}
-const p=pairs[i++];$('#tops').textContent=`Авто-майстер оновлює топ на ${hsrc()}: ${i} з ${pairs.length}…`;
-try{await need(dk({pair:p,fut:1}));const ex=cx.find(e=>listed(p,e));if(ex){const c={pair:p,ex,amt:0,per:8760,tf:0,dr:0,fut:1,lev:0},t=auto(c,ws%997);for(const o of t){const E=evalC(o,c);if(E.st.n>=5&&E.st.pnl>0&&!E.sf.liq)res.push(pack(E,ex))}}}catch(e){}
+res.sort((a,b)=>((b.wf&&b.wf.v==='стабільна')-(a.wf&&a.wf.v==='стабільна'))||(b.troi+(b.tdd||0))-(a.troi+(a.tdd||0)));TOP={ts:ws,at:Date.now(),list:res.slice(0,30),v:5,m:MD.mode,skip:skipped,np:pairs.length};sv('ztop',TOP);topBusy=0;favs();seed();return}
+const p=pairs[i++];$('#tops').textContent=`Авто-майстер оновлює топ на ${hsrc()} і робить walk-forward перевірку: ${i} з ${pairs.length}…`;
+try{await need(dk({pair:p,fut:1}));const ex=cx.find(e=>listed(p,e));if(ex){const c={pair:p,ex,amt:0,per:8760,tf:0,dr:0,fut:1,lev:0},t=auto(c,ws%997);
+/* у топ потрапляють лише пари, де підбір пройшов walk-forward перевірку */
+const w=wfo(c,{folds:8,ns:4}),wf=w&&{v:w.verdict,pos:w.pos,n:w.n,oos:w.oos,wfe:w.wfe};if(wf&&(wf.v==='стабільна'||wf.v==='сумнівна'))for(const o of t){const E=evalC(o,c);if(E.st.n>=5&&E.st.pnl>0&&!E.sf.liq)res.push({...pack(E,ex),wf})}else skipped++}}catch(e){}
 setTimeout(step,20)};step()}
 function tfilter(){$('#tfl').innerHTML=sel('tf-per','Період',TPER,TF.per)+sel('tf-by','Сортувати за',[['roi','Дохідність, %'],['pnl','PnL, USDT'],['wr','Win rate'],['n','Кількість угод'],['dd','Найменша просадка']],TF.by)+sel('tf-dep','Депозит до',[[0,'Будь-який'],[100,'100 USDT'],[300,'300 USDT'],[500,'500 USDT'],[1000,'1 000 USDT'],[3000,'3 000 USDT']],TF.dep)+sel('tf-d','Напрямок',[[0,'Усі'],[1,'Long'],[-1,'Short']],TF.d)+sel('tf-tf','Таймфрейм',[[0,'Усі'],...TFS],TF.tf)+sel('tf-dd','Просадка до',[[0,'Будь-яка'],[5,'5%'],[10,'10%'],[20,'20%'],[35,'35%']],TF.dd)+sel('tf-ex','Біржа',[['','Усі'],...cx.map(e=>[e,e])],TF.ex);
 $('#tfl').onchange=()=>{TF={per:+$('#tf-per').value,by:$('#tf-by').value,dep:+$('#tf-dep').value,d:+$('#tf-d').value,tf:+$('#tf-tf').value,dd:+$('#tf-dd').value,ex:$('#tf-ex').value};sv('ztf',TF);favs()}}
@@ -703,12 +749,12 @@ for(const x of TOP.list)o.push({...x,k:tkey(x),src:'top',title:x.g.pair,desc:x.g
 const isFav=it=>it.src==='pre'?FAVP.has(it.pid):!!FAVT[it.k];
 function tcard(it,r,per){const s=it.p&&it.p[per]||{pnl:0,roi:0,n:0,wr:0,ddp:0},fv=isFav(it),g=it.g;ITEMS[it.k]=it;
 return`<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b>${r?'#'+r+' ':''}${esc(it.title)}</b><button class="b sm tg" data-a="f" data-k="${esc(it.k)}" aria-pressed="${fv}" aria-label="${fv?'Прибрати з обраних':'Додати в обрані'}" style="font-size:18px;min-width:44px">${fv?'★':'☆'}</button></div>
-<p class="mu">${it.src==='pre'?g.pair+' · ':''}${dir(g)} · ${tfl(g.tf)} · ${g.lev||1}× · ${esc(it.ex)}${it.risk?' · ризик '+(RISK[it.risk]||esc(it.risk)):''}</p><p class="mu">${it.src==='pre'?'Orbix: ':'Авто-майстер: '}${esc(it.desc)}</p>
+<p class="mu">${it.src==='pre'?g.pair+' · ':''}${dir(g)} · ${tfl(g.tf)} · ${g.lev||1}× · ${esc(it.ex)}${it.risk?' · ризик '+(RISK[it.risk]||esc(it.risk)):''}</p><p class="mu">${it.src==='pre'?'Orbix: ':'Авто-майстер: '}${esc(it.desc)}</p>${it.wf?`<p class="mu">Walk-forward: <b class="${it.wf.v==='стабільна'?'up':''}">${it.wf.pos} з ${it.wf.n} кроків у плюсі</b>, ${it.wf.v}</p>`:''}
 <p class="mono ${cls(s.roi)}" style="margin:6px 0;font-size:18px">${f(s.roi,1)}% <span style="font-size:13px">(${f(s.pnl,0)} USDT)</span></p>
 <p class="mu">За ${TPER.find(t=>t[0]===per)[1].toLowerCase()}: угод ${s.n}, win ${s.wr.toFixed(0)}%, просадка ${f(s.ddp,1)}%${it.src==='top'&&per===8760?'. Рік включає період підбору параметрів — орієнтуйтесь на тест поза підбором.':''}</p><p class="mu">Депозит від ${n2(it.need,0)} USDT${it.res?', страховка '+n2(it.res,0):''}.${it.troi!=null?` Тест поза підбором: ${f(it.troi,0)}%.`:''}</p>
 <div class="row"><button class="b p" data-k="${esc(it.k)}" data-a="r">Запустити</button><button class="b" data-k="${esc(it.k)}" data-a="o">Відкрити</button></div></div>`}
 function favs(){const all=topItems(),per=TF.per;
-$('#tops').textContent=(topBusy?'':TOP.at?`Авто-майстер: ${fmtd(TOP.at)}, наступне оновлення в неділю. `:'Авто-майстер ще не рахував топ. ')+(PRE.length?`Стратегій Orbix: ${PRE.length}. `:'')+`Відсотки — бектест на ${hsrc()}, а не обіцянка прибутку.`;
+$('#tops').textContent=(topBusy?'':TOP.at?`Авто-майстер: ${fmtd(TOP.at)}, наступне оновлення в неділю.${TOP.skip?` Не пройшли walk-forward: ${TOP.skip} з ${TOP.np} пар.`:''} `:'Авто-майстер ще не рахував топ. ')+(PRE.length?`Стратегій Orbix: ${PRE.length}. `:'')+`Відсотки — бектест на ${hsrc()}, а не обіцянка прибутку.`;
 const L=all.map(x=>({x,s:x.p&&x.p[per]||{pnl:0,roi:0,n:0,wr:0,ddp:0}})).filter(({x,s})=>(!TF.dep||x.need<=TF.dep)&&(!TF.d||x.g.d===TF.d)&&(!TF.tf||x.g.tf===TF.tf)&&(!TF.dd||-s.ddp<=TF.dd)&&(!TF.ex||x.ex===TF.ex));
 L.sort((a,b)=>TF.by==='dd'?b.s.ddp-a.s.ddp:b.s[TF.by]-a.s[TF.by]);
 $('#fav').innerHTML=L.length?L.slice(0,10).map(({x},r)=>tcard(x,r+1,per)).join(''):(topBusy||MD.mode==='init'?'<p class="mu">Рахую…</p>':'<p class="mu">За цим фільтром ботів немає. Змініть фільтр або натисніть «Оновити».</p>');
@@ -820,7 +866,7 @@ const prev=AV;AV={k:AV.k,img:c.toDataURL('image/jpeg',.86)};if(!avSave()){AV=pre
 im.onerror=()=>{URL.revokeObjectURL(u);$('#avm').textContent='Не вдалося прочитати зображення.'};im.src=u};
 
 /* ---------- довідка ---------- */
-$('#help').innerHTML=[['Як запустити бота','Оберіть топового бота й натисніть «Запустити», або відкрийте Авто-майстер, вкажіть біржу, пару й суму. Бот працює в режимі paper: ордери не відправляються.'],['DCA-сітка','Перший ордер, крок між докупівлями, множник кроку та множник ордера (мартингейл). Середня ціна зміщується з кожною докупівлею, TP рахується від середньої.'],['Захист','Stop-Loss від середньої, Multi-TP, перенесення стопа в беззбиток, trailing. На Futures також видно ціну ліквідації.'],['Ринкові дані','Ціни й свічки беруться з публічного API Binance (резерв — Binance Vision і Bybit), без ключів. Історія кешується в браузері, нові свічки підтягуються кожні 15 секунд. Якщо біржі недоступні, вмикаються демо-дані (позначка «Демо-дані» вгорі).'],['Графіки','Ринок — повний графік TradingView. У налаштуванні бота — великий графік з індикаторами й сіткою ордерів. У ботах і бектестах — компактний графік: штрихові лінії ордерів, TP, SL, ліквідації та значки купівлі (B) і продажу (S).'],['Бектести','Бектест іде на реальній годинній історії пари (типово рік, для «3 роки» докачується більше). Минулі результати не гарантують майбутніх: дивіться перевірку поза підбором і стрес-тест.'],['Сповіщення','Звук, вібрація, спливаючі й системні сповіщення в Налаштуваннях. Месенджери в Профілі: Telegram працює прямо з браузера.'],['Акаунт і хмара','Увійдіть у Профілі: боти, бектести, обрані й ім’я збережуться в хмарі Orbix і будуть доступні з телефона та комп’ютера. Без входу все лишається в цьому браузері.'],['Топ Боти й Обрані','На головній «Топ Боти»: до 10 найкращих стратегій Orbix і Авто-майстра, гортайте вбік. Іконка-воронка біля заголовка відкриває фільтри. Зірочка додає бота в «Обрані Боти». Цифри на картках — бектест, а не обіцянка прибутку.'],['Профіль','Відкрийте меню й натисніть на свій нік угорі: там нік, картинка профілю (10 логотипів або власне фото), акаунт, біржі та месенджери.']].map(([q,a])=>`<div class="tr" style="flex-direction:column;gap:4px"><b>${q}</b><span class="mu">${a}</span></div>`).join('');
+$('#help').innerHTML=[['Як запустити бота','Оберіть топового бота й натисніть «Запустити», або відкрийте Авто-майстер, вкажіть біржу, пару й суму. Бот працює в режимі paper: ордери не відправляються.'],['DCA-сітка','Перший ордер, крок між докупівлями, множник кроку та множник ордера (мартингейл). Середня ціна зміщується з кожною докупівлею, TP рахується від середньої.'],['Захист','Stop-Loss від середньої, Multi-TP, перенесення стопа в беззбиток, trailing. На Futures також видно ціну ліквідації.'],['Ринкові дані','Ціни й свічки беруться з публічного API Binance (резерв — Binance Vision і Bybit), без ключів. Історія кешується в браузері, нові свічки підтягуються кожні 15 секунд. Якщо біржі недоступні, вмикаються демо-дані (позначка «Демо-дані» вгорі).'],['Графіки','Ринок — повний графік TradingView. У налаштуванні бота — великий графік з індикаторами й сіткою ордерів. У ботах і бектестах — компактний графік: штрихові лінії ордерів, TP, SL, ліквідації та значки купівлі (B) і продажу (S).'],['Walk-forward','Авто-майстер перевіряє сам спосіб підбору: параметри підбираються на одному вікні історії, а торгують наступне, якого підбір не бачив, і так кілька кроків поспіль. У топ потрапляють лише пари, де підбір пройшов цю перевірку.'],['Бектести','Бектест іде на реальній годинній історії пари (типово рік, для «3 роки» докачується більше). Минулі результати не гарантують майбутніх: дивіться перевірку поза підбором і стрес-тест.'],['Сповіщення','Звук, вібрація, спливаючі й системні сповіщення в Налаштуваннях. Месенджери в Профілі: Telegram працює прямо з браузера.'],['Акаунт і хмара','Увійдіть у Профілі: боти, бектести, обрані й ім’я збережуться в хмарі Orbix і будуть доступні з телефона та комп’ютера. Без входу все лишається в цьому браузері.'],['Топ Боти й Обрані','На головній «Топ Боти»: до 10 найкращих стратегій Orbix і Авто-майстра, гортайте вбік. Іконка-воронка біля заголовка відкриває фільтри. Зірочка додає бота в «Обрані Боти». Цифри на картках — бектест, а не обіцянка прибутку.'],['Профіль','Відкрийте меню й натисніть на свій нік угорі: там нік, картинка профілю (10 логотипів або власне фото), акаунт, біржі та месенджери.']].map(([q,a])=>`<div class="tr" style="flex-direction:column;gap:4px"><b>${q}</b><span class="mu">${a}</span></div>`).join('');
 
 /* ---------- меню й навігація ---------- */
 const IC={ov:'<path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',bots:'<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 8V4M9 13h.01M15 13h.01"/>',aw:'<path d="M12 3l1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M5 19l1-2.5M19 19l-1-2.5"/>',bd:'<path d="M12 5v14M5 12h14"/>',mk:'<path d="M3 17l5-6 4 3 5-7 4 4"/>',bs:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/>',jr:'<path d="M5 4h14v16H5zM9 8h6M9 12h6M9 16h4"/>',st:'<path d="M4 19V10M10 19V4M16 19v-7M22 19H2"/>',sx:'<path d="M4 14l4-8 4 10 4-6 4 4"/>',set:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',pf:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>'};

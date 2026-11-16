@@ -68,6 +68,14 @@ Deno.serve(async (req) => {
   };
 
   let done = 0, evCount = 0;
+  // один рахунок біржі — одна позиція на символ: другий бот із «Тестнет» на тій самій парі угод не дублює
+  const owner = new Map<string, string>();
+  for (const bot of rows ?? []) {
+    const c = bot.config || {};
+    if (!c._tn || !(c.fut ?? 1) || typeof c.pair !== "string") continue;
+    const k = `${bot.user_id}|${c._ex === "binance" ? "binance" : "bybit"}|${c.pair}`;
+    if (!owner.has(k) || String(bot.id) < owner.get(k)!) owner.set(k, bot.id); // стабільний вибір: найменший id
+  }
   for (const bot of rows ?? []) {
     if (Date.now() - started > 100e3) break; // запас до ліміту часу функції
     try {
@@ -86,7 +94,9 @@ Deno.serve(async (req) => {
         // дублювання на демо-рахунку біржі
         if (cfg._tn && g.fut) {
           const exName = cfg._ex === "binance" ? "binance" : "bybit";
-          try {
+          if (owner.get(`${bot.user_id}|${exName}|${g.pair}`) !== bot.id) {
+            await log(bot, "warn", `На демо-рахунку вже торгує інший бот ${g.pair} — угоду не продубльовано (позиції злилися б в одну)`);
+          } else try {
             const ex = await exFor(bot.user_id, exName);
             if (!ex) await log(bot, "error", "Ключі біржі не підключено — угоду не продубльовано");
             else if (ev.kind === "open" || ev.kind === "dca") {

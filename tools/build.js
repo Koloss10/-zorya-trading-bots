@@ -27,12 +27,32 @@ function build() {
   return { html, mods };
 }
 
+// Серверні копії: торговий рушій (модулі 01–05) для Edge Function `runner` і спільні файли бірж.
+// Рушій на сервері — той самий код, що й у браузері, тож результати ботів збігаються.
+const ENGINE_EXPORTS = ['Bot', 'entry', 'aggT', 'aggC', 'normG', 'tfMs', 'tfOff', 'DEF', 'rnd', 'lbT'];
+function generated() {
+  const fn = path.join(root, 'supabase', 'functions'), sh = path.join(fn, '_shared');
+  const eng = fs.readdirSync(path.join(src, 'js')).filter(f => /^0\d-.*\.js$/.test(f)).sort();
+  const files = {
+    [path.join(fn, 'runner', 'engine.js')]: '// ЗГЕНЕРОВАНО tools/build.js з src/js/' + eng.join(', ') + ' — не редагуйте вручну.\n' +
+      '// Торговий рушій Orbix для сервера (той самий код, що й у браузері).\n' +
+      eng.map(f => read('js/' + f)).join('') + `\nexport { ${ENGINE_EXPORTS.join(', ')} };\n`,
+  };
+  for (const f of fs.readdirSync(sh)) for (const d of ['exchange', 'runner'])
+    files[path.join(fn, d, f)] = fs.readFileSync(path.join(sh, f), 'utf8');
+  return files;
+}
+
 const { html, mods } = build();
+const gen = generated();
 if (process.argv.includes('--check')) {
   const cur = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : '';
   if (cur !== html) { console.error('orbix.html не збігається зі зборкою з src/. Запустіть: node tools/build.js'); process.exit(1); }
-  console.log(`orbix.html актуальний (${mods.length} модулів)`);
+  for (const [f, v] of Object.entries(gen))
+    if (!fs.existsSync(f) || fs.readFileSync(f, 'utf8') !== v) { console.error(`${path.relative(root, f)} застарів. Запустіть: node tools/build.js`); process.exit(1); }
+  console.log(`orbix.html актуальний (${mods.length} модулів), серверні файли актуальні (${Object.keys(gen).length})`);
 } else {
   fs.writeFileSync(out, html);
-  console.log(`orbix.html зібрано: ${mods.length} модулів, ${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ`);
+  for (const [f, v] of Object.entries(gen)) fs.writeFileSync(f, v);
+  console.log(`orbix.html зібрано: ${mods.length} модулів, ${(Buffer.byteLength(html) / 1024).toFixed(0)} КБ; серверних файлів: ${Object.keys(gen).length}`);
 }

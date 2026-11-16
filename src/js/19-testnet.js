@@ -37,7 +37,7 @@ else if(a==='close'){tnm('Закриваю позицію…');const r=await tnC
 else if(a==='pos'){tnm('Завантажую…');TN.pos=(await tnCall({action:'positions'})).positions;TN.msg='';tnR()}
 }catch(er){tnm('Помилка: '+er.message)}finally{TN.busy=0;$$('#tnc [data-tn]').forEach(x=>x.disabled=false)}};
 /* дублювання угод paper-бота на тестнеті (лише живі події, послідовно) */
-function tnMirror(x,kind,notional){if(!x.tn||!x.g.fut||!CLOUD.u||!TN.c)return;const symbol=sym(x.g.pair),side=x.g.d>0?'BUY':'SELL';
+function tnMirror(x,kind,notional){if(x.srv||!x.tn||!x.g.fut||!CLOUD.u||!TN.c)return;const symbol=sym(x.g.pair),side=x.g.d>0?'BUY':'SELL';
 const job=kind==='close'?{action:'close',symbol}:{action:'order',symbol,side,notional:+(+notional).toFixed(2),...(kind==='open'?{leverage:x.g.lev||1}:{})};
 const log=m=>{FEED.unshift({t:now(),m:TNX[TN.ex].s+' '+x.g.pair+': '+m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()};
 TN.q=TN.q.then(()=>tnCall(job)).then(r=>log(kind==='close'?(r.closed?'позицію закрито за '+px(r.order.price):'позиції не було'):(kind==='open'?'вхід ':'докупівля ')+r.order.qty+' за '+(r.order.approx?'≈':'')+px(r.order.price))).catch(e=>log('помилка — '+e.message))}

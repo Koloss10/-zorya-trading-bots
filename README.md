@@ -66,4 +66,4 @@ GitHub Pages вмикається в Settings → Pages → Source: *Deploy from
 
 ### Тести рушія
 
-`node --test tests/engine.test.js` — незалежні тести розрахунків (PnL, комісії мейкер/тейкер, DCA, TP/SL, Multi-TP, трейлінг, ліквідація за mark price, funding, відсутність зазирання в майбутнє, вирівнювання свічок, межі й відсутність витоку даних у walk-forward). Звіт аудиту: [docs/engine-audit.md](docs/engine-audit.md).
+`node --test tests/engine.test.js` — незалежні тести розрахунків (PnL, комісії мейкер/тейкер, правила біржі (крок ціни й кількості, мінімальний ордер), DCA, TP/SL, Multi-TP, трейлінг, ліквідація за mark price, funding, відсутність зазирання в майбутнє, вирівнювання свічок, межі й відсутність витоку даних у walk-forward). Звіт аудиту: [docs/engine-audit.md](docs/engine-audit.md).

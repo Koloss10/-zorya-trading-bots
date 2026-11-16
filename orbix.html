@@ -508,7 +508,8 @@ let TG={st:null,loaded:0,err:''};
 const TGM={'invalid token format':'Токен має вигляд 123456789:AA… (його видає @BotFather).','invalid chat id':'Chat ID — число (напр. 123456789 або -100…) або @назва_каналу.','mfa required':'Спершу підтвердьте вхід кодом з Google Authenticator.','not authenticated':'Увійдіть в акаунт.','telegram not configured':'Спершу збережіть токен на сервері.','telegram not configured or 2FA code required':'Спершу збережіть токен на сервері або підтвердьте вхід кодом 2FA.'};
 /* пояснення відмов Telegram українською */
 const tgMsg=m=>TGM[m]||(/chat not found/i.test(m)?'Telegram не знає цього чату. Відкрийте свого бота в Telegram, натисніть «Start» і напишіть йому будь-що, потім натисніть тут «Знайти мій чат» — Orbix сам підставить правильний Chat ID.'
-:/terminated by other getUpdates|webhook is active|Conflict/i.test(m)?'Бот уже підключений до іншого сервісу (webhook). Створіть окремого бота для Orbix у @BotFather.'
+:/terminated by other getUpdates/i.test(m)?'Telegram отримав два запити одночасно. Зачекайте кілька секунд і натисніть ще раз. Якщо повторюється — цей бот запущений ще в іншій програмі: створіть окремого бота для Orbix у @BotFather.'
+:/webhook is active/i.test(m)?'Бот уже підключений до іншого сервісу (webhook). Створіть окремого бота для Orbix у @BotFather.'
 :/bot can't initiate conversation|bot can.t initiate/i.test(m)?'Бот не може написати першим. Відкрийте свого бота в Telegram і натисніть «Start».'
 :/blocked by the user/i.test(m)?'Ви заблокували бота в Telegram. Розблокуйте його й натисніть «Start».'
 :/Unauthorized|401/i.test(m)?'Telegram не приймає токен: він неправильний або відкликаний. Скопіюйте токен у @BotFather ще раз і збережіть на сервері.'
@@ -882,13 +883,13 @@ $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF);mnuR();nameQ()};
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);pfr();tfilter()};
 $('#msg').oninput=$('#msg').onchange=e=>{const t=e.target;const m=t.id&&t.id.match(/^(tg|wa|vb|sg)-(token|chat|to|tpl)$/);if(m){MS[m[1]][m[2]]=t.value.trim();sv('zms',MS)}if(t.dataset.ms){const c=MS[t.dataset.ms];c.ev=c.ev||{...SET.ev};c.ev[t.dataset.ev]=t.checked?1:0;sv('zms',MS)}};
 $('#msg').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
-if(b.dataset.tg){const pv=$('#tg-pv');try{if(b.dataset.tg==='save'){const tok=$('#tg-tok').value.trim(),ch=$('#tg-chat').value.trim();if(!tok){pv.textContent=TG.st?'Щоб змінити Chat ID, вставте токен ще раз.':'Вставте токен бота від @BotFather.';return}
+if(b.dataset.tg){if(TG.busy)return;TG.busy=1;const bs=[...$$('#msg [data-tg]')];bs.forEach(x=>x.disabled=true);const pv=$('#tg-pv');try{if(b.dataset.tg==='save'){const tok=$('#tg-tok').value.trim(),ch=$('#tg-chat').value.trim();if(!tok){pv.textContent=TG.st?'Щоб змінити Chat ID, вставте токен ще раз.':'Вставте токен бота від @BotFather.';return}
 pv.textContent='Зберігаю на сервері…';const r=await SB.rpc('tg_save',{p_token:tok,p_chat:ch});if(r.error)throw new Error(tgMsg(r.error.message));MS.tg.token='';MS.tg.chat='';sv('zms',MS);await tgLoad();pfr();toast('Telegram підключено, токен збережено на сервері')}
 else if(b.dataset.tg==='detect'){pv.textContent='Шукаю чати, які писали вашому боту…';const d=await tgCall({action:'detect'});const L=(d&&d.chats)||[];
 if(!L.length){pv.textContent='Бот ще не отримав жодного повідомлення. Відкрийте свого бота в Telegram, натисніть «Start», напишіть будь-що й натисніть «Знайти мій чат» ще раз.';return}
 pv.innerHTML='Оберіть свій чат:<div class="row" style="margin-top:8px">'+L.map(c=>`<button class="b sm p" data-tg="use" data-tgc="${esc(c.id)}">${esc(c.title||c.id)}${c.type==='private'?'':' · '+esc(c.type)}</button>`).join('')+'</div>'}
 else if(b.dataset.tg==='use'){pv.textContent='Підключаю…';const d=await tgCall({action:'use',chat:b.dataset.tgc});await tgLoad();pfr();toast(d&&d.sent?'Telegram підключено: перевірте повідомлення від бота':'Чат збережено');}
-else{if(!confirm('Видалити токен Telegram з сервера?'))return;const r=await SB.rpc('tg_clear');if(r.error)throw new Error(tgMsg(r.error.message));await tgLoad();pfr();toast('Токен Telegram видалено')}}catch(er){pv.textContent='Помилка: '+er.message}return}
+else{if(!confirm('Видалити токен Telegram з сервера?'))return;const r=await SB.rpc('tg_clear');if(r.error)throw new Error(tgMsg(r.error.message));await tgLoad();pfr();toast('Токен Telegram видалено')}}catch(er){pv.textContent='Помилка: '+er.message}finally{TG.busy=0;bs.forEach(x=>{if(x.isConnected)x.disabled=false})}return}
 const k=b.dataset.msOn||b.dataset.msT,c=MS[k];
 if(b.dataset.msOn){c.on=c.on?0:1;sv('zms',MS);pfr();return}
 const x=bots[0]||{g:{...DEF,pair:'BTC/USDT'},ex:cx[0]||'Binance',b:new Bot({...DEF,pair:'BTC/USDT'})},text=msgText('close',x,c.tpl,{pnl:4.96}),pv=$('#'+k+'-pv');pv.textContent='Попередній перегляд:\n'+text;

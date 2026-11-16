@@ -7,9 +7,9 @@ export const BINANCE = "https://testnet.binancefuture.com";
 export const BYBIT = "https://api-demo.bybit.com";
 export const SYM = /^[A-Z0-9]{2,20}USDT$/;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-type Filt = { step: number; minQty: number; minN: number };
-type Pos = { symbol: string; amt: number; entry: number; mark: number; pnl: number; lev: number; liq: number };
-type Fill = { id: string | number; symbol: string; side: string; qty: number; price: number; status: string };
+type Filt = { step: number; minQty: number; minN: number; tick: number };
+type Pos = { symbol: string; amt: number; entry: number; mark: number; pnl: number; lev: number; liq: number; tp?: number; sl?: number };
+type Fill = { id: string | number; symbol: string; side: string; qty: number; price: number; status: string; link?: string };
 export class ExErr extends Error { code: number | null; constructor(m: string, c: number | null = null) { super(m); this.code = c; } }
 
 let bnInfo: { at: number; f: Record<string, Filt> } | null = null;
@@ -33,12 +33,13 @@ export function binance(key: string, secret: string) {
     for (const s of j.symbols ?? []) {
       const F: Record<string, any> = {};
       for (const x of s.filters ?? []) F[x.filterType] = x;
-      f[s.symbol] = { step: +(F.MARKET_LOT_SIZE?.stepSize || F.LOT_SIZE?.stepSize || 0), minQty: +(F.MARKET_LOT_SIZE?.minQty || F.LOT_SIZE?.minQty || 0), minN: +(F.MIN_NOTIONAL?.notional || 0) };
+      f[s.symbol] = { step: +(F.MARKET_LOT_SIZE?.stepSize || F.LOT_SIZE?.stepSize || 0), minQty: +(F.MARKET_LOT_SIZE?.minQty || F.LOT_SIZE?.minQty || 0), minN: +(F.MIN_NOTIONAL?.notional || 0), tick: +(F.PRICE_FILTER?.tickSize || 0) };
     }
     bnInfo = { at: Date.now(), f };
     return f;
   };
   return {
+    native: false, // TP/SL і докупівлі веде сервер (умовні ордери Binance на тестнеті не перевірені)
     invalid: (c: number | null) => c === -2014 || c === -2015 || c === -1022,
     noPerm: (_c: number | null) => false,
     async check() {
@@ -52,9 +53,16 @@ export function binance(key: string, secret: string) {
     async filt(symbol: string) { return (await filters())[symbol]; },
     async mark(symbol: string) { return +(await fetch(`${BINANCE}/fapi/v1/premiumIndex?symbol=${symbol}`).then((r) => r.json())).markPrice; },
     async leverage(symbol: string, lev: number) { await call("POST", "/fapi/v1/leverage", { symbol, leverage: lev }); },
-    async market(symbol: string, side: "BUY" | "SELL", qty: number, reduceOnly = false): Promise<Fill> {
-      const o = await call("POST", "/fapi/v1/order", { symbol, side, type: "MARKET", quantity: qty, ...(reduceOnly ? { reduceOnly: true } : {}), newOrderRespType: "RESULT" });
-      return { id: o.orderId, symbol, side, qty: +o.executedQty, price: +o.avgPrice, status: o.status };
+    async market(symbol: string, side: "BUY" | "SELL", qty: number, reduceOnly = false, link = ""): Promise<Fill> {
+      const o = await call("POST", "/fapi/v1/order", { symbol, side, type: "MARKET", quantity: qty, ...(reduceOnly ? { reduceOnly: true } : {}), ...(link ? { newClientOrderId: link } : {}), newOrderRespType: "RESULT" });
+      return { id: o.orderId, symbol, side, qty: +o.executedQty, price: +o.avgPrice, status: o.status, link: o.clientOrderId };
+    },
+    // ордер за власним ідентифікатором (null — такого немає)
+    async byLink(symbol: string, link: string): Promise<Fill | null> {
+      try {
+        const o = await call("GET", "/fapi/v1/order", { symbol, origClientOrderId: link });
+        return { id: o.orderId, symbol, side: o.side, qty: +o.executedQty, price: +o.avgPrice || +o.price, status: o.status, link };
+      } catch (e) { if ((e as ExErr).code === -2013) return null; throw e; }
     },
   };
 }
@@ -79,6 +87,7 @@ export function bybit(key: string, secret: string) {
   };
   const pub = async (path: string) => { const j = await fetch(`${BYBIT}${path}`).then((r) => r.json()); if (j?.retCode !== 0) throw new ExErr(j?.retMsg || "market data error"); return j.result; };
   return {
+    native: true, // лімітні докупівлі й TP/SL стоять на самій біржі
     invalid: (c: number | null) => c === 10003 || c === 10004 || c === 33004,
     noPerm: (c: number | null) => c === 10005,
     async check() {
@@ -89,39 +98,62 @@ export function bybit(key: string, secret: string) {
     },
     async positions(symbol?: string): Promise<Pos[]> {
       const l = (await call("GET", "/v5/position/list", { category: "linear", ...(symbol ? { symbol } : { settleCoin: "USDT" }) })).list ?? [];
-      return l.filter((x: any) => +x.size > 0).map((x: any) => ({ symbol: x.symbol, amt: x.side === "Sell" ? -x.size : +x.size, entry: +x.avgPrice, mark: +x.markPrice, pnl: +x.unrealisedPnl, lev: +x.leverage, liq: +(x.liqPrice || 0) }));
+      return l.filter((x: any) => +x.size > 0).map((x: any) => ({ symbol: x.symbol, amt: x.side === "Sell" ? -x.size : +x.size, entry: +x.avgPrice, mark: +x.markPrice, pnl: +x.unrealisedPnl, lev: +x.leverage, liq: +(x.liqPrice || 0), tp: +(x.takeProfit || 0), sl: +(x.stopLoss || 0) }));
     },
     async filt(symbol: string): Promise<Filt | undefined> {
       const s = (await pub(`/v5/market/instruments-info?category=linear&symbol=${symbol}`)).list?.[0];
-      return s ? { step: +s.lotSizeFilter.qtyStep, minQty: +s.lotSizeFilter.minOrderQty, minN: +(s.lotSizeFilter.minNotionalValue || 0) } : undefined;
+      return s ? { step: +s.lotSizeFilter.qtyStep, minQty: +s.lotSizeFilter.minOrderQty, minN: +(s.lotSizeFilter.minNotionalValue || 0), tick: +(s.priceFilter?.tickSize || 0) } : undefined;
     },
     async mark(symbol: string) { return +(await pub(`/v5/market/tickers?category=linear&symbol=${symbol}`)).list?.[0]?.markPrice; },
     async leverage(symbol: string, lev: number) {
       try { await call("POST", "/v5/position/set-leverage", { category: "linear", symbol, buyLeverage: String(lev), sellLeverage: String(lev) }); }
       catch (e) { if ((e as ExErr).code !== 110043) throw e; } // 110043: плече вже таке
     },
-    async market(symbol: string, side: "BUY" | "SELL", qty: number, reduceOnly = false): Promise<Fill> {
-      const o = await call("POST", "/v5/order/create", { category: "linear", symbol, side: side === "BUY" ? "Buy" : "Sell", orderType: "Market", qty: String(qty), ...(reduceOnly ? { reduceOnly: true } : {}) });
+    async market(symbol: string, side: "BUY" | "SELL", qty: number, reduceOnly = false, link = ""): Promise<Fill> {
+      const o = await call("POST", "/v5/order/create", { category: "linear", symbol, side: side === "BUY" ? "Buy" : "Sell", orderType: "Market", qty: String(qty), ...(reduceOnly ? { reduceOnly: true } : {}), ...(link ? { orderLinkId: link } : {}) });
       let h: any = null;
       for (let i = 0; i < 3 && !(+h?.avgPrice > 0); i++) { await sleep(300); h = (await call("GET", "/v5/order/history", { category: "linear", orderId: o.orderId })).list?.[0]; }
-      return { id: o.orderId, symbol, side, qty: +(h?.cumExecQty || qty), price: +(h?.avgPrice || 0), status: h?.orderStatus || "Submitted" };
+      return { id: o.orderId, symbol, side, qty: +(h?.cumExecQty || qty), price: +(h?.avgPrice || 0), status: h?.orderStatus || "Submitted", link };
+    },
+    // лімітний ордер (GTC) з власним ідентифікатором
+    async limit(symbol: string, side: "BUY" | "SELL", qty: number, price: number, link: string, reduceOnly = false): Promise<Fill> {
+      const o = await call("POST", "/v5/order/create", { category: "linear", symbol, side: side === "BUY" ? "Buy" : "Sell", orderType: "Limit", qty: String(qty), price: String(price), timeInForce: "GTC", orderLinkId: link, ...(reduceOnly ? { reduceOnly: true } : {}) });
+      return { id: o.orderId, symbol, side, qty, price, status: "New", link };
+    },
+    // ордер за власним ідентифікатором: спершу активні, потім історія (null — такого немає)
+    async byLink(symbol: string, link: string): Promise<Fill | null> {
+      const map = (h: any): Fill => ({ id: h.orderId, symbol, side: h.side === "Buy" ? "BUY" : "SELL", qty: +(h.cumExecQty || h.qty || 0), price: +h.avgPrice || +h.price || 0, status: h.orderStatus, link });
+      const a = (await call("GET", "/v5/order/realtime", { category: "linear", symbol, orderLinkId: link })).list?.[0];
+      if (a) return map(a);
+      const h = (await call("GET", "/v5/order/history", { category: "linear", symbol, orderLinkId: link })).list?.[0];
+      return h ? map(h) : null;
+    },
+    async openOrders(symbol: string) {
+      const l = (await call("GET", "/v5/order/realtime", { category: "linear", symbol })).list ?? [];
+      return l.map((o: any) => ({ id: o.orderId, link: o.orderLinkId, side: o.side, price: +o.price, qty: +o.qty, reduceOnly: !!o.reduceOnly }));
+    },
+    async cancelAll(symbol: string) { await call("POST", "/v5/order/cancel-all", { category: "linear", symbol }); },
+    // TP/SL на всю позицію (ринкове виконання за останньою ціною); 0 — прибрати
+    async tradingStop(symbol: string, { tp, sl }: { tp: number; sl: number }) {
+      try { await call("POST", "/v5/position/trading-stop", { category: "linear", symbol, positionIdx: 0, tpslMode: "Full", takeProfit: String(tp || 0), stopLoss: String(sl || 0), tpTriggerBy: "LastPrice", slTriggerBy: "LastPrice" }); }
+      catch (e) { if ((e as ExErr).code !== 34040) throw e; } // 34040: без змін
     },
   };
 }
 
 
 // Ринковий ордер на суму в USDT (з плечем): округлення за кроком і мінімумом біржі
-export async function marketNotional(ex: ReturnType<typeof bybit> | ReturnType<typeof binance>, symbol: string, side: "BUY" | "SELL", notional: number, lev = 0) {
+export async function marketNotional(ex: ReturnType<typeof bybit> | ReturnType<typeof binance>, symbol: string, side: "BUY" | "SELL", notional: number, lev = 0, link = "") {
   if (lev) await ex.leverage(symbol, lev);
   const F = await ex.filt(symbol);
   if (!F) throw new ExErr("symbol not on testnet");
   const px = await ex.mark(symbol), qty = floorStep(notional / px, F.step);
   if (!(qty > 0) || qty < F.minQty || qty * px < F.minN) throw new ExErr(`order too small: min ${Math.max(F.minN, F.minQty * px).toFixed(2)} USDT`);
-  const o = await ex.market(symbol, side, qty);
+  const o = await ex.market(symbol, side, qty, false, link);
   return o.price > 0 ? o : { ...o, price: px, approx: true };
 }
-export async function closePosition(ex: ReturnType<typeof bybit> | ReturnType<typeof binance>, symbol: string) {
+export async function closePosition(ex: ReturnType<typeof bybit> | ReturnType<typeof binance>, symbol: string, link = "") {
   const p = (await ex.positions(symbol))[0];
   if (!p) return null;
-  return await ex.market(symbol, p.amt > 0 ? "SELL" : "BUY", Math.abs(p.amt), true);
+  return await ex.market(symbol, p.amt > 0 ? "SELL" : "BUY", Math.abs(p.amt), true, link);
 }

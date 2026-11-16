@@ -222,4 +222,4 @@ function wfo(c,o={}){const plan=wfPlan(c,o);if(!plan)return null;return wfSum(pl
 
 
 
-export { Bot, entry, aggT, aggC, normG, tfMs, tfOff, DEF, rnd, lbT };
+export { Bot, entry, aggT, aggC, normG, tfMs, tfOff, DEF, rnd, lbT, lv };

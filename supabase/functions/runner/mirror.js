@@ -138,13 +138,52 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
 }
 
 /* щоразу (рідний режим): захист відповідає фактичній середній ціні; без позиції — знімаються залишки ордерів бота */
-export async function sync(ex, { g, symbol, botId, fl = {} }) {
+export async function sync(ex, { g, symbol, botId, fl = {}, out = {} }) {
   const p = (await ex.positions(symbol))[0];
-  if (p) { const r = await guard(ex, { g, symbol, fl }, p, await ex.filt(symbol)); return r ? r.msg : null; }
+  out.pos = p || null; out.seen = !!p; // що побачили на біржі — для звірки з моделлю (reconcile)
+  if (p) { const r = await guard(ex, { g, symbol, fl }, p, await ex.filt(symbol)); if (r && r.closed) out.pos = null; return r ? r.msg : null; }
   const mine = (await ex.openOrders(symbol)).filter((o) => String(o.link || "").startsWith("ox" + hex(botId)));
   if (!mine.length) return null;
   await ex.cancelAll(symbol);
   return `Bybit Demo: позиції немає (закрито біржею за TP/SL) — знято ${mine.length} ордер(ів) бота`;
+}
+
+/* Звірка моделі бота з позицією на біржі. mp — позиція рушія ({q, …}) або null; xp — позиція біржі ({amt, …}) або null.
+   Повертає null, якщо збігаються, або { k, t }: nopos — у моделі є, на біржі немає; orphan — на біржі є, у моделі немає;
+   size — напрям інший або кількість відрізняється більш ніж на 25 %. */
+export const MIS_TOL = 0.25;
+export function reconcile(mp, xp, g, symbol = g.pair) {
+  if (mp && !xp) return { k: "nopos", t: `модель бота веде позицію ${g.pair}, а на Bybit Demo її немає` };
+  if (!mp && xp) return { k: "orphan", t: `на Bybit Demo відкрита позиція ${symbol} (${xp.amt}), а модель бота позиції не має` };
+  if (!mp || !xp) return null;
+  if (Math.sign(xp.amt) !== Math.sign(g.d)) return { k: "size", t: `напрям позиції на Bybit Demo (${xp.amt > 0 ? "Long" : "Short"}) не збігається з ботом` };
+  const q = Math.abs(xp.amt), m = +mp.q || 0;
+  if (m > 0 && Math.abs(q - m) / m > MIS_TOL) return { k: "size", t: `обсяг на Bybit Demo ${q}, у моделі бота ${+m.toPrecision(6)} (різниця ${Math.round(Math.abs(q - m) / m * 100)} %)` };
+  return null;
+}
+/* реакція на звірку: розбіжність, що тримається 2 запуски поспіль, — один запис у журнал і одне сповіщення;
+   позицію, яку закрила сама біржа (TP/SL/трейлінг), модель закриє після своєї свічки — це не тривога */
+export const MIS_RUNS = 2;
+export async function onReconcile({ fl, mp, out, g, symbol, log, notify, now = Date.now() }) {
+  if (out.seen) fl.had = 1;
+  let d = reconcile(mp, out.pos, g, symbol);
+  if (d && d.k === "nopos" && (fl.had || fl.xc)) { fl.xc = 1; d = { k: "xc", t: "позицію вже закрила біржа (TP/SL/трейлінг); модель бота закриє угоду після закриття свічки" }; }
+  if (!mp) { delete fl.xc; if (!out.pos) delete fl.had; }
+  const prev = fl.mis;
+  if (!d) {
+    if (prev && prev.n >= MIS_RUNS && prev.k !== "xc") await log("info", `Звірка з біржею: розбіжність усунено (${prev.t})`);
+    delete fl.mis;
+    return null;
+  }
+  const n = prev && prev.k === d.k ? prev.n + 1 : 1;
+  fl.mis = { k: d.k, t: d.t, n, at: prev && prev.k === d.k ? prev.at : now };
+  if (n === MIS_RUNS && d.k !== "xc") {
+    const hint = d.k === "orphan" ? " Бот нею не керує: перевірте позицію в Bybit Demo і за потреби закрийте її там." : d.k === "nopos" ? " Нові ордери за цією угодою на біржу не надсилатимуться; бот продовжить після її закриття в моделі." : " Перевірте позицію в Bybit Demo.";
+    const m = `Звірка з біржею: ${d.t}.${hint}`;
+    await log("warn", m);
+    await notify(`Orbix (сервер): ${g.pair} — ${m}`);
+  }
+  return fl.mis;
 }
 
 /* бот на паузі (рідний режим): зняти його лімітні докупівлі; позиція лишається на біржі зі своїм стопом */
@@ -192,7 +231,12 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     }
   }
   if (native && !left.length) {
-    try { const m = await sync(ex, { g, symbol, botId: bot.id, fl }); if (m) { await log("info", m); if (/закрито (біржею|ринком)|не прийняла/.test(m)) await notify(`Orbix (сервер): ${g.pair} — ${m}`); } }
+    const out = {};
+    try {
+      const m = await sync(ex, { g, symbol, botId: bot.id, fl, out });
+      if (m) { await log("info", m); if (/закрито (біржею|ринком)|не прийняла/.test(m)) await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
+      await onReconcile({ fl, mp: r.state?.b?.pos || null, out, g, symbol, log, notify, now });
+    }
     catch (e) { await log("error", `Біржа (звірка захисту): ${e.message}`); }
   }
   if (changed || JSON.stringify(fl) !== fl0) await save({ ...st, pend: left, fl });

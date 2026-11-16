@@ -1,7 +1,7 @@
 // Виконання угод серверного бота на демо-біржі: ордери на біржі й захист від повторів (фейкова біржа).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, execute, guard, handleBot, ladder, linkId, park, protect, sync, MAX_TRIES } from '../supabase/functions/runner/mirror.js';
+import { actionsFor, execute, guard, handleBot, ladder, linkId, onReconcile, park, protect, reconcile, sync, MAX_TRIES } from '../supabase/functions/runner/mirror.js';
 import { botConfig } from '../supabase/functions/runner/core.js';
 import { Bot } from '../supabase/functions/runner/engine.js';
 
@@ -213,4 +213,55 @@ test('Пауза: знімаються лише лімітні докупівл�
 test('Після зняття з паузи прапорець «parked» скидається', async () => {
   const ex = fakeEx(), a = await run(ex, { state: { fl: { parked: 1 }, pend: [] }, events: [] });
   assert.equal(a.saved.at(-1).fl.parked, undefined);
+});
+
+test('Звірка: збіг, немає позиції на біржі, зайва позиція, інший обсяг або напрям', () => {
+  const mp = { q: 24, cost: 60 };
+  assert.equal(reconcile(null, null, g), null);
+  assert.equal(reconcile(mp, { amt: 24.5 }, g), null, 'дрібна різниця в межах допуску');
+  assert.equal(reconcile(mp, null, g).k, 'nopos');
+  assert.equal(reconcile(null, { amt: 24 }, g).k, 'orphan');
+  assert.equal(reconcile(mp, { amt: 60 }, g).k, 'size');
+  assert.match(reconcile(mp, { amt: -24 }, g).t, /напрям/);
+});
+
+const rec = async (st, mp, xp, seen = !!xp) => {
+  const logs = [], notes = [];
+  await onReconcile({ fl: st, mp, out: { pos: xp, seen }, g, symbol: 'TONUSDT', log: async (l, m) => logs.push([l, m]), notify: async (m) => notes.push(m), now: T });
+  return { logs, notes };
+};
+
+test('Розбіжність повідомляється один раз і лише після 2 запусків поспіль; після вирівнювання — запис «усунено»', async () => {
+  const fl = {}, xp = { amt: 24 };
+  let r = await rec(fl, null, xp); assert.equal(r.notes.length, 0, 'перший запуск — тиша (могла бути затримка)');
+  r = await rec(fl, null, xp); assert.equal(r.notes.length, 1); assert.match(r.notes[0], /на Bybit Demo відкрита позиція/);
+  r = await rec(fl, null, xp); assert.equal(r.notes.length, 0, 'повторно не надсилається'); assert.equal(fl.mis.n, 3);
+  r = await rec(fl, null, null); assert.equal(fl.mis, undefined); assert.match(r.logs[0][1], /усунено/);
+});
+
+test('Позицію закрила сама біржа (TP/SL/трейлінг) — це не тривога, але видно на картці', async () => {
+  const fl = {}, mp = { q: 24 };
+  await rec(fl, mp, { amt: 24 });             // позиція є на біржі й у моделі
+  let r = await rec(fl, mp, null);            // біржа закрила за своїм стопом
+  r = await rec(fl, mp, null);
+  assert.equal(r.notes.length, 0); assert.equal(fl.mis.k, 'xc'); assert.match(fl.mis.t, /закрила біржа/);
+  await rec(fl, null, null);                  // модель теж закрила угоду
+  assert.equal(fl.mis, undefined); assert.equal(fl.xc, undefined); assert.equal(fl.had, undefined);
+});
+
+test('Вхід на біржу не відбувся (позиції там і не було) — тривога після 2 запусків', async () => {
+  const fl = {}, mp = { q: 24 };
+  await rec(fl, mp, null);
+  const r = await rec(fl, mp, null);
+  assert.equal(r.notes.length, 1); assert.match(r.notes[0], /модель бота веде позицію/);
+});
+
+test('Звірка в handleBot: після входу модель і біржа збігаються — розбіжності немає', async () => {
+  const ex = fakeEx(), saved = [], notes = [];
+  const r = { state: { b: { pos: { q: 24, cost: 60 } }, lt: T }, events: [{ kind: 'open', notional: 60, price: 2.5, t: T }] };
+  await handleBot({ bot: { id: BOT, state: null }, g, r, symbol: 'TONUSDT', mirror: true, native: true, ex, now: T + 60e3,
+    save: async (s) => { saved.push(JSON.parse(JSON.stringify(s))); return true; }, log: async () => {}, notify: async (m) => notes.push(m) });
+  const st = saved.at(-1);
+  assert.equal(st.fl.mis, undefined); assert.equal(st.fl.had, 1, 'позицію на біржі побачено');
+  assert.ok(!notes.some((m) => /Звірка/.test(m)));
 });

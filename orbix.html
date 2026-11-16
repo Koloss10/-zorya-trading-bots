@@ -120,6 +120,8 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .tvw{position:relative;width:100%;height:min(72vh,640px);min-height:420px;border:1px solid var(--ln);border-radius:12px;overflow:hidden;background:var(--pan2)}
 .tvw iframe{width:100%;height:100%;border:0;display:block}
 .gr .lwc,.bt-ch{margin-top:6px}
+#lk{position:fixed;inset:0;z-index:60;background:var(--bg);display:grid;place-items:center;padding:24px}#lk .lkb{max-width:340px;text-align:center;display:flex;flex-direction:column;align-items:center}
+#sec h3{margin-top:18px}
 .cx.nw{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.cx.nw::-webkit-scrollbar{display:none}.cx.nw .b{flex:none}
 .cx [hidden]{display:none!important}
 .xsel{width:auto;min-height:34px;font:500 12px Inter,system-ui,sans-serif;padding:0 8px;border-radius:9px;flex:none}
@@ -216,6 +218,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 
 <nav id="tab" aria-label="Розділи" hidden></nav>
 <div id="ts" role="status" hidden></div>
+<div id="lk" hidden role="dialog" aria-modal="true" aria-labelledby="lkt"><div class="lkb"><span class="av" style="width:72px;height:72px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h2 id="lkt" style="margin:14px 0 6px">Orbix заблоковано</h2><p class="mu" style="margin-bottom:16px">Підтвердіть, що це ви: відбиток пальця, Face ID або PIN пристрою.</p><button class="b p" id="lkb">Розблокувати</button><p class="dn" id="lkm" style="margin-top:10px"></p><button class="b sm" id="lkr" style="margin-top:18px">Не вдається розблокувати</button></div></div>
 <div id="sh" hidden></div>
 <nav id="mn" aria-label="Меню" hidden></nav>
 <datalist id="pl"></datalist>
@@ -832,10 +835,9 @@ $('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div 
 <div class="fg" style="margin-bottom:8px">${k==='tg'?F(k,'token','Токен бота (від @BotFather)','123456:ABC…')+F(k,'chat','Chat ID','-100…'):F(k,'to',k==='vb'?'ID чату або номер':'Номер телефону','+380…')}${sel(k+'-tpl','Формат повідомлень',[['short','Короткий'],['normal','Звичайний'],['detailed','Детальний']],c.tpl)}</div>
 <h3>Події</h3><div class="sgr">${Object.entries(EVN).map(([e,l])=>`<label class="ck"><input type="checkbox" data-ms="${k}" data-ev="${e}"${(c.ev||SET.ev)[e]?' checked':''}>${l}</label>`).join('')}</div>
 <div class="ac"><button class="b sm ${c.on?'d':'p'}" data-ms-on="${k}">${c.on?'Вимкнути':'Увімкнути'}</button><button class="b sm" data-ms-t="${k}">Надіслати тест</button></div><pre class="mu" id="${k}-pv" style="white-space:pre-wrap;font:400 12px Inter,sans-serif;margin:6px 0 0"></pre></div>`}).join('');
-$('#sec').innerHTML=SW('Двофакторний вхід',PF.tf,'tf','У демо лише перемикач')+SW('Білий список IP для ключів API',PF.wl,'wl','Рекомендація: вмикайте на біржі')+`<div class="tr"><span>Права ключів API</span><span class="mono">читання + торгівля, без виведення</span></div><div class="tr"><span>Сесія</span><span class="mono">цей браузер</span></div>`;accR()}
+secR();secLoad().catch(()=>{});accR()}
 $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF);mnuR();nameQ()};
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);pfr();tfilter()};
-$('#sec').onclick=e=>{const b=e.target.closest('[data-sw]');if(!b)return;PF[b.dataset.sw]=PF[b.dataset.sw]?0:1;sv('zpf',PF);pfr()};
 $('#msg').oninput=$('#msg').onchange=e=>{const t=e.target;const m=t.id&&t.id.match(/^(tg|wa|vb|sg)-(token|chat|to|tpl)$/);if(m){MS[m[1]][m[2]]=t.value.trim();sv('zms',MS)}if(t.dataset.ms){const c=MS[t.dataset.ms];c.ev=c.ev||{...SET.ev};c.ev[t.dataset.ev]=t.checked?1:0;sv('zms',MS)}};
 $('#msg').onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.msOn||b.dataset.msT,c=MS[k];
 if(b.dataset.msOn){c.on=c.on?0:1;sv('zms',MS);pfr();return}
@@ -914,18 +916,80 @@ PRE=r.data.filter(p=>p.config&&PAIRS[p.config.pair]);for(const p of PRE){try{awa
 function preStats(p){if(p._p)return p._p;const g={...DEF,...p.config},dep=Math.round(2*g.base*ladder(g));p._dep=dep;return p._p=pstats(g,dep)}
 function presR(){favs()}
 /* акаунт */
-const AUTHM={'Invalid login credentials':'Невірний email або пароль.','Email not confirmed':'Спершу підтвердіть адресу за посиланням у листі.','User already registered':'Такий акаунт уже є — просто увійдіть.'};
-const authMsg=e=>{const m=(e&&e.message)||String(e);return AUTHM[m]||(/rate limit|too many/i.test(m)?'Забагато спроб, спробуйте трохи пізніше.':m)};
+const AUTHM={'Invalid login credentials':'Невірний email або пароль.','Email not confirmed':'Спершу підтвердіть адресу за посиланням у листі.','User already registered':'Такий акаунт уже є — просто увійдіть.','Token has expired or is invalid':'Код неправильний або застарів.','Invalid TOTP code entered':'Неправильний код з Google Authenticator.','New password should be different from the old password.':'Новий пароль має відрізнятися від старого.','Signups not allowed for otp':'Акаунта з такою поштою немає — спершу зареєструйтесь.'};
+const authMsg=e=>{const m=(e&&e.message)||String(e);return AUTHM[m]||(/rate limit|too many/i.test(m)?'Забагато спроб, спробуйте трохи пізніше.':/invalid.*(code|totp)|expired/i.test(m)?'Код неправильний або застарів.':m)};
+const RURL=()=>location.origin+location.pathname;
+let AF={mode:'',email:''};
 function accR(){const el=$('#acc'),ch=$('#chip');if(ch){ch.textContent=(MD.mode==='live'?'Live · '+MD.src+(MD.fut?' · F':''):MD.mode==='init'?'Підключення…':'Демо-дані')+(CLOUD.u?' · ☁':'');ch.title=MD.mode==='demo'&&MD.err?'Біржі недоступні: '+MD.err:''}if(!el)return;
 if(!SB){el.innerHTML='<h2>Акаунт Orbix</h2><p class="mu">Хмара зараз недоступна (немає з’єднання). Дані зберігаються в цьому браузері.</p>';return}
 const u=CLOUD.u;
-if(u){el.innerHTML=`<h2>Акаунт Orbix</h2>${KV('Email',esc(u.email||''))}${KV('Синхронізація',CLOUD.err?'<span class="dn">помилка</span>':CLOUD.ok?'збережено о '+new Date(CLOUD.ok).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}):'триває…')}${CLOUD.err?`<p class="dn" style="margin-top:6px">${esc(CLOUD.err)}</p>`:''}<p class="mu" style="margin-top:8px">Боти, бектести, обрані й ім’я зберігаються в хмарі Orbix і доступні з будь-якого пристрою.</p><div class="row" style="margin-top:12px"><button class="b" id="ao">Вийти з акаунта</button></div>`;$('#ao').onclick=()=>SB.auth.signOut();return}
-el.innerHTML=`<h2>Акаунт Orbix</h2><p class="mu" style="margin-bottom:10px">Увійдіть, щоб боти й бектести зберігалися в хмарі та були доступні з телефона й комп’ютера. Ботів, створених без входу, буде перенесено в акаунт.</p><div class="fg"><label>Email<input id="ae" type="email" autocomplete="email" inputmode="email"></label><label>Пароль, від 6 символів<input id="ap" type="password" autocomplete="current-password"></label></div><div class="row"><button class="b p" id="ai">Увійти</button><button class="b" id="au">Зареєструватися</button></div><p class="mu" id="am" style="margin-top:10px"></p>`;
-$('#ai').onclick=()=>auth(0);$('#au').onclick=()=>auth(1)}
-async function auth(up){const e=$('#ae').value.trim(),p=$('#ap').value,m=$('#am');if(!e||p.length<6){m.textContent='Вкажіть email і пароль від 6 символів.';return}
+/* другий крок входу: код з Google Authenticator */
+if(CLOUD.pend){el.innerHTML=`<h2>Підтвердження входу</h2><p class="mu" style="margin-bottom:10px">Для ${esc(CLOUD.pend.email||'')} увімкнено двофакторний вхід. Відкрийте Google Authenticator і введіть 6-значний код Orbix.</p><div class="fg"><label>Код з Google Authenticator<input id="amc" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*"></label></div><div class="row"><button class="b p" id="amv">Підтвердити</button><button class="b" id="amx">Скасувати вхід</button></div><p class="mu" id="am" style="margin-top:10px"></p>`;
+const go2=async()=>{const c=$('#amc').value.replace(/\D/g,''),m=$('#am');if(c.length!==6){m.textContent='Введіть 6 цифр.';return}m.textContent='Перевіряю…';const r=await SB.auth.mfa.challengeAndVerify({factorId:CLOUD.fid,code:c});if(r.error){m.textContent=authMsg(r.error);return}m.textContent=''};
+$('#amv').onclick=go2;$('#amc').onkeydown=e=>{if(e.key==='Enter')go2()};$('#amx').onclick=()=>SB.auth.signOut();setTimeout(()=>{const i=$('#amc');i&&i.focus()},50);return}
+/* новий пароль після переходу за посиланням «Забули пароль?» */
+if(CLOUD.rec){el.innerHTML=`<h2>Новий пароль</h2><p class="mu" style="margin-bottom:10px">Задайте новий пароль для ${esc((CLOUD.pend||u||{}).email||'акаунта')}.</p><div class="fg"><label>Новий пароль, від 8 символів<input id="anp" type="password" autocomplete="new-password"></label><label>Повторіть пароль<input id="anp2" type="password" autocomplete="new-password"></label></div><div class="row"><button class="b p" id="ans">Зберегти пароль</button></div><p class="mu" id="am" style="margin-top:10px"></p>`;
+$('#ans').onclick=()=>setPw($('#anp').value,$('#anp2').value,$('#am'),()=>{CLOUD.rec=0;accR();toast('Пароль змінено')});return}
+if(u){el.innerHTML=`<h2>Акаунт Orbix</h2>${KV('Email',esc(u.email||''))}${KV('Синхронізація',CLOUD.err?'<span class="dn">помилка</span>':CLOUD.ok?'збережено о '+new Date(CLOUD.ok).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}):'триває…')}${CLOUD.err?`<p class="dn" style="margin-top:6px">${esc(CLOUD.err)}</p>`:''}<p class="mu" style="margin-top:8px">Боти, бектести, обрані, нік і фото зберігаються в хмарі Orbix (сервер у Франкфурті) і доступні з будь-якого пристрою. Двофакторний вхід і пароль — у розділі «Безпека» нижче.</p><div class="row" style="margin-top:12px"><button class="b" id="ao">Вийти з акаунта</button></div>`;$('#ao').onclick=()=>SB.auth.signOut();return}
+const code=AF.mode==='code';
+el.innerHTML=`<h2>Акаунт Orbix</h2><p class="mu" style="margin-bottom:10px">Увійдіть, щоб боти й бектести зберігалися в хмарі та були доступні з телефона й комп’ютера. Ботів, створених без входу, буде перенесено в акаунт.</p>
+<div class="fg"><label>Email<input id="ae" type="email" autocomplete="email" inputmode="email" value="${esc(AF.email)}"></label>${code?'<label>Код з листа<input id="aoc" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>':'<label>Пароль, від 8 символів<input id="ap" type="password" autocomplete="current-password"></label>'}</div>
+<div class="row">${code?'<button class="b p" id="aov">Увійти з кодом</button><button class="b" id="aos">Надіслати код ще раз</button><button class="b" id="aop">Увійти з паролем</button>':'<button class="b p" id="ai">Увійти</button><button class="b" id="au">Зареєструватися</button>'}</div>
+${code?'':'<div class="row" style="margin-top:8px"><button class="b sm" id="aof">Забули пароль?</button><button class="b sm" id="aoc2">Увійти кодом з пошти</button></div>'}<p class="mu" id="am" style="margin-top:10px"></p>`;
+const em=()=>{const e=$('#ae').value.trim();AF.email=e;return e};
+if(code){$('#aov').onclick=async()=>{const e=em(),t=$('#aoc').value.replace(/\s/g,''),m=$('#am');if(!e||!t){m.textContent='Вкажіть email і код з листа.';return}m.textContent='Перевіряю…';const r=await SB.auth.verifyOtp({email:e,token:t,type:'email'});m.textContent=r.error?authMsg(r.error):''};
+$('#aos').onclick=()=>sendCode(em());$('#aop').onclick=()=>{AF.mode='';accR()};return}
+$('#ai').onclick=()=>auth(0);$('#au').onclick=()=>auth(1);$('#ap').onkeydown=e=>{if(e.key==='Enter')auth(0)};
+$('#aof').onclick=async()=>{const e=em(),m=$('#am');if(!e){m.textContent='Вкажіть email, на який зареєстровано акаунт.';return}m.textContent='Надсилаю лист…';const r=await SB.auth.resetPasswordForEmail(e,{redirectTo:RURL()});m.textContent=r.error?authMsg(r.error):'Якщо акаунт з такою поштою існує, ми надіслали посилання для нового пароля. Відкрийте його на цьому пристрої.'};
+$('#aoc2').onclick=()=>{AF.mode='code';accR();sendCode(em())}}
+async function sendCode(e){const m=$('#am');if(!e){m.textContent='Вкажіть email і натисніть «Надіслати код ще раз».';return}m.textContent='Надсилаю код…';
+const r=await SB.auth.signInWithOtp({email:e,options:{shouldCreateUser:false,emailRedirectTo:RURL()}});if(m.isConnected)m.textContent=r.error?authMsg(r.error):'Лист надіслано. Введіть код з листа або просто відкрийте посилання з нього на цьому пристрої.'}
+async function setPw(p,p2,m,ok){if(p.length<8){m.textContent='Пароль має містити щонайменше 8 символів.';return}if(p!==p2){m.textContent='Паролі не збігаються.';return}
+m.textContent='Зберігаю…';const r=await SB.auth.updateUser({password:p});if(r.error){m.textContent=authMsg(r.error);return}m.textContent='Пароль змінено.';ok&&ok()}
+async function auth(up){const e=$('#ae').value.trim(),p=$('#ap').value,m=$('#am');AF.email=e;if(!e||p.length<(up?8:6)){m.textContent=up?'Вкажіть email і пароль від 8 символів.':'Вкажіть email і пароль.';return}
 m.textContent=up?'Реєструю…':'Входжу…';
-try{const r=up?await SB.auth.signUp({email:e,password:p,options:{emailRedirectTo:location.origin+location.pathname}}):await SB.auth.signInWithPassword({email:e,password:p});
-if(r.error)throw r.error;if(up&&!r.data.session){m.textContent='Готово. Підтвердіть адресу за посиланням у листі, потім поверніться сюди й увійдіть.';return}m.textContent=''}catch(err){m.textContent=authMsg(err)}}
+try{const r=up?await SB.auth.signUp({email:e,password:p,options:{emailRedirectTo:RURL()}}):await SB.auth.signInWithPassword({email:e,password:p});
+if(r.error)throw r.error;if(up&&!r.data.session){m.textContent='Готово. Підтвердіть адресу за посиланням у листі, потім поверніться сюди й увійдіть зі своїм паролем.';return}m.textContent=''}catch(err){m.textContent=authMsg(err)}}
+/* вхід завершується лише після другого фактора, якщо він увімкнений */
+async function gate(u){try{const a=await SB.auth.mfa.getAuthenticatorAssuranceLevel();if(a.data&&a.data.nextLevel==='aal2'&&a.data.currentLevel!=='aal2'){const f=await SB.auth.mfa.listFactors();
+CLOUD.fid=((f.data&&f.data.totp)||[]).find(x=>x.status==='verified')?.id;CLOUD.pend=u;if(CUR!=='pf')go('pf');else accR();return}}catch(e){}
+CLOUD.pend=null;if(!CLOUD.u||CLOUD.u.id!==u.id)await cloudIn(u);else accR()}
+
+/* ---------- Безпека: Google Authenticator, пароль, блокування пристрою ---------- */
+let SEC={f:null,enr:null,msg:'',busy:0};
+async function secLoad(){if(!SB||!CLOUD.u)return;const r=await SB.auth.mfa.listFactors();SEC.f=r.error?null:((r.data&&r.data.totp)||[]).find(x=>x.status==='verified')||null;secR()}
+function secR(){const el=$('#sec');if(!el)return;const u=CLOUD.u,lk=LOCK.get();
+let h='<h3 style="margin-top:0">Двофакторний вхід (Google Authenticator)</h3>';
+if(!u)h+='<p class="mu">Увійдіть в акаунт, щоб увімкнути двофакторний вхід і змінювати пароль.</p>';
+else if(SEC.enr)h+=`<p class="mu" style="margin-bottom:10px">1. Встановіть Google Authenticator або Authy. 2. Відскануйте QR-код (або введіть ключ вручну). 3. Введіть 6-значний код, який покаже застосунок.</p><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start"><img src="${esc(SEC.enr.qr)}" alt="QR-код для Google Authenticator" style="width:180px;height:180px;background:#fff;border-radius:12px;padding:8px"><div style="flex:1;min-width:180px"><label>Ключ для ручного введення<input readonly value="${esc(SEC.enr.secret)}" style="font-size:13px"></label><label style="margin-top:10px">Код із застосунку<input id="sxc" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label><div class="row" style="margin-top:10px"><button class="b p" data-sx="v">Увімкнути</button><button class="b" data-sx="c">Скасувати</button></div></div></div>`;
+else if(SEC.f)h+=`<div class="sw"><div>Увімкнено<div class="mu">Під час входу Orbix попросить код із застосунку, а база даних без нього не віддає ваші дані.</div></div><button class="b sm d" data-sx="off">Вимкнути</button></div>`;
+else h+=`<div class="sw"><div>Вимкнено<div class="mu">Захищає акаунт, навіть якщо хтось дізнається пароль.</div></div><button class="b sm p" data-sx="on">Увімкнути</button></div>`;
+if(u)h+=`<h3>Змінити пароль</h3><div class="fg" style="margin-bottom:8px"><label>Новий пароль, від 8 символів<input id="snp" type="password" autocomplete="new-password"></label><label>Повторіть пароль<input id="snp2" type="password" autocomplete="new-password"></label></div><div class="row"><button class="b" data-sx="pw">Змінити пароль</button></div>`;
+h+=`<h3>Блокування відбитком пальця / Face ID</h3><div class="sw"><div>${lk?'Увімкнено на цьому пристрої':'Вимкнено'}<div class="mu">${LOCK.ok()?'Orbix відкривається лише після відбитка, Face ID або PIN пристрою. Захищає цей телефон чи комп’ютер; акаунт на сервері захищає двофакторний вхід.':'Доступно на сайті Orbix у браузері з відбитком або Face ID (не у файлі й не в перегляді застосунку Claude).'}</div></div><button class="b sm ${lk?'d':'p'}" data-sx="${lk?'unlock':'lock'}" ${LOCK.ok()||lk?'':'disabled'}>${lk?'Вимкнути':'Увімкнути'}</button></div>`;
+h+=`<p class="mu" id="sxm" style="margin-top:10px">${esc(SEC.msg)}</p><h3>Ключі API бірж</h3><div class="tr"><span>Права ключів API</span><span class="mono">читання + торгівля, без виведення</span></div><div class="tr"><span>Білий список IP</span><span class="mono">вмикайте на біржі</span></div>`;
+el.innerHTML=h}
+const sxm=t=>{SEC.msg=t;const m=$('#sxm');if(m)m.textContent=t};
+$('#sec').onclick=async e=>{const b=e.target.closest('[data-sx]');if(!b||SEC.busy)return;const a=b.dataset.sx;SEC.busy=1;try{
+if(a==='on'){sxm('Готую QR-код…');const L=await SB.auth.mfa.listFactors();for(const x of((L.data&&L.data.all)||[]))if(x.factor_type==='totp'&&x.status!=='verified')await SB.auth.mfa.unenroll({factorId:x.id});
+const r=await SB.auth.mfa.enroll({factorType:'totp',friendlyName:'Orbix '+new Date().toISOString().slice(0,16)});if(r.error)throw r.error;SEC.enr={id:r.data.id,qr:r.data.totp.qr_code,secret:r.data.totp.secret};SEC.msg='';secR();setTimeout(()=>{const i=$('#sxc');i&&i.focus()},50)}
+else if(a==='v'){const c=($('#sxc').value||'').replace(/\D/g,'');if(c.length!==6){sxm('Введіть 6 цифр з Google Authenticator.');return}sxm('Перевіряю…');const r=await SB.auth.mfa.challengeAndVerify({factorId:SEC.enr.id,code:c});if(r.error)throw r.error;SEC.enr=null;SEC.msg='Двофакторний вхід увімкнено. Збережіть доступ до застосунку: без нього увійти не вийде.';await secLoad();toast('Двофакторний вхід увімкнено')}
+else if(a==='c'){if(SEC.enr)await SB.auth.mfa.unenroll({factorId:SEC.enr.id});SEC.enr=null;SEC.msg='';secR()}
+else if(a==='off'){if(!confirm('Вимкнути двофакторний вхід? Акаунт буде захищено лише паролем.'))return;const r=await SB.auth.mfa.unenroll({factorId:SEC.f.id});if(r.error)throw r.error;await SB.auth.refreshSession();SEC.msg='Двофакторний вхід вимкнено.';await secLoad()}
+else if(a==='pw')await setPw($('#snp').value,$('#snp2').value,$('#sxm'),()=>{$('#snp').value=$('#snp2').value='';SEC.msg='Пароль змінено.'});
+else if(a==='lock'){sxm('Підтвердіть відбитком, Face ID або PIN…');await LOCK.enable();SEC.msg='Блокування увімкнено на цьому пристрої.';secR()}
+else if(a==='unlock'){LOCK.disable();SEC.msg='Блокування вимкнено.';secR()}
+}catch(err){sxm(err&&err.name==='NotAllowedError'?'Підтвердження скасовано.':authMsg(err))}finally{SEC.busy=0}};
+
+/* ---------- блокування застосунку на пристрої (WebAuthn, біометрія пристрою) ---------- */
+const LOCK=(()=>{const K='zlock',b64=a=>btoa(String.fromCharCode(...new Uint8Array(a))),ub=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)),rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+let hiddenAt=0;const L={get:()=>ld(K,null),ok:()=>!!(window.isSecureContext&&window.PublicKeyCredential&&navigator.credentials&&location.protocol==='https:'),
+async enable(){if(!L.ok())throw new Error('Біометричне блокування недоступне в цьому браузері.');const c=await navigator.credentials.create({publicKey:{challenge:rnd(32),rp:{name:'Orbix'},user:{id:rnd(16),name:'orbix-lock',displayName:'Orbix'},pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000}});sv(K,{id:b64(c.rawId)})},
+disable(){try{localStorage.removeItem(K)}catch(e){}},
+show(){const c=L.get();if(!c)return;const o=$('#lk');o.hidden=false;document.body.style.overflow='hidden'},
+async unlock(){const c=L.get(),m=$('#lkm');if(!c){$('#lk').hidden=true;return}try{m.textContent='';await navigator.credentials.get({publicKey:{challenge:rnd(32),allowCredentials:[{type:'public-key',id:ub(c.id)}],userVerification:'required',timeout:60000}});$('#lk').hidden=true;document.body.style.overflow=''}catch(e){m.textContent=e&&e.name==='NotAllowedError'?'Не підтверджено. Спробуйте ще раз.':'Не вдалося: '+(e&&e.message||e)}},
+reset(){if(!confirm('Скинути блокування? Дані цього браузера (боти без акаунта, налаштування) буде видалено, а з акаунта буде виконано вихід. Дані в хмарі Orbix збережуться.'))return;try{['zlock','zorya3','zex','zbt','zpf','ztop','ztf','zset','zms','zfeed','zseed','zfavp','zuid','zav','zfavt'].forEach(k=>localStorage.removeItem(k))}catch(e){}(SB?SB.auth.signOut():Promise.resolve()).finally(()=>location.reload())}};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(L.get()&&hiddenAt&&Date.now()-hiddenAt>5*6e4)L.show()});return L})();
+$('#lkb').onclick=()=>LOCK.unlock();$('#lkr').onclick=()=>LOCK.reset();LOCK.show();
 
 async function cloudIn(u){CLOUD.u=u;CLOUD.err='';accR();
 if(ld('zuid','')!==u.id)bots=bots.filter(x=>!x.rid);sv('zuid',u.id);
@@ -941,9 +1005,10 @@ if(!fv.error){const have=new Set(fv.data.map(x=>x.preset_id)),up=[...FAVP].filte
 const p=await SB.from('profiles').select('display_name,avatar').eq('id',u.id).single();
 if(!p.error&&p.data){if(p.data.display_name)PF.n=p.data.display_name;else if(PF.n)nameQ();sv('zpf',PF);const a=avFrom(p.data.avatar);if(a){AV=a;try{localStorage.setItem('zav',JSON.stringify(AV))}catch(e){}}else if(AV.img||AV.k!=='orbit')avQ();if(CUR==='pf')avR();mnuR()}
 CLOUD.ok=Date.now();accR();if(CUR==='bs')bsl();if(CUR==='pf')pfr();toast('Увійшли: дані синхронізовано')}
-function cloudOut(){CLOUD.u=null;CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
+function cloudOut(){if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
 function cloudStart(){accR();presLoad().catch(()=>{}).finally(()=>{if(!SB)return;
-SB.auth.onAuthStateChange((ev,s)=>{const u=s&&s.user;if(u&&(!CLOUD.u||CLOUD.u.id!==u.id))setTimeout(()=>cloudIn(u).catch(cloudFail),0);else if(!u&&CLOUD.u)setTimeout(cloudOut,0)})})}
+SB.auth.onAuthStateChange((ev,s)=>{const u=s&&s.user;if(ev==='PASSWORD_RECOVERY'){CLOUD.rec=1;setTimeout(()=>go('pf'),0)}
+if(u){if(ev!=='TOKEN_REFRESHED'||CLOUD.pend)setTimeout(()=>gate(u).catch(cloudFail),0)}else if(CLOUD.u||CLOUD.pend||CLOUD.rec){CLOUD.pend=null;CLOUD.rec=0;setTimeout(cloudOut,0)}})})}
 
 /* ---------- старт ---------- */
 applyTheme();mnuR();

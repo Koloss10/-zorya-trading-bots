@@ -1,11 +1,13 @@
 // Orbix runner: боти на сервері 24/7. Викликається розкладом бази (pg_cron) кожні 5 хвилин.
 // Для кожного бота з позначкою «Сервер 24/7» бере свіжі закриті свічки з біржі, проганяє той самий
 // торговий рушій, що й у браузері (engine.js, згенерований з src/js), зберігає стан, пише події,
-// за потреби дублює угоди на Bybit Demo / Binance Testnet і надсилає сповіщення в Telegram.
+// за потреби виконує угоди на Bybit Demo / Binance Testnet (mirror.js) і надсилає сповіщення в Telegram.
+// Порядок: стан (разом із чергою дій для біржі) зберігається першим із перевіркою версії — лише потім біржа.
 // Доступ лише з секретом розкладу (x-runner-secret), перевірка — RPC runner_check.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { botConfig, eventText, INTERVAL, processBot } from "./core.js";
-import { binance, bybit, closePosition, marketNotional } from "./exchanges.ts";
+import { botConfig, INTERVAL, processBot } from "./core.js";
+import { binance, bybit } from "./exchanges.ts";
+import { handleBot } from "./mirror.js";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const BYIV: Record<string, string> = { "1h": "60", "4h": "240", "12h": "720", "1d": "D", "1w": "W" };
@@ -76,6 +78,27 @@ Deno.serve(async (req) => {
     const k = `${bot.user_id}|${c._ex === "binance" ? "binance" : "bybit"}|${c.pair}`;
     if (!owner.has(k) || String(bot.id) < owner.get(k)!) owner.set(k, bot.id); // стабільний вибір: найменший id
   }
+  // версії станів для збереження з перевіркою (compare-and-swap): паралельний запуск не продублює ордери
+  const ids = (rows ?? []).map((b: any) => b.id);
+  const ver = new Map<string, string>();
+  if (ids.length) {
+    const { data: vs, error: ve } = await admin.from("bot_state").select("bot_id,updated_at").in("bot_id", ids);
+    if (ve) return json({ error: ve.message }, 500);
+    for (const v of vs ?? []) ver.set(v.bot_id, v.updated_at);
+  }
+  const saver = (bot: any) => async (state: unknown) => {
+    const at = new Date().toISOString(), old = ver.get(bot.id);
+    if (old) {
+      const { data, error } = await admin.from("bot_state").update({ state, updated_at: at }).eq("bot_id", bot.id).eq("updated_at", old).select("bot_id");
+      if (error || !data?.length) return false;
+    } else {
+      const { error } = await admin.from("bot_state").insert({ bot_id: bot.id, user_id: bot.user_id, state, updated_at: at });
+      if (error) return false;
+    }
+    ver.set(bot.id, at);
+    return true;
+  };
+
   for (const bot of rows ?? []) {
     if (Date.now() - started > 100e3) break; // запас до ліміту часу функції
     try {
@@ -87,34 +110,23 @@ Deno.serve(async (req) => {
       if (!mcache.has(mk)) mcache.set(mk, market(symbol, iv, !!g.fut));
       const m = await mcache.get(mk);
       const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now() });
-      for (const ev of r.events) {
-        evCount++;
-        const text = eventText(ev, g);
-        await log(bot, ev.kind === "liq" || ev.kind === "sl" ? "warn" : "info", text, { ...ev, src: m.src });
-        // дублювання на демо-рахунку біржі
-        if (cfg._tn && g.fut) {
-          const exName = cfg._ex === "binance" ? "binance" : "bybit";
-          if (owner.get(`${bot.user_id}|${exName}|${g.pair}`) !== bot.id) {
-            await log(bot, "warn", `На демо-рахунку вже торгує інший бот ${g.pair} — угоду не продубльовано (позиції злилися б в одну)`);
-          } else try {
-            const ex = await exFor(bot.user_id, exName);
-            if (!ex) await log(bot, "error", "Ключі біржі не підключено — угоду не продубльовано");
-            else if (ev.kind === "open" || ev.kind === "dca") {
-              const o = await marketNotional(ex, symbol, g.d > 0 ? "BUY" : "SELL", ev.notional, ev.kind === "open" ? Math.min(20, Math.max(1, Math.round(g.lev || 1))) : 0);
-              await log(bot, "info", `${exName === "bybit" ? "Bybit Demo" : "Binance Testnet"}: ${ev.kind === "open" ? "вхід" : "докупівля"} ${o.qty} за ${o.approx ? "≈" : ""}${o.price}`);
-            } else {
-              const o = await closePosition(ex, symbol);
-              await log(bot, "info", `${exName === "bybit" ? "Bybit Demo" : "Binance Testnet"}: ${o ? `позицію закрито за ${o.price}` : "позиції не було"}`);
-            }
-          } catch (e) { await log(bot, "error", `Біржа: ${(e as Error).message}`); }
-        }
-        // Telegram
-        try {
-          const t = await tgFor(bot.user_id);
-          if (t?.token && t?.chat_id) await fetch(`https://api.telegram.org/bot${t.token}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: t.chat_id, text, disable_web_page_preview: true }) });
-        } catch (_e) { /* сповіщення не критичні */ }
-      }
-      await admin.from("bot_state").upsert({ bot_id: bot.id, user_id: bot.user_id, state: r.state, updated_at: new Date().toISOString() });
+      evCount += r.events.length;
+      const exName = cfg._ex === "binance" ? "binance" : "bybit";
+      const want = !!(cfg._tn && g.fut);
+      const mirror = want && owner.get(`${bot.user_id}|${exName}|${g.pair}`) === bot.id;
+      if (want && !mirror && r.events.length) await log(bot, "warn", `На демо-рахунку вже торгує інший бот ${g.pair} — угоду не продубльовано (позиції злилися б в одну)`);
+      const ex = mirror ? await exFor(bot.user_id, exName) : null;
+      await handleBot({
+        bot, g, r, symbol, mirror, native: !!ex?.native, ex,
+        save: saver(bot),
+        log: (level: string, text: string, data: unknown = null) => log(bot, level, text, data && typeof data === "object" ? { ...(data as object), src: m.src } : data),
+        notify: async (text: string) => {
+          try {
+            const t = await tgFor(bot.user_id);
+            if (t?.token && t?.chat_id) await fetch(`https://api.telegram.org/bot${t.token}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: t.chat_id, text, disable_web_page_preview: true }) });
+          } catch (_e) { /* сповіщення не критичні */ }
+        },
+      });
       done++;
     } catch (e) {
       console.warn("runner bot failed", bot.id, (e as Error).message);

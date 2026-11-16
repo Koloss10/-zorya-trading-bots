@@ -14,5 +14,5 @@ const e=await SB.from('bot_events').select('id,bot_id,level,message,created_at')
 if(!e.error){let add=0;for(const r of (e.data||[]).slice().reverse()){if(SRV.seen.has(r.id))continue;SRV.seen.add(r.id);FEED.unshift({t:new Date(r.created_at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}),m:'☁ '+r.message});add++}
 if(add){FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()}}
 lst();upd()}catch(er){}finally{SRV.busy=0}}
-const srvLine=x=>x.srv?`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?' · угоди дублюються на '+((x.srvEx||'bybit')==='bybit'?'Bybit Demo':'Binance Testnet'):''}</p>`:'';
+const srvLine=x=>x.srv?`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?((x.srvEx||'bybit')==='bybit'?' · угоди на Bybit Demo: докупівлі, TP і SL стоять на самій біржі':' · угоди дублюються на Binance Testnet (TP/SL — з сервера після закриття свічки)'):''}</p>`:'';
 setInterval(()=>{if(!document.hidden)srvLoad()},60000);

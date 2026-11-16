@@ -680,7 +680,7 @@ if(a==='g'){const g=t.closest('.bc').querySelector('.gr');g.hidden=!g.hidden;if(
 if(a==='j'){const j=t.closest('.bc').querySelectorAll('.gr')[1];j.hidden=!j.hidden;j.innerHTML=jrn(x);return}
 if(a==='c'){fill(x.g,x.ex);go('bd');return}
 if(a==='srv'){srvToggle(x);return}
-if(a==='tn'){x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на тестнеті (поки застосунок відкритий)':'Тестнет для бота вимкнено');return}
+if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на тестнеті (поки застосунок відкритий)':'Тестнет для бота вимкнено');return}
 if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;bots=bots.filter(b=>b!==x)}else setOn(x,!x.on);sbots();lst()}
 $('#bl').onclick=botClick;$('#bl2').onclick=botClick;
 const killAll=()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;bots.forEach(x=>setOn(x,false));sbots();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR()};

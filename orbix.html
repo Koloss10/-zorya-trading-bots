@@ -155,7 +155,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 </section>
 
 <section id="v-mk" class="s" hidden>
-<div class="card"><h2>Ринок</h2><input class="srch" id="mq" list="pl" placeholder="Пара, напр. ETH/USDT" autocomplete="off"><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
+<div class="card"><h2>Ринок</h2><input class="srch" id="mq" list="pl" placeholder="Пара, напр. ETH/USDT" autocomplete="off"><div class="row" id="mkm" style="margin-bottom:8px"><button class="b sm tg" data-mm="F">Ф'ючерси USDⓈ-M</button><button class="b sm tg" data-mm="S">Спот</button></div><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
 <div class="card"><h2>Усі пари</h2><div id="mkl"></div></div>
 </section>
 
@@ -242,47 +242,72 @@ function nextC(P,R){const o=P.c;if(R()<1/400)P.m=gs(R)*.0004;if(R()<1/3000)P.a*=
 let PK=Object.keys(PAIRS);
 /* ---------- ринкові дані: реальні свічки з бірж, демо як запасний варіант ---------- */
 const H1=36e5,SYN={};
-function synth(k){if(SYN[k])return SYN[k];const P=PAIRS[k],R=rng(P.s);P.c=P.a=P.p;const a=Array.from({length:N},()=>nextC(P,R)),b=Math.floor(Date.now()/H1)*H1-N*H1;a.forEach((c,i)=>c.t=b+i*H1);return SYN[k]=a}
-const DT={},MD={mode:'init',src:'',base:'',tk:{},live:{},load:{},err:''};
-const D=new Proxy(DT,{get(t,k){if(typeof k!=='string'||!PAIRS[k])return t[k];if(t[k])return t[k];if(MD.mode==='demo')return t[k]=synth(k);need(k).then(()=>onData(k)).catch(()=>{});return synth(k)}});
+function synth(k){if(SYN[k])return SYN[k];const P=PAIRS[pairOf(k)],R=rng(P.s);P.c=P.a=P.p;const a=Array.from({length:N},()=>nextC(P,R)),b=Math.floor(Date.now()/H1)*H1-N*H1;a.forEach((c,i)=>c.t=b+i*H1);return SYN[k]=a}
+const DT={},MD={mode:'init',src:'',base:'',tk:{},live:{},load:{},err:'',fut:0,fsrc:'',fbase:'',fk:'',ftk:{},fset:null,fr:{},ferr:''};
+const D=new Proxy(DT,{get(t,k){if(typeof k!=='string'||!PAIRS[pairOf(k)])return t[k];if(t[k])return t[k];if(MD.mode==='demo')return t[k]=synth(k);need(k).then(()=>onData(k)).catch(()=>{});return synth(k)}});
 const ready=p=>MD.mode==='demo'||!!DT[p];
 const hist=p=>{const a=D[p];if(!a)throw new Error('невідома пара '+p);return a};
 const SRCS=[{n:'Binance',b:'https://api.binance.com',k:'bn'},{n:'Binance',b:'https://data-api.binance.vision',k:'bn'},{n:'Bybit',b:'https://api.bybit.com',k:'by'}];
+/* ф'ючерси USDⓈ-M / linear: свічки, mark price, funding */
+const FSRCS=[{n:'Binance Futures',b:'https://fapi.binance.com',k:'bn'},{n:'Bybit',b:'https://api.bybit.com',k:'by'}];
 async function jget(u,ms=15000){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
 const sym=p=>p.replace('/','');
+/* ключ даних: 'BTC/USDT' — спот, 'BTC/USDT@F' — ф'ючерс (якщо ф'ючерсні дані доступні для пари) */
+const FK='@F',isF=k=>typeof k==='string'&&k.endsWith(FK),pairOf=k=>isF(k)?k.slice(0,-FK.length):k;
+const dk=g=>g&&g.fut&&MD.fut&&MD.fset&&MD.fset.has(g.pair)?g.pair+FK:g&&g.pair;
+const mkLbl=k=>isF(k)?'ф\'ючерси '+MD.fsrc:'спот '+(MD.src||'');
+const withMark=(c,m)=>{if(m){c.ml=+m[3];c.mh=+m[2]}return c};
 /* свічки 1г у порядку зростання; lim до 1000; end — час відкриття останньої потрібної свічки */
-async function kl(p,{end,start,lim=1000}={}){const s=sym(p);
-if(MD.k==='by'){const j=await jget(`${MD.base}/v5/market/kline?category=spot&symbol=${s}&interval=60&limit=${lim}${end?'&end='+end:''}${start?'&start='+start:''}`);if(j.retCode)throw new Error(j.retMsg||'Bybit');return(j.result.list||[]).map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]})).reverse()}
-const j=await jget(`${MD.base}/api/v3/klines?symbol=${s}&interval=1h&limit=${lim}${end?'&endTime='+end:''}${start?'&startTime='+start:''}`);return j.map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}))}
+async function kl(k,{end,start,lim=1000}={}){const s=sym(pairOf(k)),bc=r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]});
+if(isF(k)){if(MD.fk==='by'){const q=`category=linear&symbol=${s}&interval=60&limit=${lim}${end?'&end='+end:''}${start?'&start='+start:''}`;
+const[j,m]=await Promise.all([jget(`${MD.fbase}/v5/market/kline?${q}`),jget(`${MD.fbase}/v5/market/mark-price-kline?${q}`).catch(()=>null)]);if(j.retCode)throw new Error(j.retMsg||'Bybit');
+const mm=new Map((m&&m.result&&m.result.list||[]).map(r=>[+r[0],r]));return(j.result.list||[]).map(r=>withMark(bc(r),mm.get(+r[0]))).reverse()}
+const q=`symbol=${s}&interval=1h&limit=${lim}${end?'&endTime='+end:''}${start?'&startTime='+start:''}`;
+const[j,m]=await Promise.all([jget(`${MD.fbase}/fapi/v1/klines?${q}`),jget(`${MD.fbase}/fapi/v1/markPriceKlines?${q}`).catch(()=>null)]);
+const mm=new Map((m||[]).map(r=>[+r[0],r]));return j.map(r=>withMark(bc(r),mm.get(+r[0])))}
+if(MD.k==='by'){const j=await jget(`${MD.base}/v5/market/kline?category=spot&symbol=${s}&interval=60&limit=${lim}${end?'&end='+end:''}${start?'&start='+start:''}`);if(j.retCode)throw new Error(j.retMsg||'Bybit');return(j.result.list||[]).map(bc).reverse()}
+const j=await jget(`${MD.base}/api/v3/klines?symbol=${s}&interval=1h&limit=${lim}${end?'&endTime='+end:''}${start?'&startTime='+start:''}`);return j.map(bc)}
+/* історія funding rate пари (події кожні 8 год) */
+const frOf=p=>MD.fr&&MD.fr[p]||null;
+async function frLoad(p){if(!MD.fut)return;const key='fr:'+MD.fk+':'+p,s=sym(p),now=Date.now();let F=MD.fr[p]||(await IDB.get(key))||[];
+const from=F.length?F[F.length-1].t+1:now-420*864e5,seen=new Set(F.map(x=>x.t)),add=a=>{for(const x of a)if(isFinite(x.r)&&!seen.has(x.t)){F.push(x);seen.add(x.t)}};
+if(MD.fk==='by'){let end=now;for(let g=0;g<15;g++){const j=await jget(`${MD.fbase}/v5/market/funding/history?category=linear&symbol=${s}&limit=200&endTime=${end}`);const L=(j.result&&j.result.list||[]).map(r=>({t:+r.fundingRateTimestamp,r:+r.fundingRate}));add(L.filter(x=>x.t>=from));if(L.length<200||L[L.length-1].t<=from)break;end=L[L.length-1].t-1}}
+else{let st=from;for(let g=0;g<15;g++){const j=await jget(`${MD.fbase}/fapi/v1/fundingRate?symbol=${s}&startTime=${st}&limit=1000`);const L=j.map(r=>({t:+r.fundingTime,r:+r.fundingRate}));add(L);if(L.length<1000)break;st=L[L.length-1].t+1}}
+F.sort((a,b)=>a.t-b.t);MD.fr[p]=F;IDB.set(key,F);return F}
 const IDB=(()=>{let db=null;const open=()=>db||(db=new Promise((res,rej)=>{const r=indexedDB.open('orbix-md',1);r.onupgradeneeded=()=>r.result.createObjectStore('k');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
 return{get:async k=>{try{const d=await open();return await new Promise(r=>{const q=d.transaction('k').objectStore('k').get(k);q.onsuccess=()=>r(q.result||null);q.onerror=()=>r(null)})}catch(e){return null}},
 set:async(k,v)=>{try{const d=await open();d.transaction('k','readwrite').objectStore('k').put(v,k)}catch(e){}}}})();
-const pack1=a=>({t:a.map(c=>c.t),o:a.map(c=>c.o),h:a.map(c=>c.h),l:a.map(c=>c.l),c:a.map(c=>c.c),v:a.map(c=>c.v)});
-const unpack1=s=>s&&s.t?s.t.map((t,i)=>({t,o:s.o[i],h:s.h[i],l:s.l[i],c:s.c[i],v:s.v[i]})):[];
+const pack1=a=>({t:a.map(c=>c.t),o:a.map(c=>c.o),h:a.map(c=>c.h),l:a.map(c=>c.l),c:a.map(c=>c.c),v:a.map(c=>c.v),ml:a.map(c=>c.ml),mh:a.map(c=>c.mh)});
+const unpack1=s=>s&&s.t?s.t.map((t,i)=>{const c={t,o:s.o[i],h:s.h[i],l:s.l[i],c:s.c[i],v:s.v[i]};if(s.ml&&s.ml[i]!=null){c.ml=s.ml[i];c.mh=s.mh[i]}return c}):[];
 /* розділяє закриті свічки й поточну (незакриту) */
 function split(p,a){const now=Date.now();if(a.length&&a[a.length-1].t+H1>now)MD.live[p]=a.pop();return a}
-async function load1(p,hours){const key=MD.k+':'+p;let a=DT[p]?DT[p].slice():unpack1(await IDB.get(key));
+async function load1(p,hours){const key=(isF(p)?'f'+MD.fk:MD.k)+':'+p;let a=DT[p]?DT[p].slice():unpack1(await IDB.get(key));
 if(a.length){for(let g=0;g<40;g++){const b=split(p,await kl(p,{start:a[a.length-1].t+H1}));const nw=b.filter(c=>c.t>a[a.length-1].t);a.push(...nw);if(b.length<999||!nw.length)break}}
 else a=split(p,await kl(p));
 for(let g=0;g<40&&a.length&&a.length<hours;g++){const b=(await kl(p,{end:a[0].t-H1})).filter(c=>c.t<a[0].t);if(!b.length)break;a=b.concat(a);if(b.length<999)break}
 if(a.length<60)throw new Error('замало історії для '+p);
+if(isF(p))try{await frLoad(pairOf(p))}catch(e){}
 DT[p]=a;IDB.set(key,pack1(a.length>30000?a.slice(-30000):a));return a}
-function need(p,hours=DEPTH){if(MD.mode==='init')return MD.ip.then(()=>need(p,hours));if(MD.mode!=='live')return Promise.resolve();if(!PAIRS[p])return Promise.reject(new Error('невідома пара '+p));
+function need(p,hours=DEPTH){if(MD.mode==='init')return MD.ip.then(()=>need(p,hours));if(MD.mode!=='live')return Promise.resolve();if(!PAIRS[pairOf(p)])return Promise.reject(new Error('невідома пара '+p));
 const h=DT[p];if(h&&(h.length>=hours||h._full))return Promise.resolve();const q=MD.load[p];if(q&&q.h>=hours)return q;
 const pr=(q||Promise.resolve()).catch(()=>{}).then(()=>load1(p,hours)).then(a=>{if(a.length<hours)a._full=1}).finally(()=>{if(MD.load[p]===pr)delete MD.load[p]});pr.h=hours;return MD.load[p]=pr}
 const needAll=async(ps,hours)=>{for(const p of ps)await need(p,hours)};
 /* скільки годин історії потрібно, щоб відтворити бота від запуску (з запасом на індикатори) */
 const hrsFor=(t0,tf)=>Math.min(30000,Math.max(DEPTH,Math.ceil((Date.now()-(+t0||Date.now()))/36e5)+300*(tf||1)));
 function withData(p,el,fn,hours=DEPTH){const h=DT[p];if(MD.mode==='demo'||(h&&(h.length>=hours||h._full)))return fn();
-if(el)el.innerHTML=`<p class="mu">Завантажую історію ${esc(p)}${MD.src?' з '+MD.src:''}…</p>`;need(p,hours).then(fn).catch(e=>{if(el)el.innerHTML=`<p class="dn">Не вдалося завантажити дані ${esc(p)}: ${esc(e.message)}</p>`})}
-async function mdInit(){for(const s of SRCS){try{let L;
-if(s.k==='by'){const j=await jget(s.b+'/v5/market/tickers?category=spot',10000);if(j.retCode)throw new Error(j.retMsg);L=j.result.list.map(r=>[r.symbol,+r.lastPrice,+r.prevPrice24h,+r.turnover24h,+r.highPrice24h,+r.lowPrice24h])}
-else{const j=await jget(s.b+'/api/v3/ticker/24hr?type=MINI',10000);L=j.map(r=>[r.symbol,+r.lastPrice,+r.openPrice,+r.quoteVolume,+r.highPrice,+r.lowPrice])}
-const m={};for(const[k,c,o,q,h,l]of L)m[k]={c,o,q,h,l};const ok=PK.filter(p=>m[sym(p)]&&m[sym(p)].c>0);if(ok.length<5)throw new Error('мало пар');
-MD.mode='live';MD.src=s.n;MD.base=s.b;MD.k=s.k;MD.tk=m;PK=ok;for(const k of Object.keys(PAIRS))if(!ok.includes(k))delete PAIRS[k];return}catch(e){MD.err=e.message}}
+if(el)el.innerHTML=`<p class="mu">Завантажую історію ${esc(pairOf(p))} (${mkLbl(p)})…</p>`;need(p,hours).then(fn).catch(e=>{if(el)el.innerHTML=`<p class="dn">Не вдалося завантажити дані ${esc(pairOf(p))}: ${esc(e.message)}</p>`})}
+const tkSpot=async b=>{if(MD.k==='by'){const j=await jget(b+'/v5/market/tickers?category=spot',10000);if(j.retCode)throw new Error(j.retMsg);return j.result.list.map(r=>[r.symbol,+r.lastPrice,+r.prevPrice24h,+r.turnover24h,+r.highPrice24h,+r.lowPrice24h])}
+const j=await jget(b+'/api/v3/ticker/24hr?type=MINI',10000);return j.map(r=>[r.symbol,+r.lastPrice,+r.openPrice,+r.quoteVolume,+r.highPrice,+r.lowPrice])};
+const tkFut=async(b,k)=>{if(k==='by'){const j=await jget(b+'/v5/market/tickers?category=linear',10000);if(j.retCode)throw new Error(j.retMsg);return j.result.list.map(r=>[r.symbol,+r.lastPrice,+r.prevPrice24h,+r.turnover24h,+r.highPrice24h,+r.lowPrice24h,+r.fundingRate])}
+const[j,pi]=await Promise.all([jget(b+'/fapi/v1/ticker/24hr',10000),jget(b+'/fapi/v1/premiumIndex',10000).catch(()=>[])]),fm=new Map((pi||[]).map(r=>[r.symbol,+r.lastFundingRate]));return j.map(r=>[r.symbol,+r.lastPrice,+r.openPrice,+r.quoteVolume,+r.highPrice,+r.lowPrice,fm.get(r.symbol)])};
+const tkMap=L=>{const m={};for(const[k,c,o,q,h,l,fr]of L)m[k]={c,o,q,h,l,fr};return m};
+async function mdInit(){for(const s of SRCS){try{MD.k=s.k;const m=tkMap(await tkSpot(s.b)),ok=PK.filter(p=>m[sym(p)]&&m[sym(p)].c>0);if(ok.length<5)throw new Error('мало пар');
+MD.mode='live';MD.src=s.n;MD.base=s.b;MD.tk=m;PK=ok;for(const k of Object.keys(PAIRS))if(!ok.includes(k))delete PAIRS[k];await futInit();return}catch(e){MD.err=e.message}}
 MD.mode='demo'}
-async function tkRefresh(){if(MD.mode!=='live')return;try{if(MD.k==='by'){const j=await jget(MD.base+'/v5/market/tickers?category=spot');j.result.list.forEach(r=>{MD.tk[r.symbol]={c:+r.lastPrice,o:+r.prevPrice24h,q:+r.turnover24h,h:+r.highPrice24h,l:+r.lowPrice24h}})}else{const j=await jget(MD.base+'/api/v3/ticker/24hr?type=MINI');j.forEach(r=>{MD.tk[r.symbol]={c:+r.lastPrice,o:+r.openPrice,q:+r.quoteVolume,h:+r.highPrice,l:+r.lowPrice}})}}catch(e){}}
-/* остання ціна пари: поточна свічка або остання закрита */
+async function futInit(){for(const s of FSRCS){try{const m=tkMap(await tkFut(s.b,s.k)),set=new Set(PK.filter(p=>m[sym(p)]&&m[sym(p)].c>0));if(set.size<3)throw new Error('мало ф\'ючерсних пар');
+MD.fut=1;MD.fsrc=s.n;MD.fbase=s.b;MD.fk=s.k;MD.ftk=m;MD.fset=set;return}catch(e){MD.ferr=e.message}}MD.fut=0}
+async function tkRefresh(){if(MD.mode!=='live')return;try{Object.assign(MD.tk,tkMap(await tkSpot(MD.base)))}catch(e){}if(MD.fut)try{Object.assign(MD.ftk,tkMap(await tkFut(MD.fbase,MD.fk)))}catch(e){}}
+/* остання ціна за ключем даних: поточна свічка або остання закрита */
 const lastC=p=>MD.live[p]||D[p][D[p].length-1];
 const listed=(p,e)=>PK.indexOf(p)<EXS[e][1];
 const maxLev=(p,e)=>{const i=PK.indexOf(p);return Math.min(i<2?125:i<10?75:i<30?25:10,EXS[e][0])};
@@ -291,7 +316,7 @@ function agg(cs,k){if(k===1)return cs;const o=[];for(let i=0;i+k<=cs.length;i+=k
    неповна перша група й ще не закрита остання відкидаються */
 const tfOff=tf=>tf===168?4*864e5:0,tfMs=tf=>tf*36e5;
 function aggT(cs,tf){if(tf===1)return cs;const o=[],W=tfMs(tf),off=tfOff(tf);let cur=null,key=null;
-for(const c of cs){const k=Math.floor((c.t-off)/W);if(k!==key){if(cur)o.push(cur);key=k;cur={t:k*W+off,o:c.o,h:c.h,l:c.l,c:c.c,v:c.v||0,_s:c.t}}else{if(c.h>cur.h)cur.h=c.h;if(c.l<cur.l)cur.l=c.l;cur.c=c.c;cur.v+=c.v||0}}
+for(const c of cs){const k=Math.floor((c.t-off)/W);if(k!==key){if(cur)o.push(cur);key=k;cur={t:k*W+off,o:c.o,h:c.h,l:c.l,c:c.c,v:c.v||0,_s:c.t};if(c.ml!=null){cur.ml=c.ml;cur.mh=c.mh}}else{if(c.h>cur.h)cur.h=c.h;if(c.l<cur.l)cur.l=c.l;cur.c=c.c;cur.v+=c.v||0;if(c.ml!=null){cur.ml=cur.ml==null?c.ml:Math.min(cur.ml,c.ml);cur.mh=cur.mh==null?c.mh:Math.max(cur.mh,c.mh)}}}
 if(cur)o.push(cur);if(o.length&&o[0]._s!==o[0].t)o.shift();const L=cs[cs.length-1];if(o.length&&L&&L.t+36e5<o[o.length-1].t+W)o.pop();return o}
 /* чи щойно закрилась свічка таймфрейму tf (за останньою годинною свічкою) */
 const closedTf=(cs,tf)=>{const L=cs[cs.length-1];return!!L&&(tf===1||(L.t+36e5-tfOff(tf))%tfMs(tf)===0)};
@@ -323,28 +348,39 @@ const DEF={tf:1,d:1,fut:1,lev:1,sg:['rsi','bb'],k:2,rp:14,rm:35,bn:20,bk:2,cn:20
 function entry(A,g){const S=g.sg.map(k=>SIG[k](A,g)),n=A.length,o=new Array(n).fill(false),f=PAIRS[g.pair],
 w=Math.max(g.rp,g.bn,g.cn,30,g.sg.includes('ema')?100:0,g.sg.includes('lvl')?100:0,g.sg.includes('fib')?50:0),k=Math.min(g.k||S.length,S.length);
 if(!S.length||(g.fm&&f&&f.f<g.fm))return o;for(let i=w;i<n;i++){let c=0;for(const s of S)if(s[i]===g.d)c++;o[i]=c>=k}return o}
-class Bot{constructor(g){this.g=g;this.pos=null;this.tr=[];this.cd=0;this.cum=0}
-eqv(r){const g=this.g,p=this.pos;if(!p)return this.cum;const v=p.q*r.c;return this.cum+p.real+g.d*(v-p.cost)-g.fee*(v+p.cost)}
-step(i,r,en,h=i){const g=this.g,d=g.d,p=this.pos,L=g.lev||1,fv=x=>d>0?r.h>=x:r.l<=x,ad=x=>d>0?r.l<=x:r.h>=x;
-if(!p){if(en&&i>=this.cd)this.pos={q:g.base*L/r.c,cost:g.base*L,n:1,last:r.c,first:r.c,peak:r.c,real:0,t1:0,f:[{t:r.t,p:r.c,k:'e'}]};return}
-let avg,x=0,lq=0,sl,stop=0,filled=0;
-for(;;){avg=p.cost/p.q;sl=p.t1&&p.be?p.be:avg*(1-d*g.sl);lq=0;
-if(L>1){const q=avg*(1-d*Math.max(1/L-.005,0));if(d>0?q>sl:q<sl){sl=q;lq=1}}
+/* Комісії: ftk — тейкер (ринковий вхід, стоп, трейлінг, ліквідація), fmk — мейкер (лімітні DCA і TP).
+   Funding: події fr={t,r}; при r>0 Long платить, Short отримує, сума = r·кількість·ціна.
+   Ліквідація перевіряється за mark price (ml/mh свічки), якщо вона є, інакше за ціною угод. */
+const normG=g=>{if(g.ftk==null){g.ftk=g.fut?.0005:.001;g.fmk=g.fut?.0002:.001}return g};
+const lbT=(F,t)=>{let lo=0,hi=F.length;while(lo<hi){const m=(lo+hi)>>1;if(F[m].t<t)lo=m+1;else hi=m}return lo};
+class Bot{constructor(g,fr){this.g=g;this.pos=null;this.tr=[];this.cd=0;this.cum=0;this.ft=g.ftk!=null?g.ftk:g.fee;this.fmk=g.fmk!=null?g.fmk:g.fee;
+this.fr=fr!==undefined?fr:(g.fut&&typeof frOf==='function'?frOf(g.pair):null)}
+eqv(r){const g=this.g,p=this.pos;if(!p)return this.cum;const v=p.q*r.c;return this.cum+p.real+g.d*(v-p.cost)-this.ft*v}
+fund(r){const p=this.pos,F=this.fr;if(!p||!F||!F.length||r.t==null)return;const W=tfMs(this.g.tf||1);let k=lbT(F,r.t);
+for(;k<F.length&&F[k].t<r.t+W;k++){const px=F[k].t-r.t<6e4?r.o:r.c,a=this.g.d*F[k].r*p.q*px;p.real-=a;p.fd+=a}}
+step(i,r,en,h=i){const g=this.g,d=g.d,p=this.pos,L=g.lev||1,fv=x=>d>0?r.h>=x:r.l<=x,ad=x=>d>0?r.l<=x:r.h>=x,adm=x=>d>0?(r.ml!=null?r.ml:r.l)<=x:(r.mh!=null?r.mh:r.h)>=x;
+if(!p){if(en&&i>=this.cd){const s0=g.base*L;this.pos={q:s0/r.c,cost:s0,n:1,last:r.c,first:r.c,peak:r.c,real:-this.ft*s0,fd:0,t1:0,f:[{t:r.t,p:r.c,k:'e'}]}}return}
+this.fund(r);
+let avg,x=0,lq=0,slp,lqp,stop=0,filled=0,tk=0;
+for(;;){avg=p.cost/p.q;slp=p.t1&&p.be?p.be:avg*(1-d*g.sl);lqp=L>1?avg*(1-d*Math.max(1/L-.005,0)):0;
+const lqF=lqp&&(d>0?lqp>slp:lqp<slp),lim=lqF?lqp:slp;
 const nx=!p.t1&&p.n<g.orders?p.last*(1-d*g.step*g.smul**(p.n-1)):0;
-if(nx&&(d>0?nx>sl:nx<sl)&&ad(nx)){const s=g.base*L*g.mult**p.n;p.q+=s/nx;p.cost+=s;p.n++;p.last=nx;p.f.push({t:r.t,p:nx,k:'e'});filled=1;continue}
-if(ad(sl)){x=sl*(1-d*(g.slip||0));stop=1}break}
+if(nx&&(d>0?nx>lim:nx<lim)&&ad(nx)){const s=g.base*L*g.mult**p.n;p.q+=s/nx;p.cost+=s;p.real-=this.fmk*s;p.n++;p.last=nx;p.f.push({t:r.t,p:nx,k:'e'});filled=1;continue}
+const hitL=lqp&&adm(lqp),hitS=ad(slp);
+if(lqF?hitL:(!hitS&&hitL)){x=lqp;lq=1;stop=1}else if(hitS){x=slp*(1-d*(g.slip||0));stop=1;tk=1}break}
 if(!stop&&!filled){const t=p.t1?p.a1*(1+d*g.tp2):avg*(1+d*g.tp);
-if(g.s1>0&&!p.t1){if(fv(t)){const v=p.q*g.s1*t,c=p.cost*g.s1;p.real+=d*(v-c)-g.fee*(v+c);p.q*=1-g.s1;p.cost*=1-g.s1;p.t1=1;p.f.push({t:r.t,p:t,k:'x'});p.a1=avg;p.be=g.be==1?avg:g.be==2?t:0}}
+if(g.s1>0&&!p.t1){if(fv(t)){const v=p.q*g.s1*t,c=p.cost*g.s1;p.real+=d*(v-c)-this.fmk*v;p.q*=1-g.s1;p.cost*=1-g.s1;p.t1=1;p.f.push({t:r.t,p:t,k:'x'});p.a1=avg;p.be=g.be==1?avg:g.be==2?t:0}}
 /* трейлінг: активується при досягненні TP і далі діє на кожній свічці; стоп рахується від піку
    попередніх свічок, бо порядок high/low усередині свічки невідомий */
-else if(g.trail){if(p.ta){const st=p.peak*(1-d*g.trail);if(ad(st))x=st;else p.peak=d>0?Math.max(p.peak,r.h):Math.min(p.peak,r.l)}else if(fv(t)){p.ta=1;p.peak=d>0?r.h:r.l}}
+else if(g.trail){if(p.ta){const st=p.peak*(1-d*g.trail);if(ad(st)){x=st;tk=1}else p.peak=d>0?Math.max(p.peak,r.h):Math.min(p.peak,r.l)}else if(fv(t)){p.ta=1;p.peak=d>0?r.h:r.l}}
 else if(fv(t))x=t}
-if(x){let pnl;if(lq)pnl=p.real-p.cost/L-g.fee*p.cost;else{const v=p.q*x;pnl=p.real+d*(v-p.cost)-g.fee*(v+p.cost)}this.cum+=pnl;this.tr.push({i:h,ts:r.t,pnl,n:p.n,liq:lq,sl:stop&&!lq,f:p.f.concat({t:r.t,p:x,k:'x'})});this.pos=null;this.cd=i+g.cd+1}}}
+if(x){let pnl;if(lq)pnl=p.real-p.cost/L;else{const v=p.q*x;pnl=p.real+d*(v-p.cost)-(tk?this.ft:this.fmk)*v}this.cum+=pnl;
+this.tr.push({i:h,ts:r.t,pnl,n:p.n,liq:lq,sl:stop&&!lq,fd:p.fd,f:p.f.concat({t:r.t,p:x,k:'x'})});this.pos=null;this.cd=i+g.cd+1}}}
 function run(A,e,g,off=0,keep=0,dep=0){const b=new Bot(g),tf=g.tf||1,M=dep?g.base*ladder(g):0,eq=keep?[]:null;let pk=0,dd=0,v=0,broke=0;for(let i=0;i<A.length;i++){const ok=!dep||dep+v>=M;if(!ok)broke=1;b.step(i,A[i],e[i]&&ok,off+i*tf);v=b.eqv(A[i]);if(v>pk)pk=v;if(v-pk<dd)dd=v-pk;if(keep)eq.push(v)}return{b,dd,last:v,eq,broke,pk}}
 function summ(R,dep){const tr=R.b.tr;let w=0,gp=0,gl=0,o=0;for(const t of tr){if(t.pnl>0){w++;gp+=t.pnl}else gl-=t.pnl;o+=t.n}const n=tr.length,s=R.eq?Math.ceil(R.eq.length/240):1;
-return{n,wr:n?w/n*100:0,pnl:R.last,real:R.b.cum,unr:R.last-R.b.cum,dd:R.dd,ddp:R.dd/dep*100,roi:R.last/dep*100,pf:gl?gp/gl:gp?Infinity:0,avg:n?R.b.cum/n:0,ao:n?o/n:0,liq:tr.filter(t=>t.liq).length,broke:R.broke,cur:R.eq?R.eq.filter((_,i)=>i%s===0):[]}}
+return{n,wr:n?w/n*100:0,pnl:R.last,real:R.b.cum,unr:R.last-R.b.cum,dd:R.dd,ddp:R.dd/dep*100,roi:R.last/dep*100,pf:gl?gp/gl:gp?Infinity:0,avg:n?R.b.cum/n:0,ao:n?o/n:0,liq:tr.filter(t=>t.liq).length,fund:tr.reduce((a,t)=>a+(t.fd||0),0)+(R.b.pos?R.b.pos.fd||0:0),broke:R.broke,cur:R.eq?R.eq.filter((_,i)=>i%s===0):[]}}
 const ladder=g=>{let u=0;for(let k=0;k<g.orders;k++)u+=g.mult**k;return u};
-function bt(g,per,dep,keep=1){const tf=g.tf||1,A=aggC(hist(g.pair),tf),k=Math.min(A.length,Math.floor(per/tf)),e=entry(A,g);return run(A.slice(-k),e.slice(-k),g,(A.length-k)*tf,keep,dep)}
+function bt(g,per,dep,keep=1){normG(g);const tf=g.tf||1,A=aggC(hist(dk(g)),tf),k=Math.min(A.length,Math.floor(per/tf)),e=entry(A,g);return run(A.slice(-k),e.slice(-k),g,(A.length-k)*tf,keep,dep)}
 function lv(g,p0){const L=[];let p=p0,q=0,c=0;for(let k=0;k<g.orders;k++){if(k)p*=1-g.d*g.step*g.smul**(k-1);const s=g.base*(g.lev||1)*g.mult**k;L.push({p,s});q+=s/p;c+=s}const avg=c/q,Lv=g.lev||1;return{L,avg,tp:avg*(1+g.d*g.tp),sl:avg*(1-g.d*g.sl),liq:Lv>1?avg*(1-g.d*Math.max(1/Lv-.005,0)):0}}
 const SC=[{n:'Різкий обвал −20% за годину',d:()=>0,v:.004,j:-.2},{n:'Повільне падіння −35% за 30 днів',d:()=>-.35/720,v:.0004,j:0},{n:'Обвал −40% за добу',d:i=>i<=24?-.4/24:0,v:.001,j:0},{n:'Різкий стрибок +20% за годину',d:()=>0,v:.004,j:.2},{n:'Pump +40% за 30 днів',d:()=>.4/720,v:.0004,j:0},{n:'Бічний ринок, висока волатильність',d:()=>0,v:.02,j:0},{n:'Волатильність ×3',d:()=>0,v:.018,j:0}];
 function stress(g){const tf=g.tf||1,g2={...g,slip:.02};return SC.map(s=>{const R=rng(99);let c=100;const cs=[];for(let i=0;i<tf;i++)cs.push({o:100,h:100,l:100,c:100});for(let i=1;i<=720;i++){const r=(i===1?s.j:0)+s.d(i)+s.v*gs(R),n=c*(1+r),w=Math.abs(s.v*gs(R))*.6;cs.push({o:c,h:Math.max(c,n)*(1+w),l:Math.min(c,n)*(1-w),c:n});c=n}
@@ -352,9 +388,9 @@ const A=agg(cs,tf),b=new Bot(g2);let mn=0,dca=0;A.forEach((r,i)=>{b.step(i,r,i==
 return{n:s.n,mn,dca,end:b.eqv(A[A.length-1]),liq:b.tr.some(t=>t.liq),sl:b.tr.filter(t=>t.sl).length,k:b.tr.length}})}
 const STR=[['Mean reversion: RSI + Bollinger',['rsi','bb'],2],['Осцилятори: RSI, CCI, Stochastic (2 з 3)',['rsi','cci','stoch'],2],['Тренд + відкат: EMA, RSI, MACD',['ema','rsi','macd'],3],['Патерн + рівень підтримки',['pat','lvl'],2],['Fibonacci + RSI',['fib','rsi'],2],['TA-консенсус + Bollinger',['ta','bb'],2],['MACD + Stochastic',['macd','stoch'],2]];
 const pick=(R,a)=>a[R()*a.length|0];
-function auto(c,salt=0){const H=hist(c.pair),R=rng((c.amt|0)*7+c.pair.length*7919+salt),out=[],mxL=c.fut===0?1:maxLev(c.pair,c.ex),LV=c.lev?[Math.min(c.lev,mxL)]:[1,2,3].filter(x=>x<=mxL);
+function auto(c,salt=0){const H=hist(dk(c)),R=rng((c.amt|0)*7+c.pair.length*7919+salt),out=[],mxL=c.fut===0?1:maxLev(c.pair,c.ex),LV=c.lev?[Math.min(c.lev,mxL)]:[1,2,3].filter(x=>x<=mxL);
 for(const tf of c.tf?[c.tf]:[1,4,12,24,168]){const A=aggC(H,tf),k=Math.floor(c.per/tf);if(k<60||k>A.length)continue;const tr=Math.floor(k*.7),cs=A.slice(-k),off=(A.length-k)*tf;
-for(const [name,sg,kk] of STR)for(const d of c.dr?[c.dr]:[1,-1]){if(d<0&&c.fut===0)continue;const g0={...DEF,pair:c.pair,ex:c.ex,sg,k:kk,d,tf,rm:pick(R,[30,35,40]),fut:c.fut,name},e=entry(A,g0).slice(-k);
+for(const [name,sg,kk] of STR)for(const d of c.dr?[c.dr]:[1,-1]){if(d<0&&c.fut===0)continue;const g0=normG({...DEF,pair:c.pair,ex:c.ex,sg,k:kk,d,tf,rm:pick(R,[30,35,40]),fut:c.fut,name}),e=entry(A,g0).slice(-k);
 for(let j=0;j<8;j++){const orders=3+(R()*6|0),mult=pick(R,[1,1.1,1.2,1.3,1.5,1.7]),lev=pick(R,LV),U=ladder({orders,mult}),base=c.amt>0?c.amt/U:10;if(base<5)continue;
 const g={...g0,orders,mult,lev,base,step:pick(R,[.008,.012,.016,.022,.03]),smul:pick(R,[1,1.2,1.5]),tp:pick(R,[.005,.008,.012,.018]),sl:pick(R,[.04,.06,.08,.1]),trail:pick(R,[0,.005,.01])},
 dep=c.amt>0?c.amt:2*base*U,Rn=run(cs.slice(0,tr),e.slice(0,tr),g,off,0,dep),s=summ(Rn,dep);if(s.n<8)continue;out.push({g,cs,e,tr,off,sc:s.roi+2*s.ddp-(s.liq?500:0)-(s.broke?500:0)})}}}
@@ -411,7 +447,7 @@ function msgText(ev,x,tpl,d){const g=x.g,p=x.b.pos,b=BRANDS[SET.brand].n,hd=`${b
 const line={open:`відкрито позицію по ${px(d.price||0)}`,dca:`DCA-ордер ${p?p.n:d.n} з ${g.orders} по ${px(d.price||0)}`,close:`угоду закрито, PnL ${f(d.pnl)} USDT`,sl:`${d.liq?'ліквідація':'спрацював Stop-Loss'}, PnL ${f(d.pnl)} USDT`,err:`помилка: ${d.text||''}`}[ev];
 if(tpl==='short')return `${g.pair} ${dir(g)}: ${line}`;
 let s=`${hd}\n${line}`;if(tpl==='normal')return s+(p?`\nОрдерів ${p.n} з ${g.orders}, середня ${px(p.cost/p.q)}`:'');
-const avg=p?p.cost/p.q:(d.price||lastC(g.pair).c);return s+`\nСередня ціна ${px(avg)}, TP ${px(avg*(1+g.d*g.tp))}, SL ${px(avg*(1-g.d*g.sl))}\nОрдерів ${p?p.n:'—'} з ${g.orders}, маржа сітки ${n2(g.base*ladder(g),0)} USDT\nУгод у бота ${x.b.tr.length}, реалізований PnL ${f(x.b.cum)} USDT\n${now()}`}
+const avg=p?p.cost/p.q:(d.price||lastC(dk(g)).c);return s+`\nСередня ціна ${px(avg)}, TP ${px(avg*(1+g.d*g.tp))}, SL ${px(avg*(1-g.d*g.sl))}\nОрдерів ${p?p.n:'—'} з ${g.orders}, маржа сітки ${n2(g.base*ladder(g),0)} USDT\nУгод у бота ${x.b.tr.length}, реалізований PnL ${f(x.b.cum)} USDT\n${now()}`}
 async function tgSend(token,chat,text){const r=await fetch(`https://api.telegram.org/bot${encodeURIComponent(token)}/sendMessage`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:chat,text})});const j=await r.json().catch(()=>({}));if(!j.ok)throw new Error(j.description||('HTTP '+r.status));return j}
 function notify(ev,x,d){const m=msgText(ev,x,'short',d);FEED.unshift({t:now(),m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR();if(!SET.ev[ev])return;toast(m);beep(ev==='close'?(d.pnl>0?'win':'loss'):ev);
 if(SET.vib&&navigator.vibrate)try{navigator.vibrate(ev==='sl'?[80,60,80]:40)}catch(e){}
@@ -435,7 +471,9 @@ function kdj(A,n=9){let k=50,d=50;const K=[],Q=[],J=[];for(let i=0;i<A.length;i+
 function heikin(A){const o=[];let po=null,pc=0;for(const c of A){const hc=(c.o+c.h+c.l+c.c)/4,ho=po==null?(c.o+c.c)/2:(po+pc)/2;o.push({t:c.t,o:ho,h:Math.max(c.h,ho,hc),l:Math.min(c.l,ho,hc),c:hc,v:c.v});po=ho;pc=hc}return o}
 const MTF=[['1m','1м'],['5m','5м'],['15m','15м'],['1h','1г'],['4h','4г'],['1d','1д'],['1w','1т']],IVH={'1h':1,'4h':4,'1d':24,'1w':168},BYIV={'1m':'1','5m':'5','15m':'15','1h':'60','4h':'240','1d':'D','1w':'W'};
 const MKB={};
-async function mkBars(pair,iv,lim=1000){const s=sym(pair);
+async function mkBars(key,iv,lim=1000){const s=sym(pairOf(key));
+if(isF(key)){if(MD.fk==='by'){const j=await jget(`${MD.fbase}/v5/market/kline?category=linear&symbol=${s}&interval=${BYIV[iv]}&limit=${lim}`);if(j.retCode)throw new Error(j.retMsg||'Bybit');return(j.result.list||[]).map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]})).reverse()}
+const j=await jget(`${MD.fbase}/fapi/v1/klines?symbol=${s}&interval=${iv}&limit=${lim}`);return j.map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}))}
 if(MD.k==='by'){const j=await jget(`${MD.base}/v5/market/kline?category=spot&symbol=${s}&interval=${BYIV[iv]}&limit=${lim}`);if(j.retCode)throw new Error(j.retMsg||'Bybit');return(j.result.list||[]).map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]})).reverse()}
 const j=await jget(`${MD.base}/api/v3/klines?symbol=${s}&interval=${iv}&limit=${lim}`);return j.map(r=>({t:+r[0],o:+r[1],h:+r[2],l:+r[3],c:+r[4],v:+r[5]}))}
 /* свічки для Ринку: live — будь-який інтервал напряму з біржі, демо — з годинної історії */
@@ -474,18 +512,18 @@ q('[data-iv]',b=>b.dataset.iv===S.iv);q('[data-t]',b=>+b.dataset.t===S.tf);q('[d
 el.querySelectorAll('[data-iv]').forEach(b=>b.hidden=MD.mode!=='live'&&!IVH[b.dataset.iv]);const s=el.querySelector('.xsel');if(s)s.value=S.type};
 const DK=()=>'zdraw:'+S.pair,drw=()=>ld(DK(),[]);
 let A=[],Bv=[];const tfl2=()=>mkm?(MTF.find(x=>x[0]===S.iv)||[0,S.iv])[1]:tfl(S.tf);
-const leg=c=>{if(!c)return;const g=(c.c/c.o-1)*100,am=c.l?(c.h/c.l-1)*100:0;lg.innerHTML=`<span style="color:var(--tx)">${S.pair} · ${tfl2()}</span>${MD.mode==='live'?' · '+MD.src:' · демо'}${S.tool?` · <span style="color:var(--ac)">${S.tool==='h'?'торкніться рівня':S.pend?'друга точка':'перша точка'}</span>`:''}<br>O ${px(c.o)} H ${px(c.h)} L ${px(c.l)} C <span class="${cls(g)}">${px(c.c)} (${f(g,2)}%)</span> A ${am.toFixed(2)}%${c.v!=null&&S.vol?' V '+n2(c.v,0):''}`};
+const leg=c=>{if(!c)return;const g=(c.c/c.o-1)*100,am=c.l?(c.h/c.l-1)*100:0;lg.innerHTML=`<span style="color:var(--tx)">${S.pair} · ${tfl2()}</span>${MD.mode==='live'?' · '+mkLbl(S.key):' · демо'}${S.tool?` · <span style="color:var(--ac)">${S.tool==='h'?'торкніться рівня':S.pend?'друга точка':'перша точка'}</span>`:''}<br>O ${px(c.o)} H ${px(c.h)} L ${px(c.l)} C <span class="${cls(g)}">${px(c.c)} (${f(g,2)}%)</span> A ${am.toFixed(2)}%${c.v!=null&&S.vol?' V '+n2(c.v,0):''}`};
 ch.subscribeCrosshairMove(p=>{if(!p||p.time==null){leg(Bv[Bv.length-1]);return}let i=-1,lo=0,hi=Bv.length-1;const tt=p.time;while(lo<=hi){const m=(lo+hi)>>1,x=lt(Bv[m].t);if(x===tt){i=m;break}if(x<tt)lo=m+1;else hi=m-1}if(i>=0)leg(Bv[i])});
 ch.subscribeClick(p=>{if(!S.tool||!p||!p.point||p.time==null)return;const pr=main.coordinateToPrice(p.point.y);if(pr==null||!isFinite(pr))return;const t=p.time*1e3+TZ(),L=drw();
 if(S.tool==='h'){L.push({k:'h',p:pr});S.tool=''}else if(!S.pend){S.pend={t,p:pr}}else{L.push({k:'t',a:S.pend,b:{t,p:pr}});S.pend=null;S.tool=''}sv(DK(),L);btn();draw()});
 const snap=(t)=>{let lo=0,hi=A.length-1;if(!A.length||t<A[0].t)return null;while(lo<hi){const m=(lo+hi+1)>>1;if(A[m].t<=t)lo=m;else hi=m-1}return lt(A[lo].t)};
-function hdr(){if(!xh)return;let c,o,h,l,q;const tk=MD.mode==='live'&&MD.tk[sym(S.pair)];
-if(tk){c=tk.c;o=tk.o;h=tk.h;l=tk.l;q=tk.q}else{const H=D[S.pair];if(!H)return;const z=H.slice(-24);c=lastC(S.pair).c;o=z[0].o;h=Math.max(...z.map(x=>x.h));l=Math.min(...z.map(x=>x.l));q=z.reduce((a,x)=>a+x.v*x.c,0)}
-const g=o?(c/o-1)*100:0;xh.innerHTML=`<div><b class="xp">${esc(S.pair)}</b><div class="mono ${cls(g)}" style="font-size:22px">${px(c)}</div></div><div class="xs"><span>24г зміна<b class="${cls(g)}">${f(g,2)}%</b></span><span>24г макс.<b>${h!=null?px(h):'—'}</b></span><span>24г мін.<b>${l!=null?px(l):'—'}</b></span><span>Обсяг 24г, USDT<b>${q!=null?n2(q,0):'—'}</b></span></div>`}
-function draw(err){if(!el.isConnected)return;const d=get();if(!d||!d.pair||!PAIRS[d.pair])return;const C=TH();
+function hdr(){if(!xh)return;let c,o,h,l,q;const tk=MD.mode==='live'&&(isF(S.key)?MD.ftk:MD.tk)[sym(S.pair)];
+if(tk){c=tk.c;o=tk.o;h=tk.h;l=tk.l;q=tk.q}else{const H=D[S.key||S.pair];if(!H)return;const z=H.slice(-24);c=lastC(S.key||S.pair).c;o=z[0].o;h=Math.max(...z.map(x=>x.h));l=Math.min(...z.map(x=>x.l));q=z.reduce((a,x)=>a+x.v*x.c,0)}
+const g=o?(c/o-1)*100:0;xh.innerHTML=`<div><b class="xp">${esc(S.pair)}</b> <span class="mu" style="font-size:11px">${isF(S.key)?'Perp':'Spot'}</span><div class="mono ${cls(g)}" style="font-size:22px">${px(c)}</div></div><div class="xs"><span>24г зміна<b class="${cls(g)}">${f(g,2)}%</b></span><span>24г макс.<b>${h!=null?px(h):'—'}</b></span><span>24г мін.<b>${l!=null?px(l):'—'}</b></span><span>Обсяг 24г, USDT<b>${q!=null?n2(q,0):'—'}</b></span></div>`}
+function draw(err){if(!el.isConnected)return;const d=get();if(!d||!d.pair||!PAIRS[d.pair])return;const C=TH(),dkey=d.key||d.pair;S.key=dkey;
 if(!full&&d.tf)S.tf=d.tf;if(!mkm&&!S.tf)S.tf=d.tf||1;if(mkm&&MD.mode!=='live'&&!IVH[S.iv])S.iv='1h';
 if(S.pair!==d.pair){S.pair=d.pair;S.pend=null}hdr();
-const raw=mkm?mktData(d.pair,S.iv,draw):(ready(d.pair)?barsOf(d.pair,S.tf):null);
+const raw=mkm?mktData(dkey,S.iv,draw):(ready(dkey)?barsOf(dkey,S.tf):null);
 if(!raw||!raw.length){lg.innerHTML=err?`<span class="dn">Не вдалося завантажити: ${esc(err.message)}</span>`:'Завантажую…';return}
 ch.applyOptions({layout:{textColor:C.mu,panes:{separatorColor:C.ln}},grid:{vertLines:{color:C.ln},horzLines:{color:C.ln}},rightPriceScale:{borderColor:C.ln},timeScale:{borderColor:C.ln}});
 if(S.type==='line')main.applyOptions({color:C.ac});else if(S.type==='area')main.applyOptions({lineColor:C.ac,topColor:C.ac+'55',bottomColor:C.ac+'05'});else main.applyOptions({upColor:C.up,downColor:C.dn,wickUpColor:C.up,wickDownColor:C.dn});
@@ -530,15 +568,15 @@ let bots=[],uid=0;
    він детерміновано відтворюється прогоном закритих свічок від t0 з урахуванням пауз (sp — інтервали роботи). */
 const clk=p=>{const H=DT[p];return Math.max(Date.now(),H&&H.length?H[H.length-1].t+36e5:0)};
 const actAt=(x,t)=>(x.sp||[]).some(([a,b])=>t>a&&(b==null||t<=b));
-function advance(x,live){const g=x.g,tf=g.tf||1,H=D[g.pair];if(!H||!H.length)return;const A=aggC(H,tf),W=tfMs(tf);if(!A.length)return;
+function advance(x,live){const g=x.g,tf=g.tf||1,H=D[dk(g)];if(!H||!H.length)return;const A=aggC(H,tf),W=tfMs(tf);if(!A.length)return;
 if(A[0].t>x.t0)x.trunc=1;let i=A.length;while(i>0&&A[i-1].t+W>x.lt)i--;if(i>=A.length)return;const e=entry(A,g);
 for(;i<A.length;i++){const c=A[i],ct=c.t+W;x.lt=ct;if(!actAt(x,ct))continue;const n0=x.b.tr.length,p0=x.b.pos,o0=p0?p0.n:0;
 x.b.step(Math.floor(c.t/W),c,e[i]);const v=x.b.eqv(c);x.pk=Math.max(x.pk,v);x.dd=Math.min(x.dd,v-x.pk);if(!live)continue;const t=x.b.tr,p=x.b.pos;
 if(t.length>n0){const l=t[t.length-1];notify(l.sl||l.liq?'sl':'close',x,{pnl:l.pnl,liq:l.liq})}else if(!p0&&p)notify('open',x,{price:c.c});else if(p0&&p&&p.n>o0)notify('dca',x,{price:p.last,n:p.n})}}
-function mk(g,ex,on=true,m={}){g={...DEF,...g};const t0=+m.t0||clk(g.pair),sp=Array.isArray(m.sp)?m.sp:on?[[t0,null]]:[];
+function mk(g,ex,on=true,m={}){g=normG({...DEF,...g});const t0=+m.t0||clk(dk(g)),sp=Array.isArray(m.sp)?m.sp:on?[[t0,null]]:[];
 const x={id:++uid,g,ex,on,b:new Bot(g),pk:0,dd:0,t0,lt:t0,sp};advance(x,0);bots.push(x);return x}
-function setOn(x,on){if(!!x.on===!!on)return;const t=clk(x.g.pair);x.on=!!on;if(on)x.sp.push([t,null]);else{const l=x.sp[x.sp.length-1];if(l&&l[1]==null)l[1]=t}}
-const bv=x=>x.b.eqv(lastC(x.g.pair));
+function setOn(x,on){if(!!x.on===!!on)return;const t=clk(dk(x.g));x.on=!!on;if(on)x.sp.push([t,null]);else{const l=x.sp[x.sp.length-1];if(l&&l[1]==null)l[1]=t}}
+const bv=x=>x.b.eqv(lastC(dk(x.g)));
 let BOOT=0,KEEP=[];const sloc=()=>{if(BOOT)sv('zorya3',bots.map(({g,ex,on,rid,pid,t0,sp})=>({g,ex,on,rid,pid,t0,sp})).concat(KEEP))},sbots=()=>{sloc();cloudQ()};
 function bcard(x){const p=x.b.pos,v=bv(x),s=x.b.tr,w=s.filter(t=>t.pnl>0).length;
 return`<div class="bc ${x.on?'on':'off'}" data-bot="${x.id}"><div class="bh"><b>${x.g.pair}</b><span class="mu">${dir(x.g)} · ${tfl(x.g.tf)} · ${x.g.lev}× · ${x.ex} · з ${tm(x.t0)}</span><span class="st" style="margin-left:auto">${x.on?'Працює':'Пауза'}</span></div>${!s.length&&!p?`<p class="mu" style="margin:0">Paper-бот торгує з моменту запуску: сигнал перевіряється після закриття кожної свічки ${tfl(x.g.tf)}. Минулі результати стратегії дивіться в бектесті.</p>`:''}${x.trunc?'<p class="mu" style="margin:0">Історії бракує, щоб відтворити бота з самого запуску: показано з найранішої доступної свічки.</p>':''}
@@ -557,16 +595,16 @@ if(VARIANT===2)h.innerHTML=`<div class="card hero"><div class="mu">Капіта�
 else h.innerHTML='';const a=$('#h-aw'),b=$('#h-nb'),c=$('#h-mk');if(a)a.onclick=()=>go('aw');if(b)b.onclick=()=>go('bd');if(c)c.onclick=()=>go('mk')}
 function chart(v,H=200){if(v.length<2)return'<p class="mu">Недостатньо угод для графіка.</p>';const W=640,mn=Math.min(0,...v),mx=Math.max(0,...v),sp=(mx-mn)||1,Y=y=>(H-8-(y-mn)/sp*(H-16)).toFixed(1),P=v.map((y,i)=>(i/(v.length-1)*W).toFixed(1)+' '+Y(y));
 return`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Крива капіталу" preserveAspectRatio="none" style="height:${H>150?'auto':H+'px'}"><path d="M0 ${Y(0)}H${W}" stroke="var(--ln)"/><path d="M${P.join('L')}V${H}H0Z" fill="var(--ac)" fill-opacity=".12"/><path d="M${P.join('L')}" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`}
-function stepBots(k){bots.filter(x=>x.g.pair===k&&x.on).forEach(x=>advance(x,1))}
+function stepBots(k){bots.filter(x=>dk(x.g)===k&&x.on).forEach(x=>advance(x,1))}
 /* демо: нова синтетична свічка кожні 1,5 с */
-function tick(){for(const k of Object.keys(DT)){const cs=DT[k];const c=nextC(PAIRS[k],Math.random);c.t=cs[cs.length-1].t+H1;cs.push(c);stepBots(k)}upd()}
+function tick(){for(const k of Object.keys(DT)){const cs=DT[k];const c=nextC(PAIRS[pairOf(k)],Math.random);c.t=cs[cs.length-1].t+H1;cs.push(c);stepBots(k)}upd()}
 /* live: опитування біржі, нові закриті свічки й поточна ціна */
-let polling=0;async function poll(){if(polling||MD.mode!=='live'||document.hidden)return;polling=1;try{const W=new Set(bots.filter(x=>x.on).map(x=>x.g.pair));$$('.chv').forEach(c=>{if(c.offsetParent&&c._d){const v=c===$('#gv')?$('#gv')._p:null;if(v)W.add(v)}});
-$$('.gr').forEach(g=>{if(!g.hidden){const b=g.closest('[data-bot]');if(b){const x=bots.find(y=>y.id===+b.dataset.bot);if(x)W.add(x.g.pair)}}});let ch=0;
-for(const p of W){if(!DT[p])continue;try{const a=await kl(p,{lim:3}),H=DT[p],now=Date.now();for(const c of a){if(c.t+H1<=now){if(c.t>H[H.length-1].t){H.push(c);stepBots(p);ch=1}}else{MD.live[p]=c;ch=1}}}catch(e){}}
+let polling=0;async function poll(){if(polling||MD.mode!=='live'||document.hidden)return;polling=1;try{const W=new Set(bots.filter(x=>x.on).map(x=>dk(x.g)));$$('.chv').forEach(c=>{if(c.offsetParent&&c._d){const v=c===$('#gv')?$('#gv')._k:null;if(v)W.add(v)}});
+$$('.gr').forEach(g=>{if(!g.hidden){const b=g.closest('[data-bot]');if(b){const x=bots.find(y=>y.id===+b.dataset.bot);if(x)W.add(dk(x.g))}}});let ch=0;
+for(const p of W){if(!DT[p])continue;try{const a=await kl(p,{lim:3}),H=DT[p],now=Date.now();for(const c of a){if(c.t+H1<=now){if(c.t>H[H.length-1].t){if(isF(p)&&c.t%(8*H1)===0)try{await frLoad(pairOf(p))}catch(e){}H.push(c);stepBots(p);ch=1}}else{MD.live[p]=c;ch=1}}}catch(e){}}
 if(ch)upd();const mc=$('#mkc');if(CUR==='mk'&&mc._poll)await mc._poll().catch(()=>{})}finally{polling=0}}
 function botClick(e){const t=e.target.closest('button');if(!t||!t.dataset.a)return;const x=bots.find(b=>b.id===+t.dataset.id),a=t.dataset.a;if(!x)return;
-if(a==='g'){const g=t.closest('.bc').querySelector('.gr');g.hidden=!g.hidden;if(!g.hidden&&!g._d)lwChart(g,()=>({pair:x.g.pair,tf:x.g.tf,lv:()=>lines(x.g,x.b.pos,x.g.pair),mk:()=>tradeMarks(x.b.tr,x.b.pos,x.g)}),'mini');else if(!g.hidden)g._d();return}
+if(a==='g'){const g=t.closest('.bc').querySelector('.gr');g.hidden=!g.hidden;if(!g.hidden&&!g._d)lwChart(g,()=>({pair:x.g.pair,key:dk(x.g),tf:x.g.tf,lv:()=>lines(x.g,x.b.pos,dk(x.g)),mk:()=>tradeMarks(x.b.tr,x.b.pos,x.g)}),'mini');else if(!g.hidden)g._d();return}
 if(a==='j'){const j=t.closest('.bc').querySelectorAll('.gr')[1];j.hidden=!j.hidden;j.innerHTML=jrn(x);return}
 if(a==='c'){fill(x.g,x.ex);go('bd');return}
 if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;bots=bots.filter(b=>b!==x)}else setOn(x,!x.on);sbots();lst()}
@@ -590,16 +628,20 @@ $$('[data-m]').forEach(b=>b.onclick=()=>{const c=cfg();fill({...c.g,...MODES[+b.
 function pv(){const c=cfg(),m=$('#flh'),e=bad(c);const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
 m.textContent=`Макс. плече для ${c.g.pair} на ${c.ex||'біржі'}: ${mx}×. Фундаментальний бал пари (демо): ${PAIRS[c.g.pair].f}/100.`+(c.g.lev>1&&c.g.fut?` Ліквідація приблизно за ${((1/c.g.lev-.005)*100).toFixed(1)}% проти позиції.`:'');
 if(e){$('#gs').textContent=e;return}
-if(!ready(c.g.pair)){$('#gs').textContent='Завантажую історію '+c.g.pair+(MD.src?' з '+MD.src:'')+'…';need(c.g.pair).then(pv).catch(er=>$('#gs').textContent='Не вдалося завантажити дані: '+er.message);return}
-const v=$('#gv');if(v._p!==c.g.pair||(v._g&&v._g.tf!==c.g.tf))v._mk=null;v._p=c.g.pair;v._g=c.g;if(!v._d)lwChart(v,()=>({pair:v._p,tf:v._g.tf,lv:()=>lines(v._g,null,v._p),mk:()=>v._mk||[]}),'full');else v._d();if(v._lt!==c.g.tf){v._lt=c.g.tf;if(v._tf){v._tf(c.g.tf);v._d()}}
-const A=lv(c.g,lastC(c.g.pair).c);$('#gs').textContent=`Сітка: ${n2(c.g.base*ladder(c.g),0)} USDT маржі, позиція до ${n2(A.L.reduce((a,l)=>a+l.s,0),0)} USDT. Лінії показано від поточної ціни.`}
+const ck=dk(c.g);if(!ready(ck)){$('#gs').textContent='Завантажую історію '+c.g.pair+' ('+mkLbl(ck)+')…';need(ck).then(pv).catch(er=>$('#gs').textContent='Не вдалося завантажити дані: '+er.message);return}
+const v=$('#gv');if(v._k!==ck||(v._g&&v._g.tf!==c.g.tf))v._mk=null;v._p=c.g.pair;v._k=ck;v._g=c.g;if(!v._d)lwChart(v,()=>({pair:v._p,key:v._k,tf:v._g.tf,lv:()=>lines(v._g,null,v._k),mk:()=>v._mk||[]}),'full');else v._d();if(v._lt!==c.g.tf){v._lt=c.g.tf;if(v._tf){v._tf(c.g.tf);v._d()}}
+const A=lv(c.g,lastC(ck).c);$('#gs').textContent=`Сітка: ${n2(c.g.base*ladder(c.g),0)} USDT маржі, позиція до ${n2(A.L.reduce((a,l)=>a+l.s,0),0)} USDT. Лінії показано від поточної ціни.`}
 $('#fg').oninput=$('#fg').onchange=pv;$('#fsg').onchange=pv;
 $('#bt').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;
-withData(c.g.pair,$('#res'),()=>{const R=bt(c.g,c.per,c.dep,1),s=summ(R,c.dep);bsave(c,s);
-$('#res').innerHTML=`<div class="k">${K('Угод',s.n)}${K('Win rate',s.wr.toFixed(0)+'%')}${K('PnL з відкритою позицією',f(s.pnl),cls(s.pnl))}${K('Реалізований / відкритий',f(s.real,0)+' / '+f(s.unr,0))}${K('Дохідність',f(s.roi,1)+'%',cls(s.roi))}${K('Макс. просадка',f(s.dd)+' ('+f(s.ddp,1)+'%)',cls(s.dd))}${K('Профіт-фактор',pf(s))}${K('Ліквідацій',s.liq,s.liq?'dn':'')}</div><h3>Графік угод</h3><div class="bt-ch"></div><h3>Крива капіталу</h3><div style="margin:8px 0 14px">${chart(s.cur)}</div><p class="mu">${c.g.pair}, ${tfl(c.g.tf)}, ${perl(c.per)} на ${hsrc()}${MD.mode==='live'&&D[c.g.pair].length<c.per?` (доступно ${n2(D[c.g.pair].length/24,0)} дн.)`:''}. Просадка враховує відкриті позиції, докупівлі в одній свічці виконуються до стопа. ${MD.mode==='live'?'Минулі результати не гарантують майбутніх, тому дивіться й розділ «Стрес-тест».':'Демо-ціни поводяться м’якше за реальний ринок, тому дивіться й розділ «Стрес-тест».'}</p>`+R.b.tr.slice(-8).reverse().map(t=>`<div class="tr"><span>${tm(t.ts)}, ордерів ${t.n}${t.liq?', ліквідація':t.sl?', SL':''}</span><span class="mono ${cls(t.pnl)}">${f(t.pnl)}</span></div>`).join('');
-btChart($('#res .bt-ch'),c.g,R);const v=$('#gv');if(v._d&&v._p===c.g.pair){v._mk=tradeMarks(R.b.tr,R.b.pos,c.g);v._d()}},c.per+300)};
-function btChart(el,g,R){if(!el)return;const mk=tradeMarks(R.b.tr,R.b.pos,g),lv=()=>R.b.pos?lines(g,R.b.pos,g.pair):[];lwChart(el,()=>({pair:g.pair,tf:g.tf,lv,mk:()=>mk}),'mini')}
-$('#ad').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;withData(c.g.pair,$('#res'),()=>{mk(c.g,c.ex);sbots();lst();go(VARIANT===2?'bots':'ov')})};
+withData(dk(c.g),$('#res'),()=>{const R=bt(c.g,c.per,c.dep,1),s=summ(R,c.dep);bsave(c,s);
+$('#res').innerHTML=`<div class="k">${K('Угод',s.n)}${K('Win rate',s.wr.toFixed(0)+'%')}${K('PnL з відкритою позицією',f(s.pnl),cls(s.pnl))}${K('Реалізований / відкритий',f(s.real,0)+' / '+f(s.unr,0))}${K('Дохідність',f(s.roi,1)+'%',cls(s.roi))}${K('Макс. просадка',f(s.dd)+' ('+f(s.ddp,1)+'%)',cls(s.dd))}${K('Профіт-фактор',pf(s))}${K('Ліквідацій',s.liq,s.liq?'dn':'')}${c.g.fut?K('Funding',f(-s.fund),cls(-s.fund)):''}</div><p class="mu" style="margin-top:10px">${dataNote(c.g)}</p><h3>Графік угод</h3><div class="bt-ch"></div><h3>Крива капіталу</h3><div style="margin:8px 0 14px">${chart(s.cur)}</div><p class="mu">${c.g.pair}, ${tfl(c.g.tf)}, ${perl(c.per)} на ${hsrc()}${MD.mode==='live'&&D[dk(c.g)].length<c.per?` (доступно ${n2(D[dk(c.g)].length/24,0)} дн.)`:''}. Просадка враховує відкриті позиції, докупівлі в одній свічці виконуються до стопа. ${MD.mode==='live'?'Минулі результати не гарантують майбутніх, тому дивіться й розділ «Стрес-тест».':'Демо-ціни поводяться м’якше за реальний ринок, тому дивіться й розділ «Стрес-тест».'}</p>`+R.b.tr.slice(-8).reverse().map(t=>`<div class="tr"><span>${tm(t.ts)}, ордерів ${t.n}${t.liq?', ліквідація':t.sl?', SL':''}</span><span class="mono ${cls(t.pnl)}">${f(t.pnl)}</span></div>`).join('');
+btChart($('#res .bt-ch'),c.g,R);const v=$('#gv');if(v._d&&v._k===dk(c.g)){v._mk=tradeMarks(R.b.tr,R.b.pos,c.g);v._d()}},c.per+300)};
+function btChart(el,g,R){if(!el)return;const mk=tradeMarks(R.b.tr,R.b.pos,g),k=dk(g),lv=()=>R.b.pos?lines(g,R.b.pos,k):[];lwChart(el,()=>({pair:g.pair,key:k,tf:g.tf,lv,mk:()=>mk}),'mini')}
+/* опис джерела даних і моделі комісій для бектесту */
+function dataNote(g){const k=dk(normG({...g}));if(MD.mode!=='live')return'Дані: демо-історія.';
+if(isF(k))return`Дані: ф'ючерси ${MD.fsrc} (USDⓈ-M), ліквідація за mark price, funding кожні 8 год враховано. Комісії: 0,02% мейкер (DCA, TP), 0,05% тейкер (вхід, стоп).`;
+return g.fut?`Ф'ючерсних даних для пари немає${MD.ferr?' ('+esc(MD.ferr)+')':''}: використано спот ${MD.src}, без funding і mark price. Комісії 0,1%.`:`Дані: спот ${MD.src}. Комісії 0,1%.`}
+$('#ad').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;withData(dk(c.g),$('#res'),()=>{mk(c.g,c.ex);sbots();lst();go(VARIANT===2?'bots':'ov')})};
 $('#sxb').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;SXG=c.g;go('sx')};
 
 /* ---------- історія бектестів ---------- */
@@ -608,8 +650,8 @@ function bsave(c,s){const e={ex:c.ex,per:c.per,dep:c.dep,g:c.g,n:s.n,wr:s.wr,pnl
 function bsl(){$('#bsh').innerHTML=BT.length?BT.map((b,i)=>`<div class="bc off"><div class="bh"><b>${ttl({g:b.g})}</b><span class="mu">${perl(b.per)} · ${new Date(b.t).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span></div><div class="bm"><div>PnL<b class="${cls(b.pnl)}">${f(b.pnl)}</b></div><div>Дохідність<b class="${cls(b.roi)}">${f(b.roi,1)}%</b></div><div>Угод / win<b>${b.n} / ${b.wr.toFixed(0)}%</b></div><div>Просадка<b class="${cls(b.dd)}">${f(b.dd,0)}</b></div></div><div class="ac"><button class="b sm" data-a="g" data-i="${i}">Графік</button><button class="b sm" data-a="o" data-i="${i}">Відкрити</button><button class="b sm" data-a="r" data-i="${i}">Запустити бота</button><button class="b sm d" data-a="x" data-i="${i}">Видалити</button></div><div class="gr" hidden></div></div>`).join(''):'<p class="mu">Бектестів ще немає.</p>'}
 $('#bsh').onclick=e=>{const t=e.target.closest('button');if(!t)return;const i=+t.dataset.i,b=BT[i],a=t.dataset.a;
 if(a==='o'){fill(b.g,b.ex);$('#fper').value=b.per;$('#fdp').value=b.dep;go('bd');return}
-if(a==='g'){const el=t.closest('.bc').querySelector('.gr');el.hidden=!el.hidden;if(!el.hidden&&!el._d)withData(b.g.pair,el,()=>{if(PAIRS[b.g.pair])btChart(el,b.g,bt(b.g,b.per,b.dep,0))},b.per+300);return}
-if(a==='r'){withData(b.g.pair,null,()=>{mk(b.g,b.ex);sbots();lst();go(VARIANT===2?'bots':'ov')});return}
+if(a==='g'){const el=t.closest('.bc').querySelector('.gr');el.hidden=!el.hidden;if(!el.hidden&&!el._d)withData(dk(b.g),el,()=>{if(PAIRS[b.g.pair])btChart(el,b.g,bt(b.g,b.per,b.dep,0))},b.per+300);return}
+if(a==='r'){withData(dk(b.g),null,()=>{mk(b.g,b.ex);sbots();lst();go(VARIANT===2?'bots':'ov')});return}
 const gone=BT.splice(i,1)[0];sv('zbt',BT);bsl();if(CLOUD.u&&gone&&gone.rid)SB.from('backtests').delete().eq('id',gone.rid).then(r=>{if(r.error)cloudFail(r.error)})};
 
 /* ---------- Авто-майстер ---------- */
@@ -628,12 +670,12 @@ $('#awr').innerHTML=`<div class="card"><h2>Підібрана конфігура
 function awRun(c){const o=$('#awr');if(!PAIRS[c.pair]||!c.ex||!listed(c.pair,c.ex))return o.innerHTML='<p class="dn">Оберіть пару зі списку, яка торгується на вибраній біржі.</p>';
 if(c.dr<0&&!c.fut)return o.innerHTML='<p class="dn">Short доступний лише на Futures.</p>';
 if(c.tf&&Math.floor(c.per/c.tf)<60)return o.innerHTML='<p class="dn">Для цього таймфрейму період замалий: потрібно щонайменше 60 свічок.</p>';
-withData(c.pair,o,()=>{o.innerHTML='<p class="mu">Підбираю конфігурацію…</p>';
+withData(dk(c),o,()=>{o.innerHTML='<p class="mu">Підбираю конфігурацію…</p>';
 setTimeout(()=>{try{const t=auto(c,0);if(!t.length)return o.innerHTML='<p class="dn">Не знайшлося конфігурації з достатньою кількістю угод. Спробуйте більший період, більшу суму (мінімальний ордер 5 USDT) або інший таймфрейм.</p>';
 AW={r:t.map(x=>evalC(x,c)),c};awi=0;awShow(0)}catch(e){o.innerHTML='<p class="dn">Помилка розрахунку: '+e.message+'</p>'}},30)},c.per+300)}
 $('#awb').onclick=()=>{let p=$('#awp').value.trim().toUpperCase();if(!p.includes('/'))p+='/USDT';awRun({pair:p,ex:$('#awe').value,amt:+$('#awa').value||0,per:+$('#awr2').value,tf:+$('#awt').value,dr:+$('#awd').value,fut:+$('#awm').value,lev:+$('#awl').value})};
 $('#awr').onclick=e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.v!=null){awi=+t.dataset.v;awShow(awi);return}
-const E=AW.r[awi],c=AW.c;if(t.dataset.a==='a'){withData(E.g.pair,null,()=>{mk(E.g,c.ex);sbots();lst();go(VARIANT===2?'bots':'ov')})}else if(t.dataset.a==='f'){addFav(E,c.ex);t.textContent='Додано в топові'}else{fill(E.g,c.ex);$('#fper').value=c.per;$('#fdp').value=Math.round(c.amt||E.need);go('bd')}};
+const E=AW.r[awi],c=AW.c;if(t.dataset.a==='a'){withData(dk(E.g),null,()=>{mk(E.g,c.ex);sbots();lst();go(VARIANT===2?'bots':'ov')})}else if(t.dataset.a==='f'){addFav(E,c.ex);t.textContent='Додано в топові'}else{fill(E.g,c.ex);$('#fper').value=c.per;$('#fdp').value=Math.round(c.amt||E.need);go('bd')}};
 $('#awg').onclick=()=>go('aw');
 
 /* ---------- топові боти: щонеділі перераховує Автомайстер ---------- */
@@ -649,7 +691,7 @@ function topJob(force){const ws=lastSun();if(topBusy||MD.mode==='init'||(!force&
 const step=async()=>{if(i>=pairs.length){/* рейтинг — лише за перевіркою поза підбором (останні 30% періоду), щоб не винагороджувати підгонку */
 res.sort((a,b)=>(b.troi+(b.tdd||0))-(a.troi+(a.tdd||0)));TOP={ts:ws,at:Date.now(),list:res.slice(0,30),v:4,m:MD.mode};sv('ztop',TOP);topBusy=0;favs();seed();return}
 const p=pairs[i++];$('#tops').textContent=`Авто-майстер оновлює топ на ${hsrc()}: ${i} з ${pairs.length}…`;
-try{await need(p);const ex=cx.find(e=>listed(p,e));if(ex){const c={pair:p,ex,amt:0,per:8760,tf:0,dr:0,fut:1,lev:0},t=auto(c,ws%997);for(const o of t){const E=evalC(o,c);if(E.st.n>=5&&E.st.pnl>0&&!E.sf.liq)res.push(pack(E,ex))}}}catch(e){}
+try{await need(dk({pair:p,fut:1}));const ex=cx.find(e=>listed(p,e));if(ex){const c={pair:p,ex,amt:0,per:8760,tf:0,dr:0,fut:1,lev:0},t=auto(c,ws%997);for(const o of t){const E=evalC(o,c);if(E.st.n>=5&&E.st.pnl>0&&!E.sf.liq)res.push(pack(E,ex))}}}catch(e){}
 setTimeout(step,20)};step()}
 function tfilter(){$('#tfl').innerHTML=sel('tf-per','Період',TPER,TF.per)+sel('tf-by','Сортувати за',[['roi','Дохідність, %'],['pnl','PnL, USDT'],['wr','Win rate'],['n','Кількість угод'],['dd','Найменша просадка']],TF.by)+sel('tf-dep','Депозит до',[[0,'Будь-який'],[100,'100 USDT'],[300,'300 USDT'],[500,'500 USDT'],[1000,'1 000 USDT'],[3000,'3 000 USDT']],TF.dep)+sel('tf-d','Напрямок',[[0,'Усі'],[1,'Long'],[-1,'Short']],TF.d)+sel('tf-tf','Таймфрейм',[[0,'Усі'],...TFS],TF.tf)+sel('tf-dd','Просадка до',[[0,'Будь-яка'],[5,'5%'],[10,'10%'],[20,'20%'],[35,'35%']],TF.dd)+sel('tf-ex','Біржа',[['','Усі'],...cx.map(e=>[e,e])],TF.ex);
 $('#tfl').onchange=()=>{TF={per:+$('#tf-per').value,by:$('#tf-by').value,dep:+$('#tf-dep').value,d:+$('#tf-d').value,tf:+$('#tf-tf').value,dd:+$('#tf-dd').value,ex:$('#tf-ex').value};sv('ztf',TF);favs()}}
@@ -677,7 +719,7 @@ if(a==='f'){if(it.src==='pre'){const on=!FAVP.has(it.pid);on?FAVP.add(it.pid):FA
 if(CLOUD.u&&SB){const q=on?SB.from('favorite_presets').upsert({user_id:CLOUD.u.id,preset_id:it.pid},{onConflict:'user_id,preset_id',ignoreDuplicates:true}):SB.from('favorite_presets').delete().eq('preset_id',it.pid).eq('user_id',CLOUD.u.id);q.then(r=>{if(r.error)cloudFail(r.error)})}}
 else{if(FAVT[it.k])delete FAVT[it.k];else{const{k,src,title,desc,...rest}=it;FAVT[it.k]={...rest,k,src,title,desc}}sv('zfavt',FAVT)}favs();return}
 if(!PAIRS[it.g.pair])return toast('Пара '+it.g.pair+' зараз недоступна');
-if(a==='r'){withData(it.g.pair,null,()=>{const x=mk(it.g,it.ex);if(it.pid)x.pid=it.pid;sbots();lst();toast('Бот '+it.title+' запущено в paper-режимі')});t.textContent='Додано';setTimeout(()=>t.textContent='Запустити',1500);return}
+if(a==='r'){withData(dk(it.g),null,()=>{const x=mk(it.g,it.ex);if(it.pid)x.pid=it.pid;sbots();lst();toast('Бот '+it.title+' запущено в paper-режимі')});t.textContent='Додано';setTimeout(()=>t.textContent='Запустити',1500);return}
 fill(it.g,it.ex);$('#fdp').value=Math.round(it.need||1000);go('bd')}
 $('#fav').onclick=topClick;$('#favp').onclick=topClick;
 $('#tfb').onclick=()=>{const p=$('#tfp'),o=p.hidden;p.hidden=!o;$('#tfb').setAttribute('aria-expanded',o)};
@@ -686,9 +728,17 @@ function seed(){if(ld('zseed',0)||bots.length||!TOP.list.length)return;TOP.list.
 
 /* ---------- ринок ---------- */
 let MKP='BTC/USDT';
-function mkt(){const mc=$('#mkc');mc._p=MKP;if(!mc._d)lwChart(mc,()=>({pair:mc._p}),'market');else mc._d();$('#mks').textContent=MD.mode==='live'?`Ціни ${MD.src} у реальному часі, свічки від 1 хвилини.`:'Біржі недоступні, показано демо-дані. Якщо файл відкрито в перегляді застосунку Claude, він блокує інтернет-запити: відкрийте файл у Chrome чи Safari, щоб бачити реальні ціни.';
-const row=(p,c,d)=>`<div class="pl" data-p="${p}"><b>${p}</b><span class="mono">${px(c)} <span class="${cls(d)}">${f(d,2)}%</span></span></div>`;
-$('#mkl').innerHTML=PK.slice(0,60).map(p=>{if(MD.mode==='live'){const t=MD.tk[sym(p)];return t?row(p,t.c,t.o?(t.c/t.o-1)*100:0):''}const a=D[p],l=a[a.length-1];return row(p,l.c,(l.c/a[a.length-25].c-1)*100)}).join('')}
+let MKM=ld('zmkm','F');
+const mkKey=()=>MKM==='F'&&MD.fut&&MD.fset&&MD.fset.has(MKP)?MKP+FK:MKP;
+function mkt(){const fOK=MD.mode==='live'&&MD.fut;if(!fOK)MKM='S';$$('#mkm [data-mm]').forEach(b=>{b.setAttribute('aria-pressed',b.dataset.mm===MKM);b.hidden=b.dataset.mm==='F'&&!fOK});
+const mc=$('#mkc');mc._p=MKP;mc._k=mkKey();if(!mc._d)lwChart(mc,()=>({pair:mc._p,key:mc._k}),'market');else mc._d();
+const fT=MKM==='F'&&fOK,fr=fT&&MD.ftk[sym(MKP)];
+$('#mks').textContent=MD.mode!=='live'?'Біржі недоступні, показано демо-дані. Якщо файл відкрито в перегляді застосунку Claude, він блокує інтернет-запити: відкрийте файл у Chrome чи Safari, щоб бачити реальні ціни.'
+:fT?`Безстрокові ф'ючерси ${MD.fsrc}, свічки від 1 хвилини.${fr&&isFinite(fr.fr)?' Поточний funding: '+(fr.fr*100).toFixed(4)+'%.':''}${!MD.fset.has(MKP)?' Для цієї пари ф\'ючерсу немає — показано спот.':''}`
+:`Спот ${MD.src} у реальному часі, свічки від 1 хвилини.${MD.mode==='live'&&!MD.fut&&MD.ferr?' Ф\'ючерсні дані недоступні: '+MD.ferr:''}`;
+const row=(p,c,d,x)=>`<div class="pl" data-p="${p}"><b>${p}</b><span class="mono">${px(c)} <span class="${cls(d)}">${f(d,2)}%</span>${x||''}</span></div>`,T=fT?MD.ftk:MD.tk;
+$('#mkl').innerHTML=PK.slice(0,60).map(p=>{if(MD.mode==='live'){const t=T[sym(p)];return t?row(p,t.c,t.o?(t.c/t.o-1)*100:0,fT&&isFinite(t.fr)&&t.fr?` <span class="mu">f ${(t.fr*100).toFixed(3)}%</span>`:''):''}const a=D[p],l=a[a.length-1];return row(p,l.c,(l.c/a[a.length-25].c-1)*100)}).join('')}
+$('#mkm').onclick=e=>{const b=e.target.closest('[data-mm]');if(!b)return;MKM=b.dataset.mm;sv('zmkm',MKM);mkt()};
 $('#mkl').onclick=e=>{const t=e.target.closest('[data-p]');if(!t)return;MKP=t.dataset.p;$('#mq').value=MKP;mkt();scrollTo(0,0)};
 $('#mq').onchange=()=>{let p=$('#mq').value.trim().toUpperCase();if(!p.includes('/'))p+='/USDT';if(PAIRS[p]){MKP=p;mkt()}};
 $('#mkb').onclick=()=>{fill({...DEF,pair:MKP},cx[0]);go('bd')};$('#mka').onclick=()=>{$('#awp').value=MKP;go('aw')};
@@ -705,8 +755,8 @@ let SXG=null;
 function sxr(){const o=$('#sxs');o.innerHTML=bots.map(x=>`<option value="${x.id}">${ttl(x)}</option>`).join('')+(SXG?'<option value="b">Налаштування з конструктора</option>':'')||'<option value="">Немає ботів</option>';if(SXG)o.value='b'}
 $('#sxo').onclick=()=>{const v=$('#sxs').value,g=v==='b'?SXG:(bots.find(x=>x.id===+v)||{}).g;if(!g)return $('#sxt').innerHTML='<p class="dn">Створіть бота або відкрийте стрес-тест із конструктора.</p>';
 const M=g.base*ladder(g),r=stress(g);$('#sxt').innerHTML=`<div class="sc"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Кінець</th><th>Результат</th></tr>${r.map(x=>`<tr><td>${x.n}</td><td>${x.dca}</td><td class="mono ${cls(x.mn)}">${f(x.mn,0)}</td><td class="mono ${cls(x.end)}">${f(x.end,0)}</td><td>${x.liq?'ліквідація':x.sl?'SL':'—'}</td></tr>`).join('')}</table></div><p class="mu" style="margin-top:8px">Маржа сітки ${n2(M,0)} USDT. Бот відкриває позицію перед ударом ринку; стопи виконуються з прослизанням 2%. Найгірший збиток: ${f(Math.min(...r.map(x=>x.mn)),0)} USDT.</p>`};
-$('#pfb').onclick=()=>{const o=$('#pft2');o.textContent='Рахую…';needAll(['BTC/USDT','ETH/USDT']).then(()=>setTimeout(()=>{const t0=performance.now();for(let i=0;i<100;i++)bt({...DEF,pair:'BTC/USDT',rm:30+i%10},8760,1000,0);const a=performance.now()-t0,t1=performance.now();auto({pair:'ETH/USDT',ex:'Bybit',amt:1000,per:8760,tf:0,dr:0,fut:1,lev:0},1);const b=performance.now()-t1;
-o.innerHTML=KV('100 бектестів, 1 рік',Math.round(a)+' мс')+KV('Автомайстер, 1 рік, усі таймфрейми',Math.round(b)+' мс')+KV('Пар у пам’яті',Object.keys(D).length+' з '+PK.length)+KV('Активних ботів',bots.filter(x=>x.on).length)+KV('Джерело даних',MD.mode==='live'?MD.src:'демо')},30)).catch(e=>o.textContent='Помилка: '+e.message)};
+$('#pfb').onclick=()=>{const o=$('#pft2');o.textContent='Рахую…';needAll([dk({...DEF,pair:'BTC/USDT'}),dk({...DEF,pair:'ETH/USDT'})]).then(()=>setTimeout(()=>{const t0=performance.now();for(let i=0;i<100;i++)bt({...DEF,pair:'BTC/USDT',rm:30+i%10},8760,1000,0);const a=performance.now()-t0,t1=performance.now();auto({pair:'ETH/USDT',ex:'Bybit',amt:1000,per:8760,tf:0,dr:0,fut:1,lev:0},1);const b=performance.now()-t1;
+o.innerHTML=KV('100 бектестів, 1 рік',Math.round(a)+' мс')+KV('Автомайстер, 1 рік, усі таймфрейми',Math.round(b)+' мс')+KV('Пар у пам’яті',Object.keys(D).length+' з '+PK.length)+KV('Активних ботів',bots.filter(x=>x.on).length)+KV('Джерело даних',MD.mode==='live'?MD.src+(MD.fut?' + '+MD.fsrc:''):'демо')},30)).catch(e=>o.textContent='Помилка: '+e.message)};
 
 /* ---------- статистика ---------- */
 function sta(){const R=bots.map(x=>{const t=x.b.tr,w=t.filter(a=>a.pnl>0).length,gp=t.filter(a=>a.pnl>0).reduce((a,b)=>a+b.pnl,0),gl=-t.filter(a=>a.pnl<=0).reduce((a,b)=>a+b.pnl,0);return{x,n:t.length,wr:t.length?w/t.length*100:0,v:bv(x),pf:gl?gp/gl:gp?Infinity:0,dd:x.dd}});
@@ -814,13 +864,13 @@ let PRE=[],FAVP=new Set(ld('zfavp',[]));
 async function presLoad(){if(!SB)return;
 const r=await SB.from('bot_presets').select('id,name,description,exchange,risk_level,config,sort_order').order('sort_order');
 if(r.error){toast('Не вдалося завантажити стратегії Orbix: '+r.error.message);return}
-PRE=r.data.filter(p=>p.config&&PAIRS[p.config.pair]);for(const p of PRE){try{await need(p.config.pair);preStats(p)}catch(e){}}presR()}
+PRE=r.data.filter(p=>p.config&&PAIRS[p.config.pair]);for(const p of PRE){try{await need(dk({...DEF,...p.config}));preStats(p)}catch(e){}}presR()}
 function preStats(p){if(p._p)return p._p;const g={...DEF,...p.config},dep=Math.round(2*g.base*ladder(g));p._dep=dep;return p._p=pstats(g,dep)}
 function presR(){favs()}
 /* акаунт */
 const AUTHM={'Invalid login credentials':'Невірний email або пароль.','Email not confirmed':'Спершу підтвердіть адресу за посиланням у листі.','User already registered':'Такий акаунт уже є — просто увійдіть.'};
 const authMsg=e=>{const m=(e&&e.message)||String(e);return AUTHM[m]||(/rate limit|too many/i.test(m)?'Забагато спроб, спробуйте трохи пізніше.':m)};
-function accR(){const el=$('#acc'),ch=$('#chip');if(ch){ch.textContent=(MD.mode==='live'?'Live · '+MD.src:MD.mode==='init'?'Підключення…':'Демо-дані')+(CLOUD.u?' · ☁':'');ch.title=MD.mode==='demo'&&MD.err?'Біржі недоступні: '+MD.err:''}if(!el)return;
+function accR(){const el=$('#acc'),ch=$('#chip');if(ch){ch.textContent=(MD.mode==='live'?'Live · '+MD.src+(MD.fut?' · F':''):MD.mode==='init'?'Підключення…':'Демо-дані')+(CLOUD.u?' · ☁':'');ch.title=MD.mode==='demo'&&MD.err?'Біржі недоступні: '+MD.err:''}if(!el)return;
 if(!SB){el.innerHTML='<h2>Акаунт Orbix</h2><p class="mu">Хмара зараз недоступна (немає з’єднання). Дані зберігаються в цьому браузері.</p>';return}
 const u=CLOUD.u;
 if(u){el.innerHTML=`<h2>Акаунт Orbix</h2>${KV('Email',esc(u.email||''))}${KV('Синхронізація',CLOUD.err?'<span class="dn">помилка</span>':CLOUD.ok?'збережено о '+new Date(CLOUD.ok).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}):'триває…')}${CLOUD.err?`<p class="dn" style="margin-top:6px">${esc(CLOUD.err)}</p>`:''}<p class="mu" style="margin-top:8px">Боти, бектести, обрані й ім’я зберігаються в хмарі Orbix і доступні з будь-якого пристрою.</p><div class="row" style="margin-top:12px"><button class="b" id="ao">Вийти з акаунта</button></div>`;$('#ao').onclick=()=>SB.auth.signOut();return}
@@ -835,8 +885,8 @@ async function cloudIn(u){CLOUD.u=u;CLOUD.err='';accR();
 if(ld('zuid','')!==u.id)bots=bots.filter(x=>!x.rid);sv('zuid',u.id);
 await (csQ=csQ.then(()=>cloudSave(1)));if(CLOUD.err)return;
 const r=await SB.from('bots').select('id,exchange,status,config,preset_id,started_at').order('created_at');if(r.error)return cloudFail(r.error);
-for(const row of r.data){const c=row.config||{};if(c.pair&&PAIRS[c.pair])try{await need(c.pair,hrsFor(c._t0,c.tf))}catch(e){}}
-bots=[];for(const row of r.data){const{_t0,_sp,...g}=row.config||{};if(!g.pair||!PAIRS[g.pair]||!ready(g.pair))continue;const x=mk(g,row.exchange,row.status==='running',{t0:_t0||Date.parse(row.started_at||'')||0,sp:_sp});x.rid=row.id;x.pid=row.preset_id;x._h=JSON.stringify(brow(x))}
+for(const row of r.data){const c=row.config||{};if(c.pair&&PAIRS[c.pair])try{await need(dk(c),hrsFor(c._t0,c.tf))}catch(e){}}
+bots=[];for(const row of r.data){const{_t0,_sp,...g}=row.config||{};if(!g.pair||!PAIRS[g.pair]||!ready(dk(g)))continue;const x=mk(g,row.exchange,row.status==='running',{t0:_t0||Date.parse(row.started_at||'')||0,sp:_sp});x.rid=row.id;x.pid=row.preset_id;x._h=JSON.stringify(brow(x))}
 CLOUD.known=new Set(r.data.map(x=>x.id));sloc();lst();
 const b=await SB.from('backtests').select('id,exchange,config,results,created_at').order('created_at',{ascending:false}).limit(12);
 if(!b.error){BT=b.data.filter(x=>x.config&&PAIRS[x.config.pair]).map(x=>{const s=x.results||{};return{rid:x.id,ex:x.exchange,g:x.config,per:s.per||8760,dep:s.dep||1000,n:s.n||0,wr:s.wr||0,pnl:s.pnl||0,roi:s.roi||0,dd:s.dd||0,t:Date.parse(x.created_at)}});sv('zbt',BT)}
@@ -857,8 +907,8 @@ async function boot(){await MD.ip;accR();mnuR();
 $('#fp').innerHTML=PK.map(k=>`<option value="${k}">${k}</option>`).join('');$('#pl').innerHTML=PK.map(k=>`<option value="${k}">`).join('');if(!PAIRS[MKP])MKP=PK[0];
 const saved=ld('zorya3',[]).filter(x=>x&&x.g),ps=[...new Set(saved.map(x=>x.g.pair).filter(p=>PAIRS[p]))];
 $('#tops').textContent=MD.mode==='live'?`Завантажую реальні дані ${MD.src}…`:'Біржі недоступні, працюю на демо-даних.';
-try{await need('BTC/USDT')}catch(e){}for(const x of saved)if(PAIRS[x.g.pair])try{await need(x.g.pair,hrsFor(x.t0,x.g.tf))}catch(e){}
-for(const x of saved){if(PAIRS[x.g.pair]&&ready(x.g.pair)){const b=mk(x.g,x.ex,x.on!==false,{t0:x.t0,sp:x.sp});b.rid=x.rid;b.pid=x.pid}else KEEP.push(x)}
+try{await need('BTC/USDT')}catch(e){}for(const x of saved)if(PAIRS[x.g.pair])try{await need(dk(x.g),hrsFor(x.t0,x.g.tf))}catch(e){}
+for(const x of saved){if(PAIRS[x.g.pair]&&ready(dk(x.g))){const b=mk(x.g,x.ex,x.on!==false,{t0:x.t0,sp:x.sp});b.rid=x.rid;b.pid=x.pid}else KEEP.push(x)}
 BOOT=1;sloc();lst();favs();if(CUR==='bd')pv();if(CUR==='mk')mkt();
 cloudStart();setTimeout(()=>topJob(0),400);setInterval(()=>topJob(0),60000);
 if(MD.mode==='live'){setInterval(poll,15000);setInterval(()=>{if(CUR==='mk')tkRefresh().then(mkt)},30000)}else setInterval(tick,1500)}

@@ -132,6 +132,11 @@ export function bybit(key: string, secret: string) {
       const l = (await call("GET", "/v5/order/realtime", { category: "linear", symbol, orderFilter: "Order", limit: 50 })).list ?? [];
       return l.map((o: any) => ({ id: o.orderId, link: o.orderLinkId, side: o.side, price: +o.price, qty: +o.qty, reduceOnly: !!o.reduceOnly }));
     },
+    // скасувати один ордер за власним ідентифікатором (якщо його вже немає — не помилка)
+    async cancel(symbol: string, link: string) {
+      try { await call("POST", "/v5/order/cancel", { category: "linear", symbol, orderLinkId: link }); }
+      catch (e) { if ((e as ExErr).code !== 110001) throw e; } // 110001: ордера не існує
+    },
     // скасовує лише звичайні (лімітні) ордери; TP/SL позиції лишаються, доки позиція відкрита
     async cancelAll(symbol: string) { await call("POST", "/v5/order/cancel-all", { category: "linear", symbol, orderFilter: "Order" }); },
     // TP/SL/трейлінг на всю позицію (ринкове виконання за останньою ціною); 0 — прибрати.

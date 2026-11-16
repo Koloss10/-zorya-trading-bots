@@ -1,7 +1,7 @@
 // Виконання угод серверного бота на демо-біржі: ордери на біржі й захист від повторів (фейкова біржа).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, execute, guard, handleBot, ladder, linkId, protect, sync, MAX_TRIES } from '../supabase/functions/runner/mirror.js';
+import { actionsFor, execute, guard, handleBot, ladder, linkId, park, protect, sync, MAX_TRIES } from '../supabase/functions/runner/mirror.js';
 import { botConfig } from '../supabase/functions/runner/core.js';
 import { Bot } from '../supabase/functions/runner/engine.js';
 
@@ -35,6 +35,7 @@ function fakeEx({ px = 2.5, native = true } = {}) {
     },
     async byLink(_s, link) { const o = S.orders.find((x) => x.link === link); return o ? { id: 1, qty: o.qty, price: o.price, status: o.status, link } : null; },
     async openOrders() { return S.orders.filter((o) => o.status === 'New').map((o) => ({ link: o.link, price: o.price, qty: o.qty })); },
+    async cancel(_s, link) { S.calls.push('cancel'); const o = S.orders.find((x) => x.link === link && x.status === 'New'); if (o) o.status = 'Cancelled'; },
     async cancelAll() { S.calls.push('cancelAll'); for (const o of S.orders) if (o.status === 'New') o.status = 'Cancelled'; },
     async tradingStop(_s, { tp, sl, ts = 0, ap = 0 }) { S.calls.push('tradingStop'); if (ts && S.rejectTs) throw new Error('trailing stop distance invalid'); if (S.pos) { S.pos.tp = tp; S.pos.sl = sl; S.pos.ts = ts; S.pos.ap = ap; } },
     /* ціна дійшла до лімітного ордера */
@@ -194,4 +195,22 @@ test('Застарілий сигнал (сервер простоював) на
   ex.S.pos = { symbol: 'TONUSDT', amt: 24, entry: 2.5, tp: 0, sl: 0, ts: 0 };
   await run(ex, { now: T + 9 * 36e5, events: [{ kind: 'close', pnl: 1, t: T }] });
   assert.equal(ex.S.pos, null);
+});
+
+test('Пауза: знімаються лише лімітні докупівлі цього бота, позиція зі стопом лишається; повтор нічого не робить', async () => {
+  const ex = fakeEx(), [a] = actionsFor([{ kind: 'open', notional: 60, t: T }], BOT, true);
+  await execute(ex, a, ctx);
+  ex.S.orders.push({ link: 'manual-1', side: 'BUY', qty: 1, price: 2.0, status: 'New' }); // чужий ордер користувача
+  const m = await park(ex, { symbol: 'TONUSDT', botId: BOT });
+  assert.match(m, /знято 3 лімітн/); assert.match(m, /зі стопом/);
+  assert.ok(ex.S.pos && ex.S.pos.sl > 0, 'позиція і стоп на місці');
+  assert.deepEqual((await ex.openOrders()).map((o) => o.link), ['manual-1'], 'чужі ордери не чіпаються');
+  const n = count(ex, 'cancel'); await park(ex, { symbol: 'TONUSDT', botId: BOT }); assert.equal(count(ex, 'cancel'), n);
+  ex.S.pos = null; ex.S.orders = [];
+  assert.equal(await park(ex, { symbol: 'TONUSDT', botId: BOT }), null, 'нічого немає — без повідомлення');
+});
+
+test('Після зняття з паузи прапорець «parked» скидається', async () => {
+  const ex = fakeEx(), a = await run(ex, { state: { fl: { parked: 1 }, pend: [] }, events: [] });
+  assert.equal(a.saved.at(-1).fl.parked, undefined);
 });

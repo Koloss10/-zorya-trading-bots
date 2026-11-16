@@ -1,7 +1,7 @@
 // Виконання угод серверного бота на демо-біржі: ордери на біржі й захист від повторів (фейкова біржа).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, execute, handleBot, ladder, linkId, protect, sync, MAX_TRIES } from '../supabase/functions/runner/mirror.js';
+import { actionsFor, execute, guard, handleBot, ladder, linkId, protect, sync, MAX_TRIES } from '../supabase/functions/runner/mirror.js';
 import { botConfig } from '../supabase/functions/runner/core.js';
 import { Bot } from '../supabase/functions/runner/engine.js';
 
@@ -14,13 +14,13 @@ function fakeEx({ px = 2.5, native = true } = {}) {
   const S = { px, pos: null, orders: [], calls: [], fills: [] };
   const fill = (side, qty, price) => {
     const sg = side === 'BUY' ? 1 : -1, p = S.pos;
-    if (!p) { S.pos = { symbol: 'TONUSDT', amt: sg * qty, entry: price, tp: 0, sl: 0 }; return; }
+    if (!p) { S.pos = { symbol: 'TONUSDT', amt: sg * qty, entry: price, tp: 0, sl: 0, ts: 0 }; return; }
     if (Math.sign(p.amt) === sg) { const q = Math.abs(p.amt) + qty; p.entry = (p.entry * Math.abs(p.amt) + price * qty) / q; p.amt = sg * q; }
     else { const q = Math.abs(p.amt) - qty; if (q <= 1e-12) S.pos = null; else p.amt = -sg * q; }
   };
   const ex = {
     native, S,
-    async positions() { S.calls.push('positions'); return S.pos ? [{ ...S.pos }] : []; },
+    async positions() { S.calls.push('positions'); return S.pos ? [{ ...S.pos, mark: S.px }] : []; },
     async filt() { return F; },
     async mark() { return S.px; },
     async leverage(_s, l) { S.calls.push('leverage:' + l); },
@@ -36,7 +36,7 @@ function fakeEx({ px = 2.5, native = true } = {}) {
     async byLink(_s, link) { const o = S.orders.find((x) => x.link === link); return o ? { id: 1, qty: o.qty, price: o.price, status: o.status, link } : null; },
     async openOrders() { return S.orders.filter((o) => o.status === 'New').map((o) => ({ link: o.link, price: o.price, qty: o.qty })); },
     async cancelAll() { S.calls.push('cancelAll'); for (const o of S.orders) if (o.status === 'New') o.status = 'Cancelled'; },
-    async tradingStop(_s, { tp, sl }) { S.calls.push('tradingStop'); if (S.pos) { S.pos.tp = tp; S.pos.sl = sl; } },
+    async tradingStop(_s, { tp, sl, ts = 0, ap = 0 }) { S.calls.push('tradingStop'); if (ts && S.rejectTs) throw new Error('trailing stop distance invalid'); if (S.pos) { S.pos.tp = tp; S.pos.sl = sl; S.pos.ts = ts; S.pos.ap = ap; } },
     /* ціна дійшла до лімітного ордера */
     hit(price) { S.px = price; for (const o of S.orders) if (o.status === 'New' && (o.side === 'BUY' ? price <= o.price : price >= o.price)) { o.status = 'Filled'; fill(o.side, o.qty, o.price); } },
   };
@@ -66,7 +66,9 @@ test('Драбина докупівель на біржі збігається �
 test('TP/SL від середньої з округленням до кроку ціни; з трейлінгом TP веде сервер', () => {
   const p = protect(g, 2.4567, F);
   assert.equal(p.tp, 2.4862); assert.equal(p.sl, 2.2601);
-  assert.equal(protect({ ...g, trail: 0.01 }, 2.4567, F).tp, 0);
+  const t = protect({ ...g, trail: 0.01 }, 2.4567, F);
+  assert.equal(t.tp, 0); assert.equal(t.ap, 2.4862); assert.equal(t.ts, 0.0249); assert.equal(t.sl, 2.2601);
+  assert.deepEqual(protect({ ...g, s1: 0.5 }, 2.4567, F), { tp: 0, sl: 2.2601, ap: 0, ts: 0 }, 'часткова фіксація: на біржі лише SL');
   const s = protect({ ...g, d: -1 }, 2.4567, F); assert.ok(s.tp < 2.4567 && s.sl > 2.4567);
 });
 
@@ -89,7 +91,7 @@ test('Після спрацювання докупівлі TP/SL перерах�
   await execute(ex, a, ctx); const tp0 = ex.S.pos.tp;
   ex.hit(ladder(g, 2.5, F)[0].price);
   const m = await sync(ex, ctx);
-  assert.match(m, /TP\/SL оновлено/); assert.ok(ex.S.pos.tp < tp0);
+  assert.match(m, /захист від середньої/); assert.ok(ex.S.pos.tp < tp0);
   assert.deepEqual(ex.S.pos.tp, protect(g, ex.S.pos.entry, F).tp);
   assert.equal(await sync(ex, ctx), null, 'без змін — без зайвих запитів');
 });
@@ -108,10 +110,10 @@ test('Закриття: скасування ордерів і reduce-only ри�
   const n = ex.S.orders.length; await execute(ex, c, ctx); assert.equal(ex.S.orders.length, n);
 });
 
-const run = async (ex, { saveOk = true, state = null, events } = {}) => {
+const run = async (ex, { saveOk = true, state = null, events, now } = {}) => {
   const logs = [], saved = [], notes = [];
   const r = { state: { b: {}, lt: T }, events: events ?? [{ kind: 'open', notional: 60, price: 2.5, t: T }] };
-  const res = await handleBot({ bot: { id: BOT, state }, g, r, symbol: 'TONUSDT', mirror: true, native: !!ex?.native, ex,
+  const res = await handleBot({ bot: { id: BOT, state }, g, r, symbol: 'TONUSDT', mirror: true, native: !!ex?.native, ex, now: now ?? T + 60e3,
     save: async (s) => { saved.push(s); return saveOk; }, log: async (l, m) => logs.push([l, m]), notify: async (m) => notes.push(m) });
   return { res, logs, saved, notes };
 };
@@ -139,4 +141,57 @@ test('Binance Testnet: докупівля дублюється ринковим 
   for (const a of acts) await execute(ex, a, { ...ctx, native: false });
   assert.equal(count(ex, 'market'), 2); assert.equal(count(ex, 'limit'), 0); assert.equal(count(ex, 'tradingStop'), 0);
   assert.equal(actionsFor([{ kind: 'dca', notional: 90, n: 2, t: T }], BOT, true).length, 0, 'Bybit: докупівля вже стоїть лімітом');
+});
+
+test('Бот із трейлінгом: на біржі трейлінг-стоп з активацією на рівні TP і SL', async () => {
+  const gt = { ...g, trail: 0.01 }, ex = fakeEx(), [a] = actionsFor([{ kind: 'open', notional: 60, t: T }], BOT, true);
+  const msg = await execute(ex, a, { ...ctx, g: gt });
+  assert.equal(ex.S.pos.tp, 0); assert.ok(ex.S.pos.ts > 0); assert.ok(ex.S.pos.ap > 2.5); assert.ok(ex.S.pos.sl < 2.5);
+  assert.match(msg, /трейлінг/);
+  assert.equal(await sync(ex, { ...ctx, g: gt }), null, 'без змін — без зайвих запитів');
+  const keep = { ...ex.S.pos }; ex.S.px = keep.ap * 1.02; ex.S.pos.sl = keep.entry * 1.005; // трейлінг біржі активний: стоп уже в прибутку
+  const n0 = count(ex, 'tradingStop'); assert.equal(await sync(ex, { ...ctx, g: gt }), null); assert.equal(count(ex, 'tradingStop'), n0, 'активний трейлінг не скидається');
+  Object.assign(ex.S.pos, keep);
+  ex.S.px = ex.S.pos.ap * 1.001; ex.S.pos.ts = 0; // захист скинули, а ціна вже вище рівня активації
+  await sync(ex, { ...ctx, g: gt });
+  assert.ok(ex.S.pos.ts > 0); assert.equal(ex.S.pos.ap, 0, 'рівень активації пройдено — трейлінг діє одразу');
+});
+
+test('Біржа не прийняла трейлінг: лишається SL, прапорець зберігається й повторів немає', async () => {
+  const gt = { ...g, trail: 0.01 }, ex = fakeEx(); ex.S.rejectTs = 1;
+  const fl = {}, [a] = actionsFor([{ kind: 'open', notional: 60, t: T }], BOT, true);
+  const msg = await execute(ex, a, { ...ctx, g: gt, fl });
+  assert.match(msg, /не прийняла трейлінг/); assert.equal(fl.nots, 1); assert.ok(ex.S.pos.sl > 0); assert.equal(ex.S.pos.ts, 0);
+  const n = count(ex, 'tradingStop');
+  assert.equal(await sync(ex, { ...ctx, g: gt, fl }), null); assert.equal(count(ex, 'tradingStop'), n);
+});
+
+test('Ціна вже пройшла TP після докупівлі — позицію закрито ринком, ліміти знято', async () => {
+  const ex = fakeEx(), [a] = actionsFor([{ kind: 'open', notional: 60, t: T }], BOT, true);
+  await execute(ex, a, ctx);
+  ex.hit(ladder(g, 2.5, F)[0].price); ex.S.px = 2.6; // докупівля спрацювала, і ціна відскочила вище нового TP
+  const m = await sync(ex, ctx);
+  assert.match(m, /пройшла TP/); assert.equal(ex.S.pos, null); assert.equal((await ex.openOrders()).length, 0);
+});
+
+test('Ціна вже нижче SL — позицію закрито ринком', async () => {
+  const ex = fakeEx(); ex.S.pos = { symbol: 'TONUSDT', amt: 24, entry: 2.5, tp: 0, sl: 0, ts: 0 }; ex.S.px = 2.2;
+  const r = await guard(ex, ctx, (await ex.positions())[0], F);
+  assert.ok(r.closed); assert.equal(ex.S.pos, null);
+});
+
+test('Прапорці бота зберігаються в стані разом із чергою', async () => {
+  const gt = { ...g, trail: 0.01 }, ex = fakeEx(); ex.S.rejectTs = 1;
+  const saved = [], r = { state: { b: {}, lt: T }, events: [{ kind: 'open', notional: 60, price: 2.5, t: T }] };
+  await handleBot({ bot: { id: BOT, state: null }, g: gt, r, symbol: 'TONUSDT', mirror: true, native: true, ex, now: T + 60e3,
+    save: async (s) => { saved.push(JSON.parse(JSON.stringify(s))); return true; }, log: async () => {}, notify: async () => {} });
+  assert.equal(saved.at(-1).fl.nots, 1); assert.equal(saved.at(-1).pend.length, 0);
+});
+
+test('Застарілий сигнал (сервер простоював) на біржу не надсилається, закриття — завжди', async () => {
+  const ex = fakeEx(), a = await run(ex, { now: T + 2 * 36e5 });
+  assert.equal(ex.S.orders.length, 0); assert.equal(a.saved.at(-1).pend.length, 0); assert.ok(a.logs.some((l) => /застарів/.test(l[1])));
+  ex.S.pos = { symbol: 'TONUSDT', amt: 24, entry: 2.5, tp: 0, sl: 0, ts: 0 };
+  await run(ex, { now: T + 9 * 36e5, events: [{ kind: 'close', pnl: 1, t: T }] });
+  assert.equal(ex.S.pos, null);
 });

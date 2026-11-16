@@ -8,7 +8,7 @@ export const BYBIT = "https://api-demo.bybit.com";
 export const SYM = /^[A-Z0-9]{2,20}USDT$/;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type Filt = { step: number; minQty: number; minN: number; tick: number };
-type Pos = { symbol: string; amt: number; entry: number; mark: number; pnl: number; lev: number; liq: number; tp?: number; sl?: number };
+type Pos = { symbol: string; amt: number; entry: number; mark: number; pnl: number; lev: number; liq: number; tp?: number; sl?: number; ts?: number };
 type Fill = { id: string | number; symbol: string; side: string; qty: number; price: number; status: string; link?: string };
 export class ExErr extends Error { code: number | null; constructor(m: string, c: number | null = null) { super(m); this.code = c; } }
 
@@ -98,7 +98,7 @@ export function bybit(key: string, secret: string) {
     },
     async positions(symbol?: string): Promise<Pos[]> {
       const l = (await call("GET", "/v5/position/list", { category: "linear", ...(symbol ? { symbol } : { settleCoin: "USDT" }) })).list ?? [];
-      return l.filter((x: any) => +x.size > 0).map((x: any) => ({ symbol: x.symbol, amt: x.side === "Sell" ? -x.size : +x.size, entry: +x.avgPrice, mark: +x.markPrice, pnl: +x.unrealisedPnl, lev: +x.leverage, liq: +(x.liqPrice || 0), tp: +(x.takeProfit || 0), sl: +(x.stopLoss || 0) }));
+      return l.filter((x: any) => +x.size > 0).map((x: any) => ({ symbol: x.symbol, amt: x.side === "Sell" ? -x.size : +x.size, entry: +x.avgPrice, mark: +x.markPrice, pnl: +x.unrealisedPnl, lev: +x.leverage, liq: +(x.liqPrice || 0), tp: +(x.takeProfit || 0), sl: +(x.stopLoss || 0), ts: +(x.trailingStop || 0) }));
     },
     async filt(symbol: string): Promise<Filt | undefined> {
       const s = (await pub(`/v5/market/instruments-info?category=linear&symbol=${symbol}`)).list?.[0];
@@ -129,13 +129,15 @@ export function bybit(key: string, secret: string) {
       return h ? map(h) : null;
     },
     async openOrders(symbol: string) {
-      const l = (await call("GET", "/v5/order/realtime", { category: "linear", symbol })).list ?? [];
+      const l = (await call("GET", "/v5/order/realtime", { category: "linear", symbol, orderFilter: "Order", limit: 50 })).list ?? [];
       return l.map((o: any) => ({ id: o.orderId, link: o.orderLinkId, side: o.side, price: +o.price, qty: +o.qty, reduceOnly: !!o.reduceOnly }));
     },
-    async cancelAll(symbol: string) { await call("POST", "/v5/order/cancel-all", { category: "linear", symbol }); },
-    // TP/SL на всю позицію (ринкове виконання за останньою ціною); 0 — прибрати
-    async tradingStop(symbol: string, { tp, sl }: { tp: number; sl: number }) {
-      try { await call("POST", "/v5/position/trading-stop", { category: "linear", symbol, positionIdx: 0, tpslMode: "Full", takeProfit: String(tp || 0), stopLoss: String(sl || 0), tpTriggerBy: "LastPrice", slTriggerBy: "LastPrice" }); }
+    // скасовує лише звичайні (лімітні) ордери; TP/SL позиції лишаються, доки позиція відкрита
+    async cancelAll(symbol: string) { await call("POST", "/v5/order/cancel-all", { category: "linear", symbol, orderFilter: "Order" }); },
+    // TP/SL/трейлінг на всю позицію (ринкове виконання за останньою ціною); 0 — прибрати.
+    // ts — відстань трейлінгу в ціні, ap — ціна активації (без неї трейлінг діє одразу)
+    async tradingStop(symbol: string, { tp, sl, ts = 0, ap = 0 }: { tp: number; sl: number; ts?: number; ap?: number }) {
+      try { await call("POST", "/v5/position/trading-stop", { category: "linear", symbol, positionIdx: 0, tpslMode: "Full", takeProfit: String(tp || 0), stopLoss: String(sl || 0), trailingStop: String(ts || 0), ...(ts && ap ? { activePrice: String(ap) } : {}), tpTriggerBy: "LastPrice", slTriggerBy: "LastPrice" }); }
       catch (e) { if ((e as ExErr).code !== 34040) throw e; } // 34040: без змін
     },
   };

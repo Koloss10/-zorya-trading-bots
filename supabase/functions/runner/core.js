@@ -25,9 +25,12 @@ export function restoreBot(g, state, funding = null, filters = null) {
  * @param state    збережений стан {b:{pos,tr,cd,cum}, pk, dd, lt} або null для нового бота
  * @param candles  свічки таймфрейму бота в порядку зростання {t,o,h,l,c,v,ml?,mh?} (t — час відкриття, мс)
  * @param now      поточний час, мс (обробляються лише закриті свічки)
+ * @param spans    інтервали роботи бота [[від, до|null], …] (config._sp): свічки, що закрилися під час паузи,
+ *                 пропускаються — як і в браузері, після зняття з паузи нічого не «дограється» заднім числом
  * Новий бот починає з поточного моменту: історія не «програється» заднім числом.
  */
-export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200 }) {
+export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null }) {
+  const act = (t) => !Array.isArray(spans) || !spans.length || spans.some(([a, b]) => t > a && (b == null || t <= b));
   const W = tfMs(g.tf || 1), A = candles.filter((c) => c.t + W <= now);
   const b = restoreBot(g, state, funding, filters);
   let lt = state && Number.isFinite(state.lt) ? state.lt : (A.length ? A[A.length - 1].t + W : now);
@@ -37,6 +40,7 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
     const c = A[i], ct = c.t + W;
     if (ct <= lt) continue;
     lt = ct;
+    if (!act(ct)) continue;
     const n0 = b.tr.length, p0 = b.pos, o0 = p0 ? p0.n : 0, c0 = p0 ? p0.cost : 0;
     b.step(Math.floor(c.t / W), c, e[i]);
     const v = b.eqv(c); pk = Math.max(pk, v); dd = Math.min(dd, v - pk);

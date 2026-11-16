@@ -9,7 +9,7 @@ function loadEngine(file = path.join(__dirname, '..', 'orbix.html')) {
   const end = app.indexOf('/* ===== інтерфейс');
   if (end < 0) throw new Error('не знайдено межу рушія /* ===== інтерфейс');
   const code = app.slice(0, end) + `
-;({Bot,run,summ,ladder,lv,entry,normG,SIG,agg,aggC,ema,rsi,bbands,cci,stoch,macdH,auto,evalC,stress,DEF,PAIRS,DT,MD,STR,
+;({Bot,run,summ,ladder,lv,entry,normG,wfo,wfPlan,wfFold,wfSum,searchWin,lbT,SIG,agg,aggC,ema,rsi,bbands,cci,stoch,macdH,auto,evalC,stress,DEF,PAIRS,DT,MD,STR,
   bt:typeof bt==='function'?bt:null,aggT:typeof aggT==='function'?aggT:null,closedTf:typeof closedTf==='function'?closedTf:null,
   replay:typeof replay==='function'?replay:null})`;
   const ctx = vm.createContext({ console, Math, Date, JSON, Array, Object, Number, String, Set, Map, Promise, Proxy,

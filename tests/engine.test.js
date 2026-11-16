@@ -190,3 +190,46 @@ test('Агрегація переносить мінімум і максимум
   const cs = [0, 1, 2, 3].map(i => ({ ...C(i, 100, 101, 99, 100), ml: 98 + i, mh: 102 - i }));
   const [a] = E.aggT(cs, 4); assert.equal(a.ml, 98); assert.equal(a.mh, 102);
 });
+
+// ---------- Walk-forward ----------
+function series(n, seed, start = T0) {
+  let s = seed, c = 100; const R = () => (s = (s * 16807) % 2147483647) / 2147483647, o = [];
+  for (let i = 0; i < n; i++) { const op = c; c *= 1 + (R() - 0.5) * 0.025 + Math.sin(i / 90) * 0.002; o.push({ t: start + i * H1, o: op, h: Math.max(op, c) * (1 + R() * 0.008), l: Math.min(op, c) * (1 - R() * 0.008), c, v: 1 }); }
+  return o;
+}
+function useData(arr) { E.MD.mode = 'demo'; E.MD.fut = 0; E.DT['BTC/USDT'] = arr; }
+const WC = { pair: 'BTC/USDT', ex: 'Binance', amt: 0, per: 3600, tf: 1, dr: 1, fut: 1, lev: 1 };
+
+test('Walk-forward: тестові вікна йдуть підряд, без перекриття, після свого навчання', () => {
+  useData(series(5000, 7));
+  const pl = E.wfPlan(WC, { folds: 4 }); assert.ok(pl); const H = E.DT['BTC/USDT'], end = H.at(-1).t + H1;
+  pl.P.forEach((p, i) => {
+    assert.equal(p.trE - p.trS, pl.trH * H1, 'довжина навчання'); assert.ok(p.teE > p.trE, 'тест після навчання');
+    if (i) assert.equal(p.trE, pl.P[i - 1].teE, 'тести підряд без проміжків і перекриттів');
+  });
+  assert.equal(pl.P.at(-1).teE, end, 'останній тест закінчується на останній свічці');
+  assert.equal(pl.P[0].trS, end - WC.per * H1, 'період рахується від кінця історії');
+});
+
+test('Walk-forward: підбір на кроці не бачить даних після кінця свого навчання', () => {
+  const base = series(5000, 11); useData(base);
+  const pl = E.wfPlan(WC, { folds: 4 }), p = pl.P[1], a = E.wfFold(WC, p, { ns: 3 });
+  // змінюємо всі свічки після кінця навчання цього кроку
+  const R = (s => () => (s = (s * 48271) % 2147483647) / 2147483647)(5);
+  useData(base.map(c => c.t >= p.trE ? { ...c, o: c.o * (0.8 + R() * 0.4), h: c.h * 1.3, l: c.l * 0.7, c: c.c * (0.8 + R() * 0.4) } : { ...c }));
+  const b = E.wfFold(WC, p, { ns: 3 });
+  assert.ok(a.g && b.g, 'конфігурацію знайдено');
+  assert.deepEqual(JSON.parse(JSON.stringify(b.g)), JSON.parse(JSON.stringify(a.g)), 'той самий вибір конфігурації');
+  assert.deepEqual(b.is, a.is, 'ті самі показники навчання');
+  assert.notEqual(b.pnl, a.pnl, 'тест справді рахується на нових даних');
+});
+
+test('Walk-forward: підсумок узгоджений з кроками', () => {
+  useData(series(5000, 3));
+  const r = E.wfo(WC, { folds: 4, ns: 3 }); assert.ok(r);
+  const D2 = r.F.filter(x => !x.none);
+  assert.equal(r.n, D2.length); assert.equal(r.pos, D2.filter(x => x.pnl > 0).length);
+  near(r.oos, D2.reduce((a, x) => a + x.roi, 0), 1e-9);
+  assert.ok(['стабільна', 'сумнівна', 'нестабільна', 'мало'].includes(r.verdict));
+  if (r.oos <= 0) assert.equal(r.verdict === 'стабільна', false, 'збиткова перевірка не може бути «стабільною»');
+});

@@ -51,6 +51,7 @@ function binance(key: string, secret: string) {
   };
   return {
     invalid: (c: number | null) => c === -2014 || c === -2015 || c === -1022,
+    noPerm: (_c: number | null) => false,
     async check() {
       const a = await call("GET", "/fapi/v2/account");
       return { canTrade: !!a.canTrade, withdraw: false, wallet: +a.totalWalletBalance, available: +a.availableBalance, unrealized: +a.totalUnrealizedProfit };
@@ -89,12 +90,13 @@ function bybit(key: string, secret: string) {
   };
   const pub = async (path: string) => { const j = await fetch(`${BYBIT}${path}`).then((r) => r.json()); if (j?.retCode !== 0) throw new ExErr(j?.retMsg || "market data error"); return j.result; };
   return {
-    invalid: (c: number | null) => c === 10003 || c === 10004 || c === 10005 || c === 33004,
+    invalid: (c: number | null) => c === 10003 || c === 10004 || c === 33004,
+    noPerm: (c: number | null) => c === 10005,
     async check() {
       const w = (await call("GET", "/v5/account/wallet-balance", { accountType: "UNIFIED" })).list?.[0] ?? {};
       const k = await call("GET", "/v5/user/query-api");
       const perms = JSON.stringify(k?.permissions ?? {});
-      return { canTrade: k?.readOnly === 0, withdraw: /Withdraw/i.test(perms), wallet: +(w.totalWalletBalance || 0), available: +(w.totalAvailableBalance || 0), unrealized: +(w.totalPerpUPL || 0) };
+      return { canTrade: Number(k?.readOnly) === 0, withdraw: /Withdraw/i.test(perms), wallet: +(w.totalWalletBalance || 0), available: +(w.totalAvailableBalance || 0), unrealized: +(w.totalPerpUPL || 0) };
     },
     async positions(symbol?: string): Promise<Pos[]> {
       const l = (await call("GET", "/v5/position/list", { category: "linear", ...(symbol ? { symbol } : { settleCoin: "USDT" }) })).list ?? [];
@@ -164,7 +166,9 @@ Deno.serve(async (req) => {
         if (!F) return json({ error: "symbol not on testnet" }, 400);
         const px = await ex.mark(symbol), qty = floorStep(notional / px, F.step);
         if (!(qty > 0) || qty < F.minQty || qty * px < F.minN) return json({ error: `order too small: min ${Math.max(F.minN, F.minQty * px).toFixed(2)} USDT` }, 400);
-        return json({ ok: true, order: await ex.market(symbol, side, qty) });
+        const o = await ex.market(symbol, side, qty);
+        // якщо біржа ще не віддала середню ціну — показуємо ринкову (mark) як приблизну
+        return json({ ok: true, order: o.price > 0 ? o : { ...o, price: px, approx: true } });
       }
       if (action === "close") {
         const p = (await ex.positions(symbol))[0];
@@ -175,6 +179,7 @@ Deno.serve(async (req) => {
     } catch (e) {
       const err = e as ExErr;
       if (ex.invalid(err.code ?? null)) await setStatus("invalid");
+      else if (ex.noPerm(err.code ?? null)) await setStatus("active", false);
       return json({ error: err.message, code: err.code ?? null }, 502);
     }
   } catch (e) {

@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       const symbol = g.pair.replace("/", ""), mk = `${symbol}|${iv}|${g.fut ? 1 : 0}`;
       if (!mcache.has(mk)) mcache.set(mk, market(symbol, iv, !!g.fut));
       const m = await mcache.get(mk);
-      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now() });
+      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp });
       evCount += r.events.length;
       const exName = cfg._ex === "binance" ? "binance" : "bybit";
       const want = !!(cfg._tn && g.fut);

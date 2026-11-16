@@ -58,3 +58,16 @@ test('Обробка не змінює переданий стан', () => {
   processBot({ g, state: one.state, candles: cs, now: cs.at(-1).t + H });
   assert.equal(JSON.stringify(one.state), snap);
 });
+
+test('Пауза: свічки, що закрилися під час паузи, пропускаються — після зняття нічого не дограється', () => {
+  const cs = series(900), start = 400, t0 = cs[start - 1].t + H;
+  const one = processBot({ g, state: null, candles: cs.slice(0, start), now: t0 });
+  const pA = cs[500].t + H, pB = cs[800].t + H; // пауза між свічками 500 і 800
+  const spans = [[t0 - 1, pA], [pB, null]];
+  const r = processBot({ g, state: one.state, candles: cs, now: cs.at(-1).t + H, spans });
+  assert.ok(r.events.length > 0);
+  assert.ok(r.events.every((e) => e.t <= pA || e.t > pB), 'жодної події під час паузи');
+  const full = processBot({ g, state: one.state, candles: cs, now: cs.at(-1).t + H });
+  assert.ok(full.events.some((e) => e.t > pA && e.t <= pB), 'без пауз події в цей час були б');
+  assert.equal(r.state.lt, cs.at(-1).t + H);
+});

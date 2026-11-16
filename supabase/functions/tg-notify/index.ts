@@ -41,7 +41,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ chat_id: row.chat_id, text, disable_web_page_preview: true }),
     });
     const j = await r.json().catch(() => ({}));
-    if (!j?.ok) return json({ error: j?.description || `Telegram HTTP ${r.status}` }, 502);
+    if (!j?.ok) {
+      // у журнал — лише причина відмови Telegram, без токена й тексту повідомлення
+      console.warn("telegram rejected", r.status, j?.error_code, j?.description);
+      return json({ error: j?.description || `Telegram HTTP ${r.status}` }, 502);
+    }
     return json({ ok: true });
   } catch (e) {
     return json({ error: String((e as Error)?.message ?? e) }, 500);

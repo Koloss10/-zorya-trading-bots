@@ -506,7 +506,13 @@ const avg=p?p.cost/p.q:(d.price||lastC(dk(g)).c);return s+`\nСередня ці
 /* Telegram: надсилає сервер (Edge Function tg-notify), токен — у Supabase Vault, у браузер не повертається */
 let TG={st:null,loaded:0,err:''};
 const TGM={'invalid token format':'Токен має вигляд 123456789:AA… (його видає @BotFather).','invalid chat id':'Chat ID — число (напр. 123456789 або -100…) або @назва_каналу.','mfa required':'Спершу підтвердьте вхід кодом з Google Authenticator.','not authenticated':'Увійдіть в акаунт.','telegram not configured':'Спершу збережіть токен на сервері.','telegram not configured or 2FA code required':'Спершу збережіть токен на сервері або підтвердьте вхід кодом 2FA.'};
-const tgMsg=m=>TGM[m]||(/Not Found|404/.test(m)?'Серверна функція Telegram ще не встановлена.':m);
+/* пояснення відмов Telegram українською */
+const tgMsg=m=>TGM[m]||(/chat not found/i.test(m)?'Telegram не знає цього чату. Відкрийте свого бота в Telegram і натисніть «Start» (або надішліть йому будь-що), а також перевірте Chat ID: ваш особистий ID покаже @userinfobot.'
+:/bot can't initiate conversation|bot can.t initiate/i.test(m)?'Бот не може написати першим. Відкрийте свого бота в Telegram і натисніть «Start».'
+:/blocked by the user/i.test(m)?'Ви заблокували бота в Telegram. Розблокуйте його й натисніть «Start».'
+:/Unauthorized|401/i.test(m)?'Telegram не приймає токен: він неправильний або відкликаний. Скопіюйте токен у @BotFather ще раз і збережіть на сервері.'
+:/user is deactivated|chat_id is empty|PEER_ID_INVALID/i.test(m)?'Неправильний Chat ID. Ваш особистий ID покаже @userinfobot.'
+:/Not Found|404/.test(m)?'Серверна функція Telegram ще не встановлена.':'Telegram: '+m);
 async function tgLoad(){if(!SB||!CLOUD.u){TG={st:null,loaded:1,err:''};return}const r=await SB.rpc('tg_status');TG={st:r.error?null:r.data,loaded:1,err:r.error?r.error.message:''}}
 async function tgSend(text){if(!SB||!CLOUD.u)throw new Error('Увійдіть в акаунт.');const r=await SB.functions.invoke('tg-notify',{body:{text}});
 if(r.error){let m=r.error.message;try{const j=await r.error.context.json();m=j.error||m}catch(e){}throw new Error(tgMsg(m))}return r.data}
@@ -864,7 +870,7 @@ const tgF=()=>!CLOUD.u?'<p class="mu" style="grid-column:1/-1;margin:0">Увій
 <p class="mu" style="grid-column:1/-1;margin:0">${TG.st?'Підключено: токен …'+esc(TG.st.hint)+', chat '+esc(TG.st.chat_id)+'. Токен зберігається на сервері й у браузер не повертається.':TG.err?esc(tgMsg(TG.err)):'Токен не підключено.'}</p>${MS.tg.token?'<p class="dn" style="grid-column:1/-1;margin:0">Старий токен ще лежить у цьому браузері. Натисніть «Зберегти на сервері», і звідси його буде видалено.</p>':''}`;
 if(CLOUD.u&&!TG.loaded)tgLoad().then(()=>{if(CUR==='pf')pfr()}).catch(()=>{});
 const F=(k,id,l,ph)=>`<label>${l}<input id="${k}-${id}" type="text" autocomplete="off" placeholder="${ph}" value="${esc(MS[k][id]||'')}"></label>`;
-$('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div class="bc ${c.on?'on':'off'}"><div class="bh"><b>${n}</b><span class="st" style="margin-left:auto">${c.on?'Увімкнено':'Вимкнено'}</span></div>
+$('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div class="bc ${c.on?'on':'off'}"><div class="bh"><b>${n}</b>${k!=='tg'?'<span class="mu" style="font-size:12px">лише демо</span>':''}<span class="st" style="margin-left:auto">${c.on?'Увімкнено':'Вимкнено'}</span></div>${k!=='tg'?`<p class="mu" style="margin:0">${n} поки не надсилає повідомлення: потрібне підключення до офіційного бізнес-API ${n} через сервер. Події лише записуються в журнал «Останні події».</p>`:''}
 <div class="fg" style="margin-bottom:8px">${k==='tg'?tgF():F(k,'to',k==='vb'?'ID чату або номер':'Номер телефону','+380…')}${sel(k+'-tpl','Формат повідомлень',[['short','Короткий'],['normal','Звичайний'],['detailed','Детальний']],c.tpl)}</div>
 <h3>Події</h3><div class="sgr">${Object.entries(EVN).map(([e,l])=>`<label class="ck"><input type="checkbox" data-ms="${k}" data-ev="${e}"${(c.ev||SET.ev)[e]?' checked':''}>${l}</label>`).join('')}</div>
 <div class="ac"><button class="b sm ${c.on?'d':'p'}" data-ms-on="${k}">${c.on?'Вимкнути':'Увімкнути'}</button><button class="b sm" data-ms-t="${k}">Надіслати тест</button></div><pre class="mu" id="${k}-pv" style="white-space:pre-wrap;font:400 12px Inter,sans-serif;margin:6px 0 0"></pre></div>`}).join('');

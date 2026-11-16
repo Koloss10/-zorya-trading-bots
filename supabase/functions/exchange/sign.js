@@ -11,3 +11,7 @@ export function floorStep(q, step) {
   const d = (String(step).split(".")[1] || "").replace(/0+$/, "").length;
   return Number((Math.floor(q / step + 1e-9) * step).toFixed(d));
 }
+// Рядок для підпису Bybit v5: timestamp + apiKey + recvWindow + (query-рядок для GET | тіло JSON для POST)
+export function bybitPayload(ts, apiKey, recvWindow, payload) {
+  return String(ts) + apiKey + String(recvWindow) + payload;
+}

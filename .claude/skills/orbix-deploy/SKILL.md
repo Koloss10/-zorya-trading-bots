@@ -8,7 +8,7 @@ description: Викласти зміни Orbix: тести й збірка, ро
 Повний цикл викладання змін Orbix. Кроки йдуть по черзі. Якщо крок не пройшов, зупинись, виправ і почни з нього знову. Невдачу не обходь.
 
 ## Сталі дані
-- Репозиторій `Koloss10/Orbix` (до перейменування — `Koloss10/-zorya-trading-bots`; GitHub перенаправляє старі адреси), робоча гілка `claude/trading-bots-platform-nk0qa3`, злиття в `main` лише через PR.
+- Репозиторій `Koloss10/Orbix` (раніше `Koloss10/-zorya-trading-bots`; старі git-адреси GitHub перенаправляє), сайт https://koloss10.github.io/Orbix/, робоча гілка `claude/trading-bots-platform-nk0qa3`, злиття в `main` лише через PR.
 - Проєкт Supabase `krmnaypaitruhqgaxkfw`.
 - Функції:
   - `runner`: `verify_jwt: false`, захист через `x-runner-secret`. Файли `index.ts, mirror.js, core.js, engine.js, exchanges.ts, sign.js`.

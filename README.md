@@ -2,7 +2,7 @@
 
 Платформа DCA-ботів для криптовалютних ф'ючерсів і споту: конструктор стратегій, бектести на реальних даних, перевірка якості стратегій, paper-боти в браузері й боти на сервері 24/7, які дублюють угоди на **демо-рахунках** Bybit Demo Trading або Binance Futures Testnet. Інтерфейс українською, мобільний.
 
-**Онлайн:** https://koloss10.github.io/Orbix/ (до перейменування репозиторію — https://koloss10.github.io/-zorya-trading-bots/)
+**Онлайн:** https://koloss10.github.io/Orbix/ · репозиторій [`Koloss10/Orbix`](https://github.com/Koloss10/Orbix) (раніше `-zorya-trading-bots`; старі git-адреси GitHub перенаправляє, стара адреса сайту більше не працює)
 
 ## Межі й застереження
 

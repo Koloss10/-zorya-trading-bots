@@ -5,7 +5,7 @@
 // Адреси бірж зашиті (exchanges.ts): ця функція фізично не може надіслати ордер на реальний рахунок.
 // POST /functions/v1/exchange { exchange, action: "check" | "balance" | "positions" | "order" | "close" | "flat", ... }
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import { binance, bybit, closePosition, ExErr, marketNotional, SYM } from "./exchanges.ts";
+import { binance, botPrefix, bybit, cancelPrefix, closePosition, ExErr, marketNotional, SYM } from "./exchanges.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -42,6 +42,8 @@ Deno.serve(async (req) => {
     try {
       if (action === "check" || action === "balance") {
         const a = await ex.check();
+        // ключ із правом виведення коштів відхиляється: сервер його не використовує (ex_secret_for пропускає revoked)
+        if (a.withdraw) { await setStatus("revoked"); return json({ error: "withdraw permission", code: "withdraw" }, 403); }
         await setStatus("active", a.canTrade);
         return json({ ok: true, ...a });
       }
@@ -56,8 +58,11 @@ Deno.serve(async (req) => {
         if (lev && (lev < 1 || lev > 20)) return json({ error: "leverage 1..20" }, 400);
         return json({ ok: true, order: await marketNotional(ex, symbol, side, notional, lev) });
       }
-      if (action === "flat") { // зняти лімітні ордери пари й закрити позицію (зупинка або видалення серверного бота)
-        if ("cancelAll" in ex) await ex.cancelAll(symbol);
+      if (action === "flat") { // зняти лімітні ордери бота й закрити позицію пари (зупинка або видалення серверного бота)
+        // лише ордери цього бота (botId) або, для старої сторінки без botId, будь-які ордери Orbix — ручні ордери не чіпаються
+        const bid = String(body?.botId || "");
+        if (bid && !/^[0-9a-f-]{36}$/i.test(bid)) return json({ error: "invalid botId" }, 400);
+        if (ex.native) await cancelPrefix(ex as ReturnType<typeof bybit>, symbol, bid ? botPrefix(bid.toLowerCase()) : "ox");
         const o = await closePosition(ex, symbol);
         return json({ ok: true, closed: !!o, order: o });
       }

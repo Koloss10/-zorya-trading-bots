@@ -164,6 +164,15 @@ export async function marketNotional(ex: ReturnType<typeof bybit> | ReturnType<t
   const o = await ex.market(symbol, side, qty, false, link);
   return o.price > 0 ? o : { ...o, price: px, approx: true };
 }
+// Зняти лише ордери Orbix: з префіксом ідентифікатора prefix ("ox<12 hex id бота>" — одного бота, "ox" — будь-якого бота Orbix).
+// Ручні ордери користувача на тій самій парі не чіпаються (cancelAll біржі зняв би й їх).
+export async function cancelPrefix(ex: ReturnType<typeof bybit>, symbol: string, prefix: string) {
+  if (!/^ox[0-9a-f]{0,12}$/.test(prefix)) throw new ExErr("invalid order prefix");
+  const mine = (await ex.openOrders(symbol)).filter((o: { link?: string }) => String(o.link || "").startsWith(prefix));
+  for (const o of mine) await ex.cancel(symbol, o.link);
+  return mine.length;
+}
+export const botPrefix = (botId: string) => "ox" + String(botId).replace(/-/g, "").slice(0, 12);
 export async function closePosition(ex: ReturnType<typeof bybit> | ReturnType<typeof binance>, symbol: string, link = "") {
   const p = (await ex.positions(symbol))[0];
   if (!p) return null;

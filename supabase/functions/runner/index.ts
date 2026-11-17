@@ -7,7 +7,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { botConfig, INTERVAL, processBot } from "./core.js";
 import { binance, bybit } from "./exchanges.ts";
-import { handleBot, park } from "./mirror.js";
+import { handleBot, owners, park } from "./mirror.js";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const BYIV: Record<string, string> = { "1h": "60", "4h": "240", "12h": "720", "1d": "D", "1w": "W" };
@@ -82,13 +82,7 @@ Deno.serve(async (req) => {
 
   let done = 0, evCount = 0;
   // один рахунок біржі — одна позиція на символ: другий бот із «Тестнет» на тій самій парі угод не дублює
-  const owner = new Map<string, string>();
-  for (const bot of rows ?? []) {
-    const c = bot.config || {};
-    if (!c._tn || !(c.fut ?? 1) || typeof c.pair !== "string") continue;
-    const k = `${bot.user_id}|${c._ex === "binance" ? "binance" : "bybit"}|${c.pair}`;
-    if (!owner.has(k) || String(bot.id) < owner.get(k)!) owner.set(k, bot.id); // стабільний вибір: найменший id
-  }
+  const owner = owners(rows ?? []);
   const saver = (bot: any) => async (state: unknown) => {
     const at = new Date().toISOString(), old = ver.get(bot.id);
     if (old) {

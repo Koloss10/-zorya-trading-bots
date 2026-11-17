@@ -239,6 +239,19 @@ export async function restore(ex, { g, symbol, fl, mp }) {
   return `Bybit Demo: бот знову працює — відновлено ${n} лімітн. докупівель${miss.length ? ` · не вдалося: ${miss.join("; ")}` : ""}`;
 }
 
+/* Один рахунок біржі — одна позиція на символ: з кількох працюючих ботів із «Тестнет» на одній парі одного
+   користувача й біржі угоди на біржі веде лише один (стабільний вибір — найменший id). Ключ: user|exchange|pair. */
+export function owners(rows) {
+  const owner = new Map();
+  for (const bot of rows) {
+    const c = bot.config || {};
+    if (!c._tn || !(c.fut ?? 1) || typeof c.pair !== "string") continue;
+    const k = `${bot.user_id}|${c._ex === "binance" ? "binance" : "bybit"}|${c.pair}`;
+    if (!owner.has(k) || String(bot.id) < owner.get(k)) owner.set(k, bot.id);
+  }
+  return owner;
+}
+
 /* бот на паузі (рідний режим): зняти його лімітні докупівлі; позиція лишається на біржі зі своїм стопом */
 export async function park(ex, { symbol, botId }) {
   const mine = (await ex.openOrders(symbol)).filter((o) => String(o.link || "").startsWith("ox" + hex(botId)));

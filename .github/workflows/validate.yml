@@ -41,4 +41,4 @@ jobs:
       - name: Check orbix.html is built from src/
         run: node tools/build.js --check
       - name: Run trading engine tests
-        run: node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs
+        run: node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs

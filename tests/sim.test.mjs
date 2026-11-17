@@ -73,9 +73,23 @@ function simEx() {
 }
 
 /* прогін: history свічок для індикаторів, далі кожна свічка — спершу біржа живе всередині неї, потім запуск сервера */
-async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], vol = 0.018 } = {}) {
+/* збої біржі (опція flaky — частка запитів): перевірка ордера byLink не відповідає; біржа прийняла ордер, а відповідь загубилась.
+   Ручний ордер користувача на тій самій парі (опція manual) — має дожити до кінця. */
+function chaos(ex, rate, seed) {
+  let s = seed * 9301 + 49297; const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  const bl = ex.byLink.bind(ex), mk = ex.market.bind(ex), lm = ex.limit.bind(ex);
+  ex.S.lost = 0; ex.S.down = 0;
+  ex.byLink = async (...a) => { if (rnd() < rate) { ex.S.down++; throw new Error('timeout'); } return bl(...a); };
+  ex.market = async (...a) => { const r = await mk(...a); if (rnd() < rate) { ex.S.lost++; throw new Error('socket hang up'); } return r; };
+  ex.limit = async (...a) => { const r = await lm(...a); if (rnd() < rate) { ex.S.lost++; throw new Error('socket hang up'); } return r; };
+}
+const own = (ex) => ex.S.orders.filter((o) => o.status === 'New' && String(o.link).startsWith('ox'));
+
+async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], vol = 0.018, flaky = 0, manual = false } = {}) {
   const g = botConfig({ pair: 'SIM/USDT', tf: 1, fut: 1, lev: 3, sg: ['rsi'], k: 1, rm: 45, orders: 4, base: 20, step: 0.02, smul: 1.2, mult: 1.5, tp: 0.012, sl: 0.08, ...cfg });
   const cs = series(n, seed, vol), ex = simEx(), logs = [], notes = [];
+  if (flaky) chaos(ex, flaky, seed);
+  if (manual) ex.S.orders.push({ link: 'manual-1', side: 'BUY', qty: 1, price: cs[0].c * 0.01, status: 'New' }, { link: '', side: 'SELL', qty: 1, price: cs[0].c * 100, status: 'New' });
   let stored = null, ver = 0, alarms = 0, trades = 0, maxGap = 0, crashes = 0, alarm = '', beBad = '', ladBad = '', ghostLive = 0;
   const hist = 120;
   stored = { ...processBot({ g, state: null, candles: cs.slice(0, hist), now: cs[hist - 1].t + H + 3e5 }).state, pend: [], fl: {} };
@@ -100,7 +114,7 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
         if (stored.fl?.xc && ex.S.pos) ghostLive++;
       }
     }
-    if (paused(i)) { stored = { ...stored, fl: { ...stored.fl, parked: 1 } }; if (paused(i) && !paused(i - 1)) for (const o of ex.S.orders) if (o.status === 'New') o.status = 'Cancelled'; continue; }
+    if (paused(i)) { stored = { ...stored, fl: { ...stored.fl, parked: 1 } }; if (paused(i) && !paused(i - 1)) for (const o of own(ex)) o.status = 'Cancelled'; continue; }
     const r = processBot({ g, state: stored, candles: cs.slice(Math.max(0, i - 299), i + 1), now, spans });
     // збій: на 1-му збереженні (до біржі) або на 2-му (ордери вже на біржі, а черга дій ще не очищена)
     let saves = 0;
@@ -126,7 +140,7 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
     const mp = stored.b?.pos || null;
     if (!mp && !stored.pend?.length) {
       assert.equal(ex.S.pos, null, `свічка ${i}: модель без позиції, а на біржі позиція ${ex.S.pos && ex.S.pos.amt}`);
-      assert.equal((await ex.openOrders()).length, 0, `свічка ${i}: модель без позиції, а на біржі лишились ордери бота`);
+      assert.equal(own(ex).length, 0, `свічка ${i}: модель без позиції, а на біржі лишились ордери бота`);
     }
     if (mp && ex.S.pos) maxGap = Math.max(maxGap, Math.abs(Math.abs(ex.S.pos.amt) - mp.q) / mp.q);
     if (mp && ex.S.pos && !stored.pend?.length && !stored.fl?.xc) {
@@ -135,7 +149,7 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
       // поки модель може докуповувати, на біржі стоїть драбина (хіба що біржа вже виконала всі рівні)
       if (!mp.t1 && mp.n < g.orders && stored.fl?.e0 > 0) {
         const full = Math.abs(ex.S.pos.amt) >= ladder(g, stored.fl.e0, F).reduce((a, x) => a + x.qty, 0) * 0.98;
-        if (!full && !(await ex.openOrders()).length) ladBad ||= `свічка ${i}: модель на рівні ${mp.n} з ${g.orders}, а лімітних докупівель на біржі немає`;
+        if (!full && !own(ex).length) ladBad ||= `свічка ${i}: модель на рівні ${mp.n} з ${g.orders}, а лімітних докупівель на біржі немає`;
       }
     }
   }
@@ -172,6 +186,20 @@ test('Симуляція зі збоями: робочий процес пада
   for (const seed of [7, 11]) {
     const s = await simulate({ d: 1 }, { seed, crashEvery: 3 });
     assert.ok(s.crashes >= 5, `збоїв ${s.crashes}`); assert.ok(s.trades >= 3); assert.equal(s.ex.S.dup, 0); assert.deepEqual(s.errs, []); assert.equal(s.alarms, 0); assert.equal(s.xrBad, ''); assert.equal(s.ghostLive, 0);
+  }
+});
+
+test('Симуляція з ненадійною біржею: перевірки ордерів не відповідають, відповіді на ордери губляться — дублів немає, ручні ордери живі', async () => {
+  for (const [seed, d, cfg, pauses] of [[7, 1, {}], [11, -1, {}], [23, 1, { s1: 0.5, tp2: 0.02, be: 1 }], [7, 1, { trail: 0.006 }], [11, 1, {}, [[200, 215], [320, 340], [450, 470]]]]) {
+    const s = await simulate({ d, ...cfg }, { seed, flaky: 0.08, manual: true, pauses: pauses || [] });
+    assert.ok(s.ex.S.down >= 10 && s.ex.S.lost >= 3, `seed ${seed}: збоїв замало (перевірок ${s.ex.S.down}, загублених відповідей ${s.ex.S.lost})`);
+    assert.ok(s.trades >= 3, `seed ${seed}: угод ${s.trades}`);
+    assert.equal(s.ex.S.dup, 0, `seed ${seed}: повторний orderLinkId — ордер надіслано вдруге, хоча статус попереднього був невідомий`);
+    const filled = s.ex.S.orders.filter((o) => o.status === 'Filled' && o.link), ids = filled.map((o) => o.link);
+    assert.equal(new Set(ids).size, ids.length, `seed ${seed}: два виконання з одним ідентифікатором`);
+    assert.equal(s.ex.S.orders.filter((o) => !String(o.link).startsWith('ox') && o.status === 'New').length, 2, `seed ${seed}: ручні ордери користувача знято`);
+    assert.equal(s.ghostLive, 0, `seed ${seed}: зайва позиція`);
+    assert.ok(!s.logs.some(([, m]) => /знято після/.test(m)), `seed ${seed}: дію загублено після ${'MAX_TRIES'} спроб`);
   }
 });
 

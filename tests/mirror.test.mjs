@@ -505,3 +505,104 @@ test('Біржа не повернула ціну ринкового ордер�
   const m2 = await execute(ex, { id: linkId(BOT, T + 2e3, 'c'), kind: 'close', t: T + 2e3 }, ctx);
   assert.match(m2, /позицію закрито за ≈2\.5/);
 });
+
+/* ---------- біржа не відповідає на перевірку попереднього ордера / відповідь на ордер загубилась ---------- */
+const flaky = (ex) => { const bl = ex.byLink.bind(ex); ex.S.down = 0; ex.byLink = async (...a) => { if (ex.S.down > 0) { ex.S.down--; throw new Error('timeout'); } return bl(...a); }; return ex; };
+/* Binance Testnet: newClientOrderId унікальний лише серед ВІДКРИТИХ ордерів — виконаний ринковий можна повторити */
+const binanceLike = (ex) => { ex.native = false; ex.market = async function (symbol, side, qty, reduceOnly, link) {
+  this.S.calls.push('market:' + side); this.S.orders.push({ link, side, qty, price: this.S.px, status: 'Filled' });
+  const sg = side === 'BUY' ? 1 : -1, p = this.S.pos; if (!p) this.S.pos = { symbol, amt: sg * qty, entry: this.S.px, tp: 0, sl: 0, ts: 0 }; else { const q = p.amt + sg * qty; if (Math.abs(q) < 1e-12) this.S.pos = null; else p.amt = q; }
+  return { id: this.S.orders.length, qty, price: this.S.px, link }; }; return ex; };
+const fills = (ex, link) => ex.S.orders.filter((o) => o.link === link && o.status === 'Filled').length;
+
+test('Біржа не відповіла на перевірку попереднього ордера — новий ордер не надсилається (вхід, докупівля, фіксація, закриття)', async () => {
+  for (const native of [true, false]) {
+    const ex = flaky(native ? fakeEx() : binanceLike(fakeEx())), c = { ...ctx, native };
+    const o = { id: linkId(BOT, T, 'o'), kind: 'open', t: T, notional: 60, price: 2.5 };
+    await execute(ex, o, c);
+    const n0 = ex.S.orders.length;
+    for (const a of [o, { id: linkId(BOT, T + 1e3, 'a2'), kind: 'dca', t: T + 1e3, notional: 30 }, { id: linkId(BOT, T + 2e3, 'p'), kind: 'part', t: T + 2e3, share: 0.5 }, { id: linkId(BOT, T + 3e3, 'c'), kind: 'close', t: T + 3e3 }]) {
+      ex.S.down = 1;
+      await assert.rejects(execute(ex, a, c), /timeout/, `${a.kind}: помилка перевірки не ковтається`);
+      assert.equal(ex.S.orders.length, n0, `${a.kind}: статус невідомий — ордер не надіслано (${native ? 'Bybit' : 'Binance'})`);
+    }
+    // біржа знову відповідає: повтор входу не дублює його
+    await execute(ex, o, c);
+    assert.equal(fills(ex, o.id), 1, 'вхід лише один');
+  }
+});
+
+test('Відповідь біржі загубилась після прийняття ордера — наступний запуск знаходить ордер, дубля немає', async () => {
+  for (const native of [true, false]) {
+    const ex = flaky(native ? fakeEx() : binanceLike(fakeEx())), mk = ex.market.bind(ex), saved = [], logs = [];
+    ex.S.lose = 1; // біржа виконала ордер, але відповідь не дійшла, і перевірка одразу після цього теж не вдалась
+    ex.market = async (...a) => { const r = await mk(...a); if (ex.S.lose > 0) { ex.S.lose--; ex.S.down = 1; throw new Error('socket hang up'); } return r; };
+    const go = (state, events, t) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos: { q: 24, n: 1, first: 2.5 } }, lt: t }, events }, symbol: 'TONUSDT', mirror: true, native, ex, now: t,
+      save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async (l, m) => logs.push([l, m]), notify: async () => {} });
+    await go(null, [{ kind: 'open', notional: 60, price: 2.5, t: T }], T);
+    let st = saved.at(-1);
+    assert.equal(st.pend.length, 1, 'дія лишилась у черзі');
+    const id = st.pend[0].id;
+    assert.equal(fills(ex, id), 1);
+    await go(st, [], T + 5 * 60e3); st = saved.at(-1);
+    assert.equal(st.pend.length, 0, 'наступний запуск завершив дію');
+    assert.equal(fills(ex, id), 1, `другого входу немає (${native ? 'Bybit' : 'Binance'})`);
+    await go(st, [], T + 10 * 60e3);
+    assert.equal(fills(ex, id), 1);
+  }
+});
+
+test('Відновлення драбини після паузи: перевірка попереднього покоління не вдалася — нових сходинок немає', async () => {
+  const ex = flaky(fakeEx()), fl = {};
+  await execute(ex, actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0], { ...ctx, fl });
+  await park(ex, { symbol: 'TONUSDT', botId: BOT });
+  const n0 = ex.S.orders.length;
+  ex.S.down = 1;
+  await assert.rejects(restore(ex, { g, symbol: 'TONUSDT', fl, mp: { q: 1, n: 1, t1: 0 } }), /timeout/);
+  assert.equal(ex.S.orders.length, n0, 'нічого не поставлено');
+  // handleBot: fl.rs лишається, відновлення повториться
+  const saved = [];
+  ex.S.down = 1;
+  await handleBot({ bot: { id: BOT, state: { fl: { ...fl, parked: 1 }, pend: [] } }, g, r: { state: { b: { pos: { q: 24, n: 1, first: 2.5, f: [{ t: T }] } }, lt: T + 6e4 }, events: [] }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: T + 6e4,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
+  assert.equal(saved.at(-1).fl.rs, 1, 'відновлення відкладено, а не загублено');
+  assert.equal(ex.S.orders.length, n0);
+});
+
+test('Ручні ордери користувача на тій самій парі не знімаються: фіксація, закриття, sync, guard, пауза, зайва позиція', async () => {
+  const manual = (ex) => { ex.S.orders.push({ link: 'manual-1', side: 'SELL', qty: 1, price: 9, status: 'New' }); ex.S.orders.push({ link: '', side: 'BUY', qty: 1, price: 0.5, status: 'New' }); };
+  const alive = (ex) => ex.S.orders.filter((o) => o.status === 'New' && !String(o.link).startsWith('ox')).length;
+  const open = () => actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0];
+  // часткова фіксація і закриття
+  let ex = fakeEx(); manual(ex); await execute(ex, open(), ctx);
+  await execute(ex, { id: linkId(BOT, T + 1e3, 'p'), kind: 'part', t: T + 1e3, share: 0.5 }, ctx);
+  assert.equal(ex.S.orders.filter((o) => o.status === 'New' && o.link.startsWith('ox')).length, 0, 'лімітні докупівлі бота знято');
+  assert.equal(alive(ex), 2, 'ручні лишились після фіксації');
+  await execute(ex, { id: linkId(BOT, T + 2e3, 'c'), kind: 'close', t: T + 2e3 }, ctx);
+  assert.equal(alive(ex), 2, 'ручні лишились після закриття');
+  // sync без позиції (біржа закрила за TP/SL)
+  ex = fakeEx(); manual(ex); await execute(ex, open(), ctx); ex.S.pos = null;
+  assert.match(await sync(ex, ctx), /знято 3 ордер/); assert.equal(alive(ex), 2);
+  // guard: ціна пройшла SL — закриття ринком
+  ex = fakeEx(); manual(ex); await execute(ex, open(), ctx); ex.S.px = 2.0;
+  assert.ok((await guard(ex, ctx, (await ex.positions())[0], F)).closed); assert.equal(alive(ex), 2);
+  // пауза
+  ex = fakeEx(); manual(ex); await execute(ex, open(), ctx);
+  await park(ex, { symbol: 'TONUSDT', botId: BOT }); assert.equal(alive(ex), 2);
+  // ордери іншого бота Orbix теж не чіпаються
+  ex = fakeEx(); await execute(ex, open(), ctx);
+  ex.S.orders.push({ link: linkId('99999999-0000-0000-0000-000000000000', T, 'd1'), side: 'BUY', qty: 1, price: 1, status: 'New' });
+  ex.S.pos = null; await sync(ex, ctx);
+  assert.equal(ex.S.orders.filter((o) => o.status === 'New').length, 1, 'ордер іншого бота лишився');
+  // зайва позиція після закриття біржею
+  ex = fakeEx(); manual(ex);
+  const saved = [], mp = { q: 24, n: 1, first: 2.5, f: [{ t: T }] };
+  const go = (state, events, t) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos: mp }, lt: t }, events }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: t,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
+  await go(null, [{ kind: 'open', notional: 60, price: 2.5, t: T }], T);
+  ex.S.pos = null; await go(saved.at(-1), [], T + 5 * 60e3);
+  ex.S.orders.filter((o) => o.status === 'Cancelled').forEach((o) => { o.status = 'New'; });
+  ex.hit(ladder(g, 2.5, F)[0].price); await go(saved.at(-1), [], T + 10 * 60e3);
+  assert.equal(ex.S.pos, null); assert.equal(alive(ex), 2, 'ручні лишились після закриття зайвої позиції');
+  assert.equal(ex.S.calls.filter((c) => c === 'cancelAll').length, 0, 'cancelAll не викликається');
+});

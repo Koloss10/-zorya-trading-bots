@@ -157,11 +157,26 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
 export async function sync(ex, { g, symbol, botId, fl = {}, out = {}, mp = null }) {
   const p = (await ex.positions(symbol))[0];
   out.pos = p || null; out.seen = !!p; // що побачили на біржі — для звірки з моделлю (reconcile)
-  if (p) { const r = await guard(ex, { g, symbol, fl, mp }, p, await ex.filt(symbol)); if (r && r.closed) out.pos = null; return r ? r.msg : null; }
-  const mine = (await ex.openOrders(symbol)).filter((o) => String(o.link || "").startsWith("ox" + hex(botId)));
+  const mineOf = async () => (await ex.openOrders(symbol)).filter((o) => String(o.link || "").startsWith("ox" + hex(botId)));
+  if (p) {
+    const r = await guard(ex, { g, symbol, fl, mp }, p, await ex.filt(symbol));
+    if (r && r.closed) out.pos = null;
+    else if (r) out.pos = (await ex.positions(symbol))[0] || null; // захист змінено — для моніторингу беремо свіжий стан
+    out.ord = out.pos ? (await mineOf()).length : 0;
+    return r ? r.msg : null;
+  }
+  const mine = await mineOf();
+  out.ord = 0;
   if (!mine.length) return null;
   await ex.cancelAll(symbol);
   return `Bybit Demo: позиції немає (закрито біржею за TP/SL) — знято ${mine.length} ордер(ів) бота`;
+}
+
+/* Знімок стану біржі для моніторингу (state.xs): позиція, її захист і кількість лімітних ордерів бота; null — порожньо */
+export function snapshot(out) {
+  const p = out && out.pos;
+  if (!p) return null;
+  return { amt: p.amt, entry: p.entry, sl: +p.sl || 0, tp: +p.tp || 0, ts: +p.ts || 0, ord: out.ord || 0 };
 }
 
 /* Звірка моделі бота з позицією на біржі. mp — позиція рушія ({q, first, t1, …}) або null; xp — позиція біржі ({amt, …}) або null.
@@ -272,7 +287,10 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
   if (fl.parked && native) fl.rs = 1; // бот знято з паузи — відновити драбину на біржі (повторюється, доки не вдасться)
   delete fl.parked; // бот знову працює
   if (!(mirror && native && ex)) clearMis(fl); // звірки немає — давнє попередження не лишається на картці
-  const st = { ...r.state, pend, fl };
+  // xs — знімок біржі (моніторинг), xe — остання помилка біржі {m, at}; без дублювання на біржу обидва не потрібні
+  const st = { ...r.state, pend, fl, ...(mirror && ex ? { xs: bot.state?.xs ?? null, ...(bot.state?.xe ? { xe: bot.state.xe } : {}) } : {}) };
+  const xs0 = JSON.stringify([st.xs ?? null, st.xe ?? null]);
+  const exErr = (m) => { st.xe = { m: String(m).slice(0, 200), at: now }; };
   if (!(await save(st))) { await log("warn", "Стан не збережено (паралельний запуск або помилка бази) — біржу не чіпаю, повторю наступного разу"); return { saved: false }; }
   for (const ev of r.events) {
     const text = eventText(ev, g);
@@ -294,6 +312,7 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     catch (e) {
       const b = { ...a, tries: (a.tries || 0) + 1 };
       changed = true;
+      exErr(e.message);
       if (b.tries >= MAX_TRIES) { const m = `Біржа: дію «${a.kind}» знято після ${MAX_TRIES} спроб — ${e.message}`; await log("error", m); await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
       else { await log("error", `Біржа: ${e.message} (спроба ${b.tries} з ${MAX_TRIES}, повторю)`); left.push(b); stop = true; }
     }
@@ -307,9 +326,10 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
       const m = await sync(ex, { g, symbol, botId: bot.id, fl, out, mp });
       if (m) { await log("info", m); if (/закрито (біржею|ринком)|не прийняла/.test(m)) await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
       await onReconcile({ fl, mp, out, g, log, notify, now });
+      st.xs = snapshot(out); delete st.xe; // звірка пройшла — біржа відповідає
     }
-    catch (e) { await log("error", `Біржа (звірка захисту): ${e.message}`); }
+    catch (e) { exErr(e.message); await log("error", `Біржа (звірка захисту): ${e.message}`); }
   }
-  if (changed || JSON.stringify(fl) !== fl0) await save({ ...st, pend: left, fl });
+  if (changed || JSON.stringify(fl) !== fl0 || JSON.stringify([st.xs ?? null, st.xe ?? null]) !== xs0) await save({ ...st, pend: left, fl });
   return { saved: true, left: left.length };
 }

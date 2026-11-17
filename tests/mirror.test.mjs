@@ -1,7 +1,7 @@
 // Виконання угод серверного бота на демо-біржі: ордери на біржі й захист від повторів (фейкова біржа).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, execute, guard, handleBot, ladder, linkId, onReconcile, park, protect, reconcile, sync, MAX_TRIES, RUN_GAP } from '../supabase/functions/runner/mirror.js';
+import { actionsFor, execute, guard, handleBot, ladder, linkBase, linkId, onReconcile, park, protect, reconcile, restore, sync, MAX_TRIES, RUN_GAP } from '../supabase/functions/runner/mirror.js';
 import { botConfig } from '../supabase/functions/runner/core.js';
 import { Bot } from '../supabase/functions/runner/engine.js';
 
@@ -328,4 +328,53 @@ test('Без звірки (дублювання вимкнено) давнє п�
   await handleBot({ bot: { id: BOT, state: { fl: { mis: { k: 'size', t: 'x', n: 3, on: 1 }, had: 1, tid: 1 } } }, g, r: { state: { b: { pos: null }, lt: T }, events: [] }, symbol: 'TONUSDT', mirror: false, native: false, ex: null, now: T,
     save: async (s) => { saved.push(JSON.parse(JSON.stringify(s))); return true; }, log: async () => {}, notify: async () => {} });
   assert.deepEqual(saved.at(-1).fl, {});
+});
+
+test('Після TP1 з беззбитком стоп на біржі переноситься туди ж, куди й у моделі', async () => {
+  const gb = { ...g, s1: 0.5, be: 1 };
+  assert.equal(protect(gb, 2.5, F, { t1: 1, be: 2.4567 }).sl, 2.4567);
+  assert.equal(protect(gb, 2.5, F, { t1: 0, be: 2.4567 }).sl, protect(gb, 2.5, F).sl, 'до TP1 — звичайний стоп');
+  const ex = fakeEx(); await execute(ex, actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0], { ...ctx, g: gb });
+  ex.S.px = 2.53;
+  const m = await sync(ex, { ...ctx, g: gb, mp: { q: 12, t1: 1, be: ex.S.pos.entry } });
+  assert.match(m, /SL 2\.5/); assert.equal(ex.S.pos.sl, ex.S.pos.entry);
+});
+
+test('Зняття з паузи: драбина докупівель повертається на біржу, лише ще не зроблені рівні', async () => {
+  const ex = fakeEx(), fl = {}, open = actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0];
+  await execute(ex, open, { ...ctx, fl });
+  assert.equal(fl.lb, linkBase(BOT, T)); assert.equal(fl.e0, 2.5);
+  const L = ladder(g, 2.5, F); ex.hit(L[0].price);               // 1-ша докупівля виконалась (модель: n = 2)
+  await park(ex, { symbol: 'TONUSDT', botId: BOT });
+  assert.equal((await ex.openOrders()).length, 0);
+  const m = await restore(ex, { g, symbol: 'TONUSDT', fl, mp: { q: 1, n: 2, t1: 0 } });
+  assert.match(m, /відновлено 2 лімітн/);
+  assert.deepEqual((await ex.openOrders()).map((o) => o.link), [fl.lb + 'e1x2', fl.lb + 'e1x3']);
+  assert.equal(await restore(ex, { g, symbol: 'TONUSDT', fl, mp: { q: 1, n: 2, t1: 0 } }), null, 'усе вже стоїть — нічого не дублюється');
+  await park(ex, { symbol: 'TONUSDT', botId: BOT });            // друга пауза — нове покоління ідентифікаторів
+  await restore(ex, { g, symbol: 'TONUSDT', fl, mp: { q: 1, n: 2, t1: 0 } });
+  assert.deepEqual((await ex.openOrders()).map((o) => o.link), [fl.lb + 'e3x2', fl.lb + 'e3x3']);
+});
+
+test('Зняття з паузи: без позиції на біржі, після TP1 або для старої угоди драбина не ставиться', async () => {
+  const ex = fakeEx(), fl = { lb: linkBase(BOT, T), e0: 2.5 };
+  assert.equal(await restore(ex, { g, symbol: 'TONUSDT', fl, mp: { n: 1 } }), null, 'позиції на біржі немає');
+  await execute(ex, actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0], ctx);
+  await park(ex, { symbol: 'TONUSDT', botId: BOT });
+  assert.equal(await restore(ex, { g, symbol: 'TONUSDT', fl, mp: { n: 1, t1: 1 } }), null, 'після TP1 докупівель немає');
+  assert.match(await restore(ex, { g, symbol: 'TONUSDT', fl: {}, mp: { n: 1 } }), /не відновлено/);
+});
+
+test('handleBot: після паузи драбина відновлюється один раз; угоду закрито — дані драбини прибрано', async () => {
+  const ex = fakeEx(), saved = [], logs = [];
+  const go = (state, pos) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos }, lt: T }, events: [] }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: T,
+    save: async (s) => { saved.push(JSON.parse(JSON.stringify(s))); return true; }, log: async (_l, m) => logs.push(m), notify: async () => {} });
+  const fl = {}; await execute(ex, actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0], { ...ctx, fl });
+  await park(ex, { symbol: 'TONUSDT', botId: BOT });
+  await go({ fl: { ...fl, parked: 1 }, pend: [] }, { q: 24, n: 1, first: 2.5, f: [{ t: T }] });
+  assert.ok(logs.some((m) => /відновлено 3 лімітн/.test(m)));
+  const st = saved.at(-1); assert.equal(st.fl.rs, undefined); assert.equal(st.fl.parked, undefined); assert.equal(st.fl.rg, 1);
+  ex.S.pos = null; ex.S.orders = [];
+  await go(st, null);
+  const f2 = saved.at(-1).fl; assert.equal(f2.lb, undefined); assert.equal(f2.e0, undefined); assert.equal(f2.rg, undefined);
 });

@@ -19,6 +19,7 @@ w=Math.max(g.rp,g.bn,g.cn,30,g.sg.includes('ema')?100:0,g.sg.includes('lvl')?100
 if(!S.length||(g.fm&&f&&f.f<g.fm))return o;for(let i=w;i<n;i++){let c=0;for(const s of S)if(s[i]===g.d)c++;o[i]=c>=k}return o}
 /* Комісії: ftk — тейкер (ринковий вхід, стоп, трейлінг, ліквідація), fmk — мейкер (лімітні DCA і TP).
    Funding: події fr={t,r}; при r>0 Long платить, Short отримує, сума = r·кількість·ціна.
+   g.frx — множник funding для перевірки якості (за замовчуванням 1; 0 — без funding, 2 — подвоєний).
    Ліквідація перевіряється за mark price (ml/mh свічки), якщо вона є, інакше за ціною угод. */
 /* округлення під правила біржі: кількість — вниз до кроку, ціна лімітного ордера — у бік гіршого виконання */
 const decs=x=>{const s=String(x);if(s.includes('e-'))return+s.split('e-')[1];const i=s.indexOf('.');return i<0?0:s.length-i-1};
@@ -32,7 +33,7 @@ qty(s,px){const F=this.F;if(!F)return s/px;const q=rnd(s/px,F.step,'floor');retu
 lp(x,up){const F=this.F;return F&&F.tick?rnd(x,F.tick,up?'ceil':'floor'):x}
 eqv(r){const g=this.g,p=this.pos;if(!p)return this.cum;const v=p.q*r.c;return this.cum+p.real+g.d*(v-p.cost)-this.ft*v}
 fund(r){const p=this.pos,F=this.fr;if(!p||!F||!F.length||r.t==null)return;const W=tfMs(this.g.tf||1);let k=lbT(F,r.t);
-for(;k<F.length&&F[k].t<r.t+W;k++){const px=F[k].t-r.t<6e4?r.o:r.c,a=this.g.d*F[k].r*p.q*px;p.real-=a;p.fd+=a}}
+for(;k<F.length&&F[k].t<r.t+W;k++){const px=F[k].t-r.t<6e4?r.o:r.c,a=this.g.d*F[k].r*p.q*px*(this.g.frx!=null?this.g.frx:1);p.real-=a;p.fd+=a}}
 step(i,r,en,h=i){const g=this.g,d=g.d,p=this.pos,L=g.lev||1,fv=x=>d>0?r.h>=x:r.l<=x,ad=x=>d>0?r.l<=x:r.h>=x,adm=x=>d>0?(r.ml!=null?r.ml:r.l)<=x:(r.mh!=null?r.mh:r.h)>=x;
 if(!p){if(en&&i>=this.cd){const q0=this.qty(g.base*L,r.c);if(!q0)return;const s0=q0*r.c;this.pos={q:q0,cost:s0,n:1,last:r.c,first:r.c,peak:r.c,real:-this.ft*s0,fd:0,t1:0,f:[{t:r.t,p:r.c,k:'e'}]}}return}
 this.fund(r);

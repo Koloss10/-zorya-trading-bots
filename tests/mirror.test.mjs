@@ -1,7 +1,7 @@
 // Виконання угод серверного бота на демо-біржі: ордери на біржі й захист від повторів (фейкова біржа).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, execute, guard, handleBot, ladder, linkBase, linkId, onReconcile, park, protect, reconcile, restore, snapshot, sync, MAX_TRIES, RUN_GAP } from '../supabase/functions/runner/mirror.js';
+import { actionsFor, execute, guard, handleBot, ladder, linkBase, linkId, onReconcile, park, protect, reconcile, restore, snapshot, sync, MAX_TRIES, RUN_GAP, XR_KEEP } from '../supabase/functions/runner/mirror.js';
 import { botConfig } from '../supabase/functions/runner/core.js';
 import { Bot } from '../supabase/functions/runner/engine.js';
 
@@ -405,4 +405,51 @@ test('Моніторинг: без дублювання на біржу знім
   await handleBot({ bot: { id: BOT, state: { xs: { amt: 1 }, xe: { m: 'x', at: 1 } } }, g, r: { state: { b: { pos: null }, lt: T }, events: [] }, symbol: 'TONUSDT', mirror: false, native: false, ex: null, now: T,
     save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
   assert.equal(saved.at(-1).xs, undefined); assert.equal(saved.at(-1).xe, undefined);
+});
+
+test('Demo проти моделі: сервер записує ціну входу на біржі й закриття позицій за даними біржі', async () => {
+  const ex = fakeEx(), saved = [];
+  ex.S.closed = []; ex.closedPnl = async (_s, start) => { ex.S.calls.push('closedPnl'); return ex.S.closed.filter((x) => x.t >= start); };
+  const go = (state, pos, events = [], t = T) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos }, lt: t }, events }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: t,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
+  // модель увійшла за закриттям свічки 2,49, біржа виконала ринковий ордер за 2,5
+  await go(null, { q: 24, n: 1, first: 2.49, f: [{ t: T }] }, [{ kind: 'open', notional: 60, price: 2.49, t: T }]);
+  let st = saved.at(-1);
+  assert.equal(st.xr.from, T); assert.equal(st.xr.l.length, 0);
+  assert.equal(st.xr.en.length, 1); assert.equal(st.xr.en[0].m, 2.49); assert.equal(st.xr.en[0].x, 2.5);
+  assert.equal(count(ex, 'closedPnl'), 0, 'поки позиція відкрита, закриття не запитуються');
+  // біржа закрила позицію за TP, але запис про закриття з'явиться з затримкою
+  ex.S.pos = null;
+  await go(st, null, [], T + 5 * 60e3); st = saved.at(-1);
+  assert.equal(st.xr.l.length, 0); assert.equal(st.xr.due, 2, 'запитаю ще двічі');
+  ex.S.closed.push({ id: 'c1', t: T + 4 * 60e3, pnl: 0.61, q: 24, px: 2.53 }, { id: 'old', t: T - 864e5, pnl: -5, q: 1, px: 1 });
+  await go(st, null, [], T + 10 * 60e3); st = saved.at(-1);
+  assert.equal(st.xr.l.length, 1, 'чуже давнє закриття (до початку обліку) не враховано'); assert.equal(st.xr.l[0].pnl, 0.61); assert.equal(st.xr.due, undefined);
+  // далі без змін на біржі запитів немає, повторно запис не додається
+  const n = count(ex, 'closedPnl'); await go(st, null, [], T + 15 * 60e3); st = saved.at(-1);
+  assert.equal(count(ex, 'closedPnl'), n); assert.equal(st.xr.l.length, 1);
+  // запис так і не з'явився — після 3 спроб облік не запитує біржу щоразу
+  st = { ...st, xs: { amt: 24, entry: 2.5 } };
+  for (let i = 0; i < 5; i++) { await go(st, null, [], T + (20 + 5 * i) * 60e3); st = saved.at(-1); }
+  assert.equal(st.xr.due, undefined); assert.equal(count(ex, 'closedPnl'), n + 3);
+  // список обмежено
+  st.xr.l = Array.from({ length: XR_KEEP }, (_, i) => ({ id: 'x' + i, t: T + i, pnl: 0, q: 1, px: 1 })); st.xr.due = 1;
+  ex.S.closed.push({ id: 'c2', t: T + 3600e3, pnl: 1, q: 1, px: 1 });
+  await go(st, null, [], T + 3700e3); st = saved.at(-1);
+  assert.equal(st.xr.l.length, XR_KEEP); assert.equal(st.xr.l.at(-1).id, 'c2');
+});
+
+test('Demo проти моделі: часткова фіксація теж записується; Binance Testnet облік не веде', async () => {
+  const ex = fakeEx(), saved = [];
+  ex.S.closed = []; ex.closedPnl = async (_s, start) => ex.S.closed.filter((x) => x.t >= start);
+  const go = (exx, state, pos, events = [], t = T, native = true) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos }, lt: t }, events }, symbol: 'TONUSDT', mirror: true, native, ex: exx, now: t,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
+  await go(ex, null, { q: 24, n: 1, first: 2.5, f: [{ t: T }] }, [{ kind: 'open', notional: 60, price: 2.5, t: T }]);
+  let st = saved.at(-1);
+  ex.S.px = 2.52; ex.S.closed.push({ id: 'p1', t: T + 3600e3 + 1e3, pnl: 0.3, q: 12, px: 2.53 });
+  await go(ex, st, { q: 12, n: 1, first: 2.5, t1: 1, f: [{ t: T }] }, [{ kind: 'part', share: 0.5, price: 2.53, t: T + 3600e3 }], T + 3600e3); st = saved.at(-1);
+  assert.equal(Math.abs(st.xs.amt), 12); assert.equal(st.xr.l.length, 1); assert.equal(st.xr.l[0].id, 'p1');
+  const bn = fakeEx({ native: false });
+  await go(bn, null, { q: 24, n: 1, first: 2.5, f: [{ t: T }] }, [{ kind: 'open', notional: 60, price: 2.5, t: T }], T, false);
+  assert.equal(saved.at(-1).xr, undefined);
 });

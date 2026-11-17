@@ -27,7 +27,7 @@ function build() {
   return { html, mods };
 }
 
-// Серверні копії: торговий рушій (модулі 01–05) для Edge Function `runner` і спільні файли бірж.
+// Серверні копії: торговий рушій (модулі 01–06) для Edge Function `runner` і спільні файли бірж.
 // Рушій на сервері — той самий код, що й у браузері, тож результати ботів збігаються.
 const ENGINE_EXPORTS = ['Bot', 'entry', 'aggT', 'aggC', 'normG', 'tfMs', 'tfOff', 'DEF', 'rnd', 'lbT', 'lv'];
 function generated() {

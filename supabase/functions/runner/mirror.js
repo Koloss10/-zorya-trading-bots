@@ -276,11 +276,6 @@ export async function park(ex, { symbol, botId }) {
   return `Bybit Demo: бот на паузі — знято ${mine.length} лімітн. докупівель` + (p ? `; позиція ${symbol} лишається на біржі${p.sl ? ` зі стопом ${p.sl}` : " БЕЗ стопу — перевірте її вручну"}` : "");
 }
 
-/**
- * Обробка бота після прогону рушія.
- * deps: save(state) → true, якщо стан збережено й ніхто інший його не змінив; log(level, text, data); notify(text);
- *       ex — адаптер біржі або null (немає ключів); mirror — чи дублювати угоди; native — рідний режим Bybit.
- */
 /* Результати на біржі для порівняння з моделлю (state.xr, лише Bybit Demo):
    from — з якого моменту ведеться облік; l — закриття позицій за даними біржі {id, t, pnl, q, px} (PnL з комісіями біржі);
    en — входи {t, m, x}: ціна входу моделі (закриття свічки) і фактична ціна на біржі; due — скільки ще разів запитати
@@ -295,6 +290,11 @@ export async function results(ex, { symbol, xr }) {
   return add.length;
 }
 
+/**
+ * Обробка бота після прогону рушія.
+ * deps: save(state) → true, якщо стан збережено й ніхто інший його не змінив; log(level, text, data); notify(text);
+ *       ex — адаптер біржі або null (немає ключів); mirror — чи дублювати угоди; native — рідний режим Bybit.
+ */
 export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, log, notify, now = Date.now() }) {
   const pend = [...(Array.isArray(bot.state?.pend) ? bot.state.pend : []), ...(mirror ? actionsFor(r.events, bot.id, native) : [])];
   const fl = { ...(bot.state?.fl || {}) }, fl0 = JSON.stringify(fl);

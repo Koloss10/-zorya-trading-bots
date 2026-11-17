@@ -139,6 +139,11 @@ export function bybit(key: string, secret: string) {
     },
     // скасовує лише звичайні (лімітні) ордери; TP/SL позиції лишаються, доки позиція відкрита
     async cancelAll(symbol: string) { await call("POST", "/v5/order/cancel-all", { category: "linear", symbol, orderFilter: "Order" }); },
+    // закриття позицій від start (мс) — результат за даними біржі, з її комісіями; Bybit віддає не більше 7 днів за запит
+    async closedPnl(symbol: string, start: number) {
+      const l = (await call("GET", "/v5/position/closed-pnl", { category: "linear", symbol, startTime: Math.max(Math.floor(start), Date.now() - 7 * 864e5 + 6e4), limit: 50 })).list ?? [];
+      return l.map((x: any) => ({ id: String(x.orderId), t: +x.updatedTime, pnl: +x.closedPnl, q: +(x.closedSize || x.qty), px: +x.avgExitPrice }));
+    },
     // TP/SL/трейлінг на всю позицію (ринкове виконання за останньою ціною); 0 — прибрати.
     // ts — відстань трейлінгу в ціні, ap — ціна активації (без неї трейлінг діє одразу)
     async tradingStop(symbol: string, { tp, sl, ts = 0, ap = 0 }: { tp: number; sl: number; ts?: number; ap?: number }) {

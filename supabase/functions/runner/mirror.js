@@ -28,7 +28,7 @@ export const linkId = (botId, t, kind) => linkBase(botId, t) + kind;
 export function actionsFor(events, botId, native) {
   const out = [];
   for (const ev of events) {
-    if (ev.kind === "open") out.push({ id: linkId(botId, ev.t, "o"), kind: "open", t: ev.t, notional: ev.notional, tries: 0 });
+    if (ev.kind === "open") out.push({ id: linkId(botId, ev.t, "o"), kind: "open", t: ev.t, notional: ev.notional, price: ev.price, tries: 0 });
     else if (ev.kind === "dca") { if (!native) out.push({ id: linkId(botId, ev.t, "a" + ev.n), kind: "dca", t: ev.t, notional: ev.notional, tries: 0 }); }
     else if (ev.kind === "part") out.push({ id: linkId(botId, ev.t, "p"), kind: "part", t: ev.t, share: ev.share, tries: 0 });
     else out.push({ id: linkId(botId, ev.t, "c"), kind: "close", t: ev.t, tries: 0 });
@@ -281,6 +281,20 @@ export async function park(ex, { symbol, botId }) {
  * deps: save(state) → true, якщо стан збережено й ніхто інший його не змінив; log(level, text, data); notify(text);
  *       ex — адаптер біржі або null (немає ключів); mirror — чи дублювати угоди; native — рідний режим Bybit.
  */
+/* Результати на біржі для порівняння з моделлю (state.xr, лише Bybit Demo):
+   from — з якого моменту ведеться облік; l — закриття позицій за даними біржі {id, t, pnl, q, px} (PnL з комісіями біржі);
+   en — входи {t, m, x}: ціна входу моделі (закриття свічки) і фактична ціна на біржі; due — скільки ще разів запитати
+   закриття (запис на біржі може з'явитися із затримкою). Зберігаються останні XR_KEEP записів. */
+export const XR_KEEP = 50;
+export const newXr = (now) => ({ from: now, at: now, l: [], en: [] });
+export async function results(ex, { symbol, xr }) {
+  const seen = new Set(xr.l.map((x) => x.id));
+  const add = (await ex.closedPnl(symbol, xr.at - 6e4)).filter((x) => x.t >= xr.from && !seen.has(x.id)).sort((a, b) => a.t - b.t);
+  if (add.length) { xr.l = [...xr.l, ...add].slice(-XR_KEEP); xr.at = Math.max(xr.at, ...add.map((x) => x.t)); delete xr.due; }
+  else if (--xr.due <= 0) delete xr.due;
+  return add.length;
+}
+
 export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, log, notify, now = Date.now() }) {
   const pend = [...(Array.isArray(bot.state?.pend) ? bot.state.pend : []), ...(mirror ? actionsFor(r.events, bot.id, native) : [])];
   const fl = { ...(bot.state?.fl || {}) }, fl0 = JSON.stringify(fl);
@@ -289,7 +303,10 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
   if (!(mirror && native && ex)) clearMis(fl); // звірки немає — давнє попередження не лишається на картці
   // xs — знімок біржі (моніторинг), xe — остання помилка біржі {m, at}; без дублювання на біржу обидва не потрібні
   const st = { ...r.state, pend, fl, ...(mirror && ex ? { xs: bot.state?.xs ?? null, ...(bot.state?.xe ? { xe: bot.state.xe } : {}) } : {}) };
-  const xs0 = JSON.stringify([st.xs ?? null, st.xe ?? null]);
+  // xr — результати на біржі для порівняння з моделлю (лише рідний режим)
+  if (mirror && ex && native && typeof ex.closedPnl === "function") st.xr = bot.state?.xr ? JSON.parse(JSON.stringify(bot.state.xr)) : newXr(now);
+  const xsOf = () => JSON.stringify([st.xs ?? null, st.xe ?? null, st.xr ?? null]);
+  const xs0 = JSON.stringify([bot.state?.xs ?? null, bot.state?.xe ?? null, st.xr ? bot.state?.xr ?? null : null]);
   const exErr = (m) => { st.xe = { m: String(m).slice(0, 200), at: now }; };
   if (!(await save(st))) { await log("warn", "Стан не збережено (паралельний запуск або помилка бази) — біржу не чіпаю, повторю наступного разу"); return { saved: false }; }
   for (const ev of r.events) {
@@ -308,7 +325,11 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
   for (const a of pend) {
     if (stop) { left.push(a); continue; }
     if (a.kind !== "close" && a.kind !== "part" && now - a.t > STALE_MS) { changed = true; await log("warn", `Біржа: сигнал застарів (${Math.round((now - a.t) / 60e3)} хв) — ${a.kind === "open" ? "вхід" : "докупівлю"} не надіслано`); continue; }
-    try { await log("info", await execute(ex, a, { g, symbol, native, botId: bot.id, fl })); changed = true; }
+    try {
+      await log("info", await execute(ex, a, { g, symbol, native, botId: bot.id, fl })); changed = true;
+      // прослизання входу: ціна моделі (закриття свічки) проти фактичної середньої ціни на біржі
+      if (a.kind === "open" && st.xr && a.price > 0 && fl.e0 > 0) st.xr.en = [...st.xr.en, { t: a.t, m: a.price, x: fl.e0 }].slice(-XR_KEEP);
+    }
     catch (e) {
       const b = { ...a, tries: (a.tries || 0) + 1 };
       changed = true;
@@ -326,10 +347,15 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
       const m = await sync(ex, { g, symbol, botId: bot.id, fl, out, mp });
       if (m) { await log("info", m); if (/закрито (біржею|ринком)|не прийняла/.test(m)) await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
       await onReconcile({ fl, mp, out, g, log, notify, now });
+      const pv = bot.state?.xs, cur = out.pos;
       st.xs = snapshot(out); delete st.xe; // звірка пройшла — біржа відповідає
+      // позиція на біржі зникла або зменшилась — запитати закриття (до 3 запусків, поки запис не з'явиться)
+      if (st.xr && pv && pv.amt && (!cur || Math.abs(cur.amt) < Math.abs(pv.amt) - 1e-12)) st.xr.due = 3;
     }
     catch (e) { exErr(e.message); await log("error", `Біржа (звірка захисту): ${e.message}`); }
   }
-  if (changed || JSON.stringify(fl) !== fl0 || JSON.stringify([st.xs ?? null, st.xe ?? null]) !== xs0) await save({ ...st, pend: left, fl });
+  // закриття за даними біржі; помилка не критична — повторю наступного запуску, але не більше 3 разів
+  if (st.xr && st.xr.due) { try { await results(ex, { symbol, xr: st.xr }); } catch (e) { if (--st.xr.due <= 0) delete st.xr.due; } }
+  if (changed || JSON.stringify(fl) !== fl0 || xsOf() !== xs0) await save({ ...st, pend: left, fl });
   return { saved: true, left: left.length };
 }

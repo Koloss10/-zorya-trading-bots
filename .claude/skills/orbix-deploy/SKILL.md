@@ -25,10 +25,10 @@ description: Викласти зміни Orbix: тести й збірка, ро
 ```bash
 node tools/build.js            # перегенерувати orbix.html, runner/engine.js і копії _shared/*
 node tools/build.js --check    # усе актуальне
-node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs
+node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs tests/quality.test.js
 ```
 Згенеровані файли вручну не редагуй:
-- `runner/engine.js` збирається з `src/js/01–05`;
+- `runner/engine.js` збирається з `src/js/01–06`;
 - `exchange/`, `runner/exchanges.ts` і `sign.js` копіюються з `supabase/functions/_shared/`.
 
 ## 2. Коміт і push
@@ -37,7 +37,7 @@ node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.
 
 ## 3. Які функції розгортати
 `git diff --name-only origin/main...HEAD -- supabase/functions` показує, що змінилося:
-- `src/js/01–05`, `runner/*` → `runner`;
+- `src/js/01–06`, `runner/*` → `runner`;
 - `_shared/*` → `runner` **і** `exchange`;
 - `exchange/index.ts` → `exchange`;
 - `tg-notify/*` → `tg-notify`.

@@ -19,13 +19,15 @@ function series(n, seed, vol = 0.018, px = 2.5) {
 
 /* підставна біржа: одна позиція, лімітні ордери, TP/SL/трейлінг на позиції; ціна йде o → (l,h або h,l) → c */
 function simEx() {
-  const S = { px: 0, pos: null, orders: [], links: new Set(), dup: 0, fills: [], ghost: 0 };
+  const S = { px: 0, pos: null, orders: [], links: new Set(), dup: 0, fills: [], ghost: 0, t: 0, closed: [] };
   const fill = (side, qty, price) => {
     const sg = side === 'BUY' ? 1 : -1, p = S.pos;
     S.fills.push({ side, qty, price });
     if (!p) { S.pos = { amt: sg * qty, entry: price, tp: 0, sl: 0, ts: 0, ap: 0, peak: 0, act: 0 }; return; }
     if (Math.sign(p.amt) === sg) { const q = Math.abs(p.amt) + qty; p.entry = (p.entry * Math.abs(p.amt) + price * qty) / q; p.amt = sg * q; }
-    else { const q = +(Math.abs(p.amt) - qty).toFixed(8); if (q <= 1e-9) S.pos = null; else p.amt = -sg * q; } // як на Bybit: лімітні ордери після закриття позиції лишаються
+    else { // закриття (повне чи часткове) — запис для обліку результатів на біржі, як closed-pnl Bybit
+      S.closed.push({ id: 'c' + S.closed.length, t: S.t, pnl: -sg * (price - p.entry) * qty, q: qty, px: price });
+      const q = +(Math.abs(p.amt) - qty).toFixed(8); if (q <= 1e-9) S.pos = null; else p.amt = -sg * q; } // як на Bybit: лімітні ордери після закриття позиції лишаються
   };
   const order = (link, o) => {
     if (link) { if (S.links.has(link)) { S.dup++; const e = new Error('OrderLinkedID is duplicate'); e.code = 110072; throw e; } S.links.add(link); }
@@ -50,6 +52,7 @@ function simEx() {
     at,
     candle(c) { for (const x of this.path(c)) at(x); },
     async positions() { return S.pos ? [{ symbol: 'SIMUSDT', ...S.pos, mark: S.px }] : []; },
+    async closedPnl(_s, start) { return S.closed.filter((x) => x.t >= start).slice(-50); },
     async filt() { return F; },
     async mark() { return S.px; },
     async leverage() {},
@@ -80,12 +83,12 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
   const spans = pauses.length ? sp : null;
   for (let i = hist; i < n; i++) {
     const c = cs[i], now = c.t + H + 3e5, win = cs.slice(Math.max(0, i - 300), i);
-    if (paused(i)) ex.candle(c);
+    if (paused(i)) { ex.S.t = c.t; ex.candle(c); }
     else {
       // усередині свічки сервер запускається кожні ~5 хв: нових подій моделі немає, але звірка захисту й прибирання ордерів працюють
       const pts = ex.path(c);
       for (let k = 0; k < pts.length; k++) {
-        ex.at(pts[k]);
+        ex.S.t = c.t + k * 15 * 60e3; ex.at(pts[k]);
         if (k === pts.length - 1) break;
         const at = c.t + (k + 1) * 15 * 60e3, ri = processBot({ g, state: stored, candles: win.concat([c]), now: at, spans });
         await handleBot({ bot: { id: BOT, state: stored }, g, r: ri, symbol: 'SIMUSDT', mirror: true, native: true, ex, now: at,
@@ -133,7 +136,10 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
     }
   }
   const errs = logs.filter(([l]) => l === 'error').map(([, m]) => m);
-  return { g, ex, logs, notes, alarms, alarm, trades, errs, maxGap, stored, crashes, beBad, ladBad };
+  // облік результатів на біржі (Demo проти моделі): кожне закриття на біржі записано один раз, нічого не загублено
+  const xr = stored.xr, want = ex.S.closed.filter((x) => x.t >= xr.from).slice(-50).map((x) => x.id), got = xr.l.map((x) => x.id);
+  const xrBad = new Set(got).size !== got.length ? 'повторний запис закриття' : want.join() !== got.join() ? `закриття на біржі ${want.length}, записано ${got.length}` : '';
+  return { g, ex, logs, notes, alarms, alarm, trades, errs, maxGap, stored, crashes, beBad, ladBad, xrBad, xr };
 }
 
 for (const [name, cfg] of [
@@ -152,6 +158,7 @@ for (const [name, cfg] of [
       assert.deepEqual(s.errs, [], `seed ${seed}: помилки біржі`);
       assert.equal(s.alarms, 0, `seed ${seed}: тривога звірки — ${s.alarm}`);
       assert.equal(s.beBad, '', `seed ${seed}: ${s.beBad}`); assert.equal(s.ladBad, '', `seed ${seed}: ${s.ladBad}`);
+      assert.equal(s.xrBad, '', `seed ${seed}: ${s.xrBad}`); assert.ok(s.xr.l.length >= 3 && s.xr.en.length >= 3, `seed ${seed}: облік результатів порожній`);
     }
   });
 }
@@ -159,7 +166,7 @@ for (const [name, cfg] of [
 test('Симуляція зі збоями: робочий процес падає після збереження стану — дії виконуються наступного запуску без дублів', async () => {
   for (const seed of [7, 11]) {
     const s = await simulate({ d: 1 }, { seed, crashEvery: 3 });
-    assert.ok(s.crashes >= 5, `збоїв ${s.crashes}`); assert.ok(s.trades >= 3); assert.equal(s.ex.S.dup, 0); assert.deepEqual(s.errs, []); assert.equal(s.alarms, 0);
+    assert.ok(s.crashes >= 5, `збоїв ${s.crashes}`); assert.ok(s.trades >= 3); assert.equal(s.ex.S.dup, 0); assert.deepEqual(s.errs, []); assert.equal(s.alarms, 0); assert.equal(s.xrBad, '');
   }
 });
 

@@ -1,4 +1,4 @@
-name: Validate ZORYA
+name: Validate Orbix
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
           from pathlib import Path
           import re
 
-          for name, out in [("Zorya — торгові боти.html", "zorya"), ("orbix.html", "orbix")]:
+          for name, out in [("orbix.html", "orbix")]:
               html = Path(name).read_text(encoding="utf-8")
               scripts = re.findall(r"<script>(.*?)</script>", html, flags=re.S)
               if not scripts:
@@ -36,9 +36,8 @@ jobs:
           PY
       - name: Check JavaScript syntax
         run: |
-          node --check /tmp/zorya-inline.js
           node --check /tmp/orbix-inline.js
       - name: Check orbix.html is built from src/
-        run: node tools/build.js --check
+        run: npm run check
       - name: Run trading engine tests
-        run: node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs tests/quality.test.js
+        run: npm test

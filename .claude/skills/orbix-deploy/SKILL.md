@@ -8,7 +8,7 @@ description: Викласти зміни Orbix: тести й збірка, ро
 Повний цикл викладання змін Orbix. Кроки йдуть по черзі. Якщо крок не пройшов, зупинись, виправ і почни з нього знову. Невдачу не обходь.
 
 ## Сталі дані
-- Репозиторій `Koloss10/-zorya-trading-bots`, робоча гілка `claude/trading-bots-platform-nk0qa3`, злиття в `main` лише через PR.
+- Репозиторій `Koloss10/Orbix` (до перейменування — `Koloss10/-zorya-trading-bots`; GitHub перенаправляє старі адреси), робоча гілка `claude/trading-bots-platform-nk0qa3`, злиття в `main` лише через PR.
 - Проєкт Supabase `krmnaypaitruhqgaxkfw`.
 - Функції:
   - `runner`: `verify_jwt: false`, захист через `x-runner-secret`. Файли `index.ts, mirror.js, core.js, engine.js, exchanges.ts, sign.js`.
@@ -23,9 +23,9 @@ description: Викласти зміни Orbix: тести й збірка, ро
 
 ## 1. Перевірка локально
 ```bash
-node tools/build.js            # перегенерувати orbix.html, runner/engine.js і копії _shared/*
-node tools/build.js --check    # усе актуальне
-node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs tests/quality.test.js
+npm run build    # перегенерувати orbix.html, runner/engine.js і копії _shared/*
+npm run check    # усе актуальне
+npm test         # усі тести
 ```
 Згенеровані файли вручну не редагуй:
 - `runner/engine.js` збирається з `src/js/01–06`;
@@ -72,7 +72,7 @@ select level, left(message,200), created_at from bot_events
 
 ## 7. PR і злиття
 - `create_pull_request` з `head` = робоча гілка, `base` = `main`. Опиши, що змінено, і окремо розгортання (версії, звірку). Опис закінчи рядками атрибуції, які дає сесія.
-- Дочекайся зеленого `Validate ZORYA` (`actions_list`, `list_workflow_runs` для гілки).
+- Дочекайся зеленого `Validate Orbix` (`actions_list`, `list_workflow_runs` для гілки).
 - `merge_pull_request` з `expectedHeadSha`.
 - Підтягни гілку до `main`:
   ```bash
@@ -81,3 +81,7 @@ select level, left(message,200), created_at from bot_events
 
 ## 8. Звіт користувачу (українською, коротко)
 Що змінилося для користувача, версії функцій, результат звірки й запуску розкладу, що лишилося неперевіреним наживо.
+
+## 8. Реліз (для стабільних змін)
+- Після злиття постав анотований тег на коміт злиття: `git tag -a orbix-<YYYY-MM-DD>-<назва> <sha> -m "<що>; runner vN, exchange vM"`, потім `git push origin <тег>`.
+- Додай рядок у таблицю релізів в `archive/README.md`. За потреби збережи знімок: `archive/orbix/<дата>-<назва>/orbix.html`.

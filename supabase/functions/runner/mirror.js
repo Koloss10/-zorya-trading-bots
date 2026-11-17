@@ -104,6 +104,8 @@ export async function guard(ex, { g, symbol, fl = {}, mp = null }, p, F) {
   return { msg: `Bybit Demo: захист від середньої ${p.entry}${protText(want)}` };
 }
 
+/* ціна виконання для журналу: біржа не завжди встигає повернути середню ціну ринкового ордера — тоді приблизно за mark price */
+const pxOf = (o, p) => (o && o.price > 0 ? o.price : p && p.mark > 0 ? "≈" + p.mark : "ринковою ціною");
 /* одна дія на біржі; повертає текст для журналу */
 export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
   const side = g.d > 0 ? "BUY" : "SELL", name = native ? "Bybit Demo" : "Binance Testnet";
@@ -146,7 +148,7 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
     const F = await ex.filt(symbol), q = floorStep(Math.abs(p.amt) * a.share, F && F.step);
     if (!(q > 0) || (F && q < F.minQty)) return `${name}: частка ${Math.round(a.share * 100)} % замала для біржі — часткову фіксацію пропущено`;
     const o = await once(ex, symbol, a.id, () => ex.market(symbol, p.amt > 0 ? "SELL" : "BUY", q, true, a.id));
-    return `${name}: частково зафіксовано ${o.qty} за ${o.price}${native ? " · лімітні докупівлі знято" : ""}`;
+    return `${name}: частково зафіксовано ${o.qty} за ${pxOf(o, p)}${native ? " · лімітні докупівлі знято" : ""}`;
   }
   // close
   if (native) await ex.cancelAll(symbol);
@@ -155,7 +157,7 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
   const p = (await ex.positions(symbol))[0];
   if (!p) return `${name}: позиції вже немає${native ? " (закрито біржею за TP/SL)" : ""}`;
   const o = await once(ex, symbol, a.id, () => ex.market(symbol, p.amt > 0 ? "SELL" : "BUY", Math.abs(p.amt), true, a.id));
-  return `${name}: позицію закрито за ${o.price}`;
+  return `${name}: позицію закрито за ${pxOf(o, p)}`;
 }
 
 /* щоразу (рідний режим): захист відповідає фактичній середній ціні; без позиції — знімаються залишки ордерів бота */
@@ -210,8 +212,10 @@ export function reconcile(mp, xp, g) {
 export const MIS_RUNS = 2;
 export const RUN_GAP = 12 * 60e3; // запуски йдуть кожні 5 хв; більший проміжок — лічильник починається знову
 export const clearMis = (fl) => { delete fl.mis; delete fl.had; delete fl.xc; delete fl.tid; };
+/* угода моделі, до якої належать прапорці звірки */
+const tidOf = (mp) => (mp ? (mp.f && mp.f[0] && mp.f[0].t) || mp.first || 1 : null);
 export async function onReconcile({ fl, mp, out, g, log, notify, now = Date.now() }) {
-  const tid = mp ? (mp.f && mp.f[0] && mp.f[0].t) || mp.first || 1 : null;
+  const tid = tidOf(mp);
   if (fl.tid !== tid) { delete fl.had; delete fl.xc; if (tid == null) delete fl.tid; else fl.tid = tid; }
   if (mp && out.seen) fl.had = 1;
   let d = reconcile(mp, out.pos, g);
@@ -349,6 +353,17 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     const out = {};
     try {
       if (fl.rs) { const m = await restore(ex, { g, symbol, fl, mp }); if (m) await log("info", m); delete fl.rs; }
+      // біржа вже закрила цю угоду (fl.xc), а позиція на біржі знову є: між закриттям і запуском сервера виконалась
+      // залишкова лімітна докупівля бота — це зайва позиція, модель нею не керує: закрити її й зняти ордери
+      if (fl.xc && mp && fl.tid === tidOf(mp)) {
+        const gp = (await ex.positions(symbol))[0];
+        if (gp && Math.sign(gp.amt) === Math.sign(g.d)) {
+          await ex.cancelAll(symbol);
+          const o = await ex.market(symbol, gp.amt > 0 ? "SELL" : "BUY", Math.abs(gp.amt), true);
+          const m = `Bybit Demo: угоду вже закрила біржа, але після цього виконалась залишкова лімітна докупівля — зайву позицію ${Math.abs(gp.amt)} закрито ринком${o.price > 0 ? ` за ${o.price}` : ""}`;
+          await log("warn", m); await notify(`Orbix (сервер): ${g.pair} — ${m}`);
+        }
+      }
       const m = await sync(ex, { g, symbol, botId: bot.id, fl, out, mp });
       if (m) { await log("info", m); if (/закрито (біржею|ринком)|не прийняла/.test(m)) await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
       await onReconcile({ fl, mp, out, g, log, notify, now });

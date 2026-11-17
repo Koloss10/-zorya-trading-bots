@@ -471,3 +471,37 @@ test('Demo проти моделі: часткова фіксація теж з�
   await go(bn, null, { q: 24, n: 1, first: 2.5, f: [{ t: T }] }, [{ kind: 'open', notional: 60, price: 2.5, t: T }], T, false);
   assert.equal(saved.at(-1).xr, undefined);
 });
+
+test('Залишкова лімітна докупівля після закриття біржею: зайва позиція закривається, нова угода не чіпається', async () => {
+  const ex = fakeEx(), saved = [], logs = [];
+  const go = (state, pos, events = [], t = T) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos }, lt: t }, events }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: t,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async (l, m) => logs.push([l, m]), notify: async () => {} });
+  const mp = { q: 24, n: 1, first: 2.5, f: [{ t: T }] };
+  await go(null, mp, [{ kind: 'open', notional: 60, price: 2.5, t: T }]);
+  let st = saved.at(-1);
+  // біржа закрила угоду за TP (позиції немає, лімітні докупівлі ще стоять) — сервер позначив xc
+  ex.S.pos = null; await go(st, mp, [], T + 5 * 60e3); st = saved.at(-1);
+  assert.equal(st.fl.xc, 1);
+  // до наступного запуску ціна дійшла до залишкової докупівлі — на біржі зайва позиція
+  ex.S.orders.filter((o) => o.status === 'Cancelled').forEach((o) => { o.status = 'New'; }); // ордери ще не зняті
+  ex.hit(ladder(g, 2.5, F)[0].price);
+  assert.ok(ex.S.pos, 'зайва позиція з\'явилась');
+  await go(st, mp, [], T + 10 * 60e3); st = saved.at(-1);
+  assert.equal(ex.S.pos, null, 'зайву позицію закрито');
+  assert.equal(ex.S.orders.filter((o) => o.status === 'New').length, 0, 'ордери знято');
+  assert.ok(logs.some(([l, m]) => l === 'warn' && /залишкова лімітна докупівля/.test(m)));
+  // нова угода моделі (інший tid) з позицією на біржі — не зайва, не закривається
+  const mp2 = { q: 24, n: 1, first: 2.6, f: [{ t: T + 864e5 }] };
+  ex.S.px = 2.6; await go(st, mp2, [{ kind: 'open', notional: 60, price: 2.6, t: T + 864e5 }], T + 864e5 + 60e3);
+  assert.ok(ex.S.pos && ex.S.pos.amt > 0, 'нова позиція лишилась');
+});
+
+test('Біржа не повернула ціну ринкового ордера — у журналі приблизна ціна, а не «за 0»', async () => {
+  const ex = fakeEx(), mk = ex.market.bind(ex);
+  ex.market = async (...a) => ({ ...(await mk(...a)), price: 0 });
+  await execute(ex, { id: linkId(BOT, T, 'o'), kind: 'open', t: T, notional: 60, price: 2.5 }, ctx);
+  const m1 = await execute(ex, { id: linkId(BOT, T + 1e3, 'p'), kind: 'part', t: T + 1e3, share: 0.5 }, ctx);
+  assert.match(m1, /частково зафіксовано \S+ за ≈2\.5/); assert.doesNotMatch(m1, / за 0\b/);
+  const m2 = await execute(ex, { id: linkId(BOT, T + 2e3, 'c'), kind: 'close', t: T + 2e3 }, ctx);
+  assert.match(m2, /позицію закрито за ≈2\.5/);
+});

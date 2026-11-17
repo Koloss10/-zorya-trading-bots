@@ -25,7 +25,7 @@ description: Викласти зміни Orbix: тести й збірка, ро
 ```bash
 node tools/build.js            # перегенерувати orbix.html, runner/engine.js і копії _shared/*
 node tools/build.js --check    # усе актуальне
-node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs
+node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs
 ```
 Згенеровані файли вручну не редагуй:
 - `runner/engine.js` збирається з `src/js/01–05`;

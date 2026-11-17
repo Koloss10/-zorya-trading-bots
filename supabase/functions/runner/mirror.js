@@ -36,10 +36,12 @@ export function actionsFor(events, botId, native) {
   return out;
 }
 
-/* ціни й кількості докупівель від фактичної ціни входу — той самий розрахунок, що й у рушії (lv) */
+/* ціни й кількості докупівель від ціни входу моделі — той самий розрахунок, що й у рушії (lv; на сервері рушій працює
+   без правил біржі, тож рівні не округлені). Ціна лімітного ордера округлюється до кроку ціни в бік виконання
+   (Long — вгору, Short — вниз): ордер виконується щоразу, коли модель зараховує докупівлю. */
 export function ladder(g, px, F) {
-  const R = lv(g, px, F ? { tick: F.tick, step: F.step, minQty: F.minQty, minN: F.minN } : null);
-  return R.L.slice(1).map((x, i) => ({ k: i + 1, price: x.p, qty: F && F.step ? floorStep(x.s / x.p, F.step) : x.s / x.p })).filter((x) => x.qty > 0);
+  const R = lv(g, px, F ? { step: F.step, minQty: F.minQty, minN: F.minN } : null);
+  return R.L.slice(1).map((x, i) => ({ k: i + 1, price: F && F.tick ? rnd(x.p, F.tick, g.d > 0 ? "ceil" : "floor") : x.p, qty: F && F.step ? floorStep(x.s / x.p, F.step) : x.s / x.p })).filter((x) => x.qty > 0);
 }
 
 /* Захист позиції від середньої ціни; округлення до кроку ціни в гірший бік, як у рушії.
@@ -117,13 +119,16 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
     const F = await ex.filt(symbol), p = (await ex.positions(symbol))[0];
     if (!p) return msg + " (позиції вже немає)";
     const base = a.id.slice(0, -1);
+    // драбина — від ціни входу моделі (закриття свічки), а не від фактичної ціни на біржі: інакше прослизання входу
+    // зсуває всі рівні, і біржа докуповує не там, де модель (дії старих версій без ціни — від ціни на біржі)
+    const e0 = a.price > 0 ? a.price : p.entry;
     let n = 0;
-    for (const r of ladder(g, p.entry, F)) {
+    for (const r of ladder(g, e0, F)) {
       try { await once(ex, symbol, base + "d" + r.k, () => ex.limit(symbol, side, r.qty, r.price, base + "d" + r.k)); n++; }
       catch (e) { msg += ` · докупівля ${r.k}: ${e.message}`; }
     }
     delete fl.nots; delete fl.rg;
-    fl.lb = base; fl.e0 = p.entry; // для відновлення драбини після паузи
+    fl.lb = base; fl.e0 = e0; fl.ex = p.entry; // e0 — база драбини (для відновлення після паузи), ex — ціна входу на біржі
     const gd = await guard(ex, { g, symbol, fl }, p, F);
     return msg + ` · на біржі: ${n} лімітн. докупівель${gd ? " · " + gd.msg.replace("Bybit Demo: ", "") : ""}`;
   }
@@ -328,7 +333,7 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     try {
       await log("info", await execute(ex, a, { g, symbol, native, botId: bot.id, fl })); changed = true;
       // прослизання входу: ціна моделі (закриття свічки) проти фактичної середньої ціни на біржі
-      if (a.kind === "open" && st.xr && a.price > 0 && fl.e0 > 0) st.xr.en = [...st.xr.en, { t: a.t, m: a.price, x: fl.e0 }].slice(-XR_KEEP);
+      if (a.kind === "open" && st.xr && a.price > 0 && fl.ex > 0) st.xr.en = [...st.xr.en, { t: a.t, m: a.price, x: fl.ex }].slice(-XR_KEEP);
     }
     catch (e) {
       const b = { ...a, tries: (a.tries || 0) + 1 };
@@ -339,7 +344,7 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     }
   }
   const mp = r.state?.b?.pos || null;
-  if (!mp) { delete fl.lb; delete fl.e0; delete fl.rg; delete fl.rs; } // угоди немає — дані драбини не потрібні
+  if (!mp) { delete fl.lb; delete fl.e0; delete fl.ex; delete fl.rg; delete fl.rs; } // угоди немає — дані драбини не потрібні
   if (native && !left.length) {
     const out = {};
     try {

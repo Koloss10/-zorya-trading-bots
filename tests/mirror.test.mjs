@@ -52,16 +52,34 @@ test('Ідентифікатор ордера незмінний для поді
   assert.notEqual(linkId(BOT, T, 'o'), linkId(BOT, T + 864e5, 'o'));
 });
 
-test('Драбина докупівель на біржі збігається з цінами DCA, які бере рушій', () => {
+test('Драбина докупівель на біржі: рівні моделі, округлені в бік виконання', () => {
   const L = ladder(g, 2.5, F);
   assert.equal(L.length, g.orders - 1);
-  // рушій: вхід за 2.5, далі ціна падає — Bot.step виставляє докупівлі за тими самими цінами
-  const b = new Bot(g, null, F), cs = [{ t: 0, o: 2.5, h: 2.5, l: 2.5, c: 2.5 }];
+  // рушій на сервері працює без правил біржі: вхід за 2.5, ціна падає — докупівлі за неокругленими рівнями
+  const b = new Bot(g, null, null), cs = [{ t: 0, o: 2.5, h: 2.5, l: 2.5, c: 2.5 }];
   b.step(0, cs[0], true);
-  for (let i = 1; i <= 3; i++) { const lo = L[i - 1].price; b.step(i, { t: i, o: lo * 1.001, h: lo * 1.001, l: lo, c: lo * 1.0005 }, false); }
+  for (let i = 1; i <= 3; i++) { const lo = L[i - 1].price - F.tick; b.step(i, { t: i, o: lo * 1.001, h: lo * 1.001, l: lo, c: lo * 1.0005 }, false); }
   const eng = b.pos.f.slice(1).map((x) => x.p);
-  assert.deepEqual(eng, L.map((x) => x.price));
+  assert.equal(eng.length, 3);
+  // Long: лімітний ордер на біржі не нижче рівня моделі й не більше ніж на крок ціни вище — виконується, коли модель докуповує
+  eng.forEach((m, i) => { const x = L[i].price; assert.ok(x >= m - 1e-12 && x - m < F.tick, `рівень ${i + 1}: біржа ${x}, модель ${m}`); });
   for (const x of L) assert.ok(Math.abs(x.qty / F.step - Math.round(x.qty / F.step)) < 1e-9, 'кількість кратна кроку біржі');
+  // Short — округлення вниз
+  const gs = { ...g, d: -1 }, Ls = ladder(gs, 2.5, F), bs = new Bot(gs, null, null);
+  bs.step(0, cs[0], true); bs.step(1, { t: 1, o: 2.55, h: 2.7, l: 2.55, c: 2.6 }, false);
+  assert.ok(Ls[0].price <= bs.pos.f[1].p + 1e-12 && bs.pos.f[1].p - Ls[0].price < F.tick);
+});
+
+test('Вхід із прослизанням: драбина на біржі від ціни входу моделі, ціна біржі — в обліку прослизання', async () => {
+  const ex = fakeEx({ px: 2.51 }), fl = {}; // модель увійшла за закриттям свічки 2.5, біржа виконала за 2.51
+  await execute(ex, { id: linkId(BOT, T, 'o'), kind: 'open', t: T, notional: 60, price: 2.5 }, { ...ctx, fl });
+  const lim = ex.S.orders.filter((o) => o.status === 'New').map((o) => o.price), want = ladder(g, 2.5, F).map((x) => x.price);
+  assert.deepEqual(lim, want, 'рівні від 2.5, не від 2.51');
+  assert.equal(fl.e0, 2.5); assert.equal(fl.ex, 2.51);
+  // дія старої версії без ціни моделі — драбина від ціни на біржі
+  const ex2 = fakeEx({ px: 2.51 }), fl2 = {};
+  await execute(ex2, { id: linkId(BOT, T, 'o'), kind: 'open', t: T, notional: 60 }, { ...ctx, fl: fl2 });
+  assert.equal(fl2.e0, 2.51);
 });
 
 test('TP/SL від середньої з округленням до кроку ціни; з трейлінгом TP веде сервер', () => {

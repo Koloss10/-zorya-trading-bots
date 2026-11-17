@@ -19,7 +19,7 @@ function series(n, seed, vol = 0.018, px = 2.5) {
 
 /* підставна біржа: одна позиція, лімітні ордери, TP/SL/трейлінг на позиції; ціна йде o → (l,h або h,l) → c */
 function simEx() {
-  const S = { px: 0, pos: null, orders: [], links: new Set(), dup: 0, fills: [], ghost: 0, t: 0, closed: [] };
+  const S = { px: 0, pos: null, orders: [], links: new Set(), dup: 0, fills: [], ghost: 0, t: 0, closed: [], slip: 0.002 };
   const fill = (side, qty, price) => {
     const sg = side === 'BUY' ? 1 : -1, p = S.pos;
     S.fills.push({ side, qty, price });
@@ -58,8 +58,10 @@ function simEx() {
     async leverage() {},
     async market(_s, side, qty, reduceOnly, link) {
       if (reduceOnly && !S.pos) { const e = new Error('position is zero'); e.code = 110017; throw e; }
-      order(link, { side, qty, price: S.px, status: 'Filled' }); fill(side, qty, S.px);
-      return { id: S.orders.length, qty, price: S.px, link };
+      // ринковий вхід — із прослизанням проти напрямку (як наживо: модель входить за закриттям свічки, біржа — трохи гірше)
+      const px = reduceOnly ? S.px : +(S.px * (1 + (side === 'BUY' ? 1 : -1) * S.slip)).toFixed(6);
+      order(link, { side, qty, price: px, status: 'Filled' }); fill(side, qty, px);
+      return { id: S.orders.length, qty, price: px, link };
     },
     async limit(_s, side, qty, price, link) { order(link, { side, qty, price, status: 'New' }); return { id: S.orders.length, qty, price, link }; },
     async byLink(_s, link) { const o = S.orders.find((x) => x.link === link); return o ? { id: 1, qty: o.qty, price: o.price, status: o.status, link } : null; },

@@ -1,0 +1,11 @@
+{
+  "name": "orbix",
+  "private": true,
+  "description": "Orbix — платформа DCA-ботів: інтерфейс (orbix.html), рушій, серверні функції Supabase. Лише Demo/Testnet.",
+  "scripts": {
+    "build": "node tools/build.js",
+    "check": "node tools/build.js --check",
+    "test": "node --test tests/engine.test.js tests/exchange-sign.test.mjs tests/runner-core.test.mjs tests/mirror.test.mjs tests/sim.test.mjs tests/quality.test.js",
+    "verify": "npm run check && npm test"
+  }
+}

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1020">
+<title>ZORYA — Arbitrage Monitor</title>
+<style>
+:root{color-scheme:dark;--bg:#080d19;--panel:#111a2c;--panel2:#0d1525;--line:#263550;--text:#e8eefb;--muted:#91a0bb;--gold:#f3b64b;--green:#39d69a;--red:#ff737d;--blue:#77aaff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 50% -200px,#1b2b4a 0,transparent 70%),var(--bg);color:var(--text);font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}.wrap{max-width:1440px;margin:auto;padding:20px;display:grid;gap:16px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.brand{font-size:23px;font-weight:900;letter-spacing:.18em}.brand b{color:var(--gold)}.sub{color:var(--muted);font-size:12px}.spacer{flex:1}
+.pill{border:1px solid var(--line);border-radius:99px;padding:5px 10px;color:var(--muted);font-size:12px}.pill.live{color:var(--green);border-color:#245b4b}.pill.warn{color:var(--gold);border-color:#6a5228}
+.panel{background:linear-gradient(160deg,rgba(21,32,53,.97),rgba(13,21,37,.98));border:1px solid var(--line);border-radius:15px;padding:16px;min-width:0;box-shadow:0 10px 35px #0002}
+h2{font-size:15px;margin:0 0 12px;font-weight:700}.muted{color:var(--muted)}.small{font-size:12px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.stat{padding:14px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}.stat label{display:block;color:var(--muted);font-size:11px}.stat strong{font-size:21px;font-variant-numeric:tabular-nums}
+.toolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.field{display:grid;gap:5px;color:var(--muted);font-size:11px}.field input,.field select{width:100%;min-height:38px;border-radius:8px;border:1px solid var(--line);background:#091222;color:var(--text);padding:7px 10px;min-width:90px}
+.btn{border:1px solid var(--line);border-radius:8px;background:#17243b;color:var(--text);padding:9px 13px;min-height:38px}.btn:hover{border-color:var(--gold)}.btn.primary{background:var(--gold);border-color:var(--gold);color:#15100a;font-weight:800}.btn.ghost{background:transparent}
+.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(300px,.8fr);gap:16px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:760px}th{text-align:right;color:var(--muted);font-size:11px;font-weight:600;padding:10px 9px;border-bottom:1px solid var(--line);white-space:nowrap}th:first-child,td:first-child{text-align:left}td{text-align:right;padding:11px 9px;border-bottom:1px solid #202d44;font-variant-numeric:tabular-nums;white-space:nowrap}tr.data-row{cursor:pointer}tr.data-row:hover{background:#1b2942}tr.selected{background:#1b2b46}.pair{font-weight:800}.exchange{font-size:10px;color:var(--muted)}.positive{color:var(--green)}.negative{color:var(--red)}.neutral{color:var(--muted)}
+.chartbox{height:250px;position:relative;background:#091222;border:1px solid var(--line);border-radius:10px;overflow:hidden}canvas{width:100%;height:100%;display:block}.charttools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.charttools .muted{margin-left:auto}
+.sidecards{display:grid;gap:12px}.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #202d44}.kv:last-child{border:0}.kv span:first-child{color:var(--muted)}
+.note{font-size:12px;color:var(--muted);line-height:1.5}.statusline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.dot{width:7px;height:7px;border-radius:50%;background:var(--red);display:inline-block}.dot.ok{background:var(--green)}.dot.wait{background:var(--gold)}
+.badge{font-size:10px;padding:3px 7px;border-radius:6px;background:#20304b;color:#b7c8e8}.direction{font-size:11px;color:var(--gold)}
+.modal{position:fixed;inset:0;background:#020611c9;display:none;align-items:center;justify-content:center;padding:14px;z-index:20}.modal.open{display:flex}.dialog{width:min(900px,100%);max-height:94vh;overflow:auto;background:#101a2c;border:1px solid #344663;border-radius:16px;padding:18px;box-shadow:0 20px 80px #0009}.dialoghead{display:flex;align-items:center;gap:10px;margin-bottom:14px}.dialoghead h2{font-size:18px;margin:0}.dialoghead .spacer{flex:1}.modalgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.mini-chart{height:220px;background:#091222;border:1px solid var(--line);border-radius:10px}
+.empty{text-align:center;padding:35px 10px;color:var(--muted)}
+footer{padding:0 3px 12px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.wrap{padding:12px;gap:12px}.panel{padding:12px}.stats{gap:8px}.stat{padding:10px}.stat strong{font-size:17px}.toolbar>*{flex:1}.field{min-width:calc(50% - 8px)}.toolbar button{flex:1}.modalgrid{grid-template-columns:1fr}.chartbox{height:220px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><div class="brand">ZORYA<b> /</b> ARB</div><div class="sub">LIVE SPOT SPREAD MONITOR</div></div>
+  <div class="spacer"></div>
+  <span class="pill warn" id="modePill">PUBLIC DATA · NO ORDERS</span>
+  <span class="pill" id="connectionPill"><i class="dot" id="connectionDot"></i> Підключення…</span>
+</header>
+
+<section class="stats">
+  <div class="stat"><label>Найкращий валовий спред</label><strong id="bestSpread">—</strong></div>
+  <div class="stat"><label>Найкращий розрахунковий net</label><strong id="bestNet">—</strong></div>
+  <div class="stat"><label>Активні пари</label><strong id="activePairs">0 / 10</strong></div>
+  <div class="stat"><label>Останнє оновлення</label><strong id="lastUpdate">—</strong></div>
+</section>
+
+<section class="panel">
+  <div class="toolbar">
+    <label class="field">Комісія Binance, %<input id="feeBinance" type="number" min="0" max="2" step="0.01" value="0.10"></label>
+    <label class="field">Комісія Bybit, %<input id="feeBybit" type="number" min="0" max="2" step="0.01" value="0.10"></label>
+    <label class="field">Прослизання на бік, %<input id="slippage" type="number" min="0" max="2" step="0.01" value="0.03"></label>
+    <label class="field">Мін. net-спред, %<input id="minNet" type="number" min="-5" max="10" step="0.01" value="0.05"></label>
+    <button class="btn primary" id="reconnectBtn">Перепідключити</button>
+    <button class="btn ghost" id="soundBtn" aria-pressed="false">Звук: вимкнено</button>
+  </div>
+  <p class="note" style="margin:10px 0 0">Net оцінка = валовий спред мінус дві торгові комісії та орієнтовне прослизання на обох ногах. Це оцінка до фінансування, виведення, затримки та інших витрат; не гарантія прибутку.</p>
+</section>
+
+<div class="grid">
+  <section class="panel">
+    <div class="charttools"><h2 style="margin:0">Арбітражні можливості</h2><span class="muted small">Клік — графік · правий клік / «Калькулятор» — розрахунок</span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Пара</th><th>Binance bid / ask</th><th>Bybit bid / ask</th><th>Купити Binance → продати Bybit</th><th>Купити Bybit → продати Binance</th><th>Net max</th><th></th></tr></thead>
+        <tbody id="marketRows"></tbody>
+      </table>
+    </div>
+    <div class="note" style="margin-top:10px">Котирування беруться з публічних WebSocket-каналів спотових ринків. Порівнюються bid/ask, а не остання ціна угоди.</div>
+  </section>
+  <aside class="sidecards">
+    <section class="panel">
+      <h2>Вибрана пара: <span id="selectedPair">BTCUSDT</span></h2>
+      <div class="kv"><span>Напрямок</span><b id="selectedDirection">Очікування даних</b></div>
+      <div class="kv"><span>Валовий спред</span><b id="selectedGross">—</b></div>
+      <div class="kv"><span>Оцінка net</span><b id="selectedNet">—</b></div>
+      <div class="kv"><span>Дані Binance</span><b id="binanceAge">—</b></div>
+      <div class="kv"><span>Дані Bybit</span><b id="bybitAge">—</b></div>
+      <button class="btn" style="width:100%;margin-top:12px" id="calcBtn">Відкрити калькулятор</button>
+    </section>
+    <section class="panel">
+      <h2>Рівні сповіщень</h2>
+      <div class="toolbar">
+        <label class="field" style="flex:1">Верхній рівень, %<input id="upperAlert" type="number" step="0.01" value="0.50"></label>
+        <label class="field" style="flex:1">Нижній рівень, %<input id="lowerAlert" type="number" step="0.01" value="-0.50"></label>
+      </div>
+      <p class="note">Звук спрацює лише після увімкнення кнопки звуку та перетину рівня net-спредом.</p>
+      <div class="kv"><span>Останній сигнал</span><b id="lastAlert">Немає</b></div>
+    </section>
+  </aside>
+</div>
+
+<section class="panel">
+  <div class="charttools"><h2 style="margin:0">Історія спреду · <span id="chartPair">BTCUSDT</span></h2><span class="muted small">Net spread, %</span></div>
+  <div class="chartbox"><canvas id="spreadChart"></canvas></div>
+</section>
+<footer class="note">
+  Важливо: це моніторинг спотових котирувань Binance та Bybit. Він не відправляє ордери, не зберігає API-ключі та не враховує гарантію виконання обох угод. Для реального арбітражу потрібні достатня ліквідність, контроль глибини стакана, комісій твого тарифу, балансу на обох біржах і ризику часткового виконання.
+</footer>
+</div>
+
+<div class="modal" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+ <div class="dialog">
+  <div class="dialoghead"><h2 id="dialogTitle">BTCUSDT · деталі</h2><div class="spacer"></div><button class="btn" id="closeModal">Закрити ✕</button></div>
+  <div class="modalgrid">
+   <div><h2>Калькулятор угоди</h2>
+    <div class="toolbar">
+     <label class="field" style="flex:1">Обсяг, USDT<input id="tradeAmount" type="number" min="1" step="10" value="1000"></label>
+     <label class="field" style="flex:1">Напрямок<select id="tradeDirection"><option value="b2y">Long Binance → Short Bybit</option><option value="y2b">Long Bybit → Short Binance</option></select></label>
+    </div>
+    <div class="kv"><span>Ціна купівлі (ask)</span><b id="buyPrice">—</b></div>
+    <div class="kv"><span>Ціна продажу (bid)</span><b id="sellPrice">—</b></div>
+    <div class="kv"><span>Розрахунковий gross</span><b id="calcGross">—</b></div>
+    <div class="kv"><span>Оцінка комісій + slippage</span><b id="calcCosts">—</b></div>
+    <div class="kv"><span>Оцінка net PnL</span><b id="calcPnl">—</b></div>
+    <p class="note">Модель наближена: обсяг задано в USDT на сторону; не враховано глибину стакана та часткове виконання.</p>
+   </div>
+   <div><h2>Свічки Binance Spot</h2><div class="mini-chart"><canvas id="candleChart"></canvas></div><p class="note" id="candleStatus">Завантаження свічок…</p></div>
+  </div>
+ </div>
+</div>
+
+<script>
+'use strict';
+const SYMBOLS=['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','TONUSDT'];
+const state={quotes:{},selected:'BTCUSDT',history:{},sockets:[],sound:false,alertState:{},lastAlert:'',reconnectTimer:null,candles:[]};
+const $=id=>document.getElementById(id);
+const fmt=(n,d=6)=>Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:d}):'—';
+const pct=n=>Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(3)+'%':'—';
+const now=()=>Date.now();
+function initPair(s){if(!state.quotes[s])state.quotes[s]={binance:null,bybit:null};if(!state.history[s])state.history[s]=[]}
+SYMBOLS.forEach(initPair);
+function validQuote(q){return q&&Number.isFinite(q.bid)&&Number.isFinite(q.ask)&&q.bid>0&&q.ask>=q.bid}
+function stale(q){return !q||now()-q.ts>10000}
+function spreadFor(s){
+ const q=state.quotes[s],b=q.binance,y=q.bybit;
+ if(!validQuote(b)||!validQuote(y)||stale(b)||stale(y))return null;
+ const b2y=(y.bid/b.ask-1)*100, y2b=(b.bid/y.ask-1)*100;
+ const costs=num('feeBinance')+num('feeBybit')+2*num('slippage');
+ return {b2y,y2b,netB2Y:b2y-costs,netY2B:y2b-costs,net:Math.max(b2y,y2b)-costs,dir:b2y>=y2b?'Long Binance → Short Bybit':'Long Bybit → Short Binance',gross:Math.max(b2y,y2b)};
+}
+function num(id){const v=Number($(id).value);return Number.isFinite(v)?v:0}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){
+ let rows='',active=0,best=null;
+ for(const s of SYMBOLS){
+  const q=state.quotes[s],b=q.binance,y=q.bybit,sp=spreadFor(s);
+  if(sp){active++;if(!best||sp.net>best.sp.net)best={s,sp}}
+  const btxt=validQuote(b)?`${fmt(b.bid)} / ${fmt(b.ask)}`:'—';
+  const ytxt=validQuote(y)?`${fmt(y.bid)} / ${fmt(y.ask)}`:'—';
+  const fresh=sp!==null;
+  rows+=`<tr class="data-row ${s===state.selected?'selected':''}" data-symbol="${s}">
+   <td><span class="pair">${s}</span><div class="exchange">SPOT / USDT</div></td>
+   <td>${btxt}</td><td>${ytxt}</td>
+   <td class="${fresh?(sp.b2y>=0?'positive':'negative'):'neutral'}">${fresh?pct(sp.b2y):'—'}</td>
+   <td class="${fresh?(sp.y2b>=0?'positive':'negative'):'neutral'}">${fresh?pct(sp.y2b):'—'}</td>
+   <td class="${fresh?(sp.net>=num('minNet')?'positive':'neutral'):'neutral'}">${fresh?pct(sp.net):'—'}</td>
+   <td><button class="btn" data-calc="${s}" style="padding:5px 8px">Кальк.</button></td></tr>`;
+ }
+ $('marketRows').innerHTML=rows;
+ $('activePairs').textContent=`${active} / ${SYMBOLS.length}`;
+ $('bestSpread').textContent=best?pct(best.sp.gross):'—';
+ $('bestNet').textContent=best?pct(best.sp.net):'—';
+ $('lastUpdate').textContent=new Date().toLocaleTimeString('uk-UA');
+ const anyB=SYMBOLS.some(s=>!stale(state.quotes[s].binance)),anyY=SYMBOLS.some(s=>!stale(state.quotes[s].bybit));
+ const ok=anyB&&anyY;$('connectionPill').innerHTML=`<i class="dot ${ok?'ok':'wait'}"></i> ${ok?'Потік даних активний':'Очікування котирувань'}`;
+ $('connectionDot').className='dot '+(ok?'ok':'wait');
+ updateSelected();drawSpread();
+}
+function updateSelected(){
+ const s=state.selected,q=state.quotes[s],sp=spreadFor(s);
+ $('selectedPair').textContent=s;$('chartPair').textContent=s;
+ $('selectedDirection').textContent=sp?sp.dir:'Очікування актуальних котирувань';
+ $('selectedGross').textContent=sp?pct(sp.gross):'—';$('selectedNet').textContent=sp?pct(sp.net):'—';
+ $('binanceAge').textContent=age(q.binance);$('bybitAge').textContent=age(q.bybit);
+}
+function age(q){return !q?'немає':stale(q)?'застарілі':((now()-q.ts)/1000).toFixed(1)+' с'}
+function selectPair(s){if(!SYMBOLS.includes(s))return;state.selected=s;render()}
+function record(s){
+ const sp=spreadFor(s);if(!sp)return;
+ const arr=state.history[s];arr.push({t:now(),v:sp.net,g:sp.gross});if(arr.length>360)arr.shift();
+ const upper=num('upperAlert'),lower=num('lowerAlert'),v=sp.net,prev=state.alertState[s];
+ if(prev!==undefined&&((prev<upper&&v>=upper)||(prev>lower&&v<=lower))){
+  state.lastAlert=`${s}: ${pct(v)} · ${new Date().toLocaleTimeString('uk-UA')}`;$('lastAlert').textContent=state.lastAlert;
+  if(state.sound)beep();
+ }
+ state.alertState[s]=v;
+}
+function renderLoop(){for(const s of SYMBOLS)record(s);render()}
+function connectBinance(){
+ const streams=SYMBOLS.map(s=>s.toLowerCase()+'@bookTicker').join('/');
+ const ws=new WebSocket('wss://stream.binance.com:9443/stream?streams='+streams);state.sockets.push(ws);
+ ws.onmessage=e=>{try{const d=JSON.parse(e.data).data,s=d.s;if(!state.quotes[s])return;state.quotes[s].binance={bid:+d.b,ask:+d.a,ts:now()}}catch{}};
+ ws.onclose=()=>scheduleReconnect();ws.onerror=()=>{try{ws.close()}catch{}};
+}
+function connectBybit(){
+ const ws=new WebSocket('wss://stream.bybit.com/v5/public/spot');state.sockets.push(ws);
+ ws.onopen=()=>ws.send(JSON.stringify({op:'subscribe',args:SYMBOLS.map(s=>'tickers.'+s)}));
+ ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(!d.topic||!d.data)return;const s=d.topic.split('.')[1],t=d.data;if(!state.quotes[s])return;const old=state.quotes[s].bybit||{};state.quotes[s].bybit={bid:+(t.bid1Price||old.bid),ask:+(t.ask1Price||old.ask),ts:now()}}catch{}};
+ ws.onclose=()=>scheduleReconnect();ws.onerror=()=>{try{ws.close()}catch{}};
+}
+function scheduleReconnect(){if(state.reconnectTimer)return;state.reconnectTimer=setTimeout(()=>{state.reconnectTimer=null;connectAll()},3000)}
+function connectAll(){state.sockets.forEach(ws=>{try{ws.close()}catch{}});state.sockets=[];try{connectBinance();connectBybit()}catch(e){console.error(e)}}
+function beep(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.045;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.16);o.onended=()=>c.close()}catch{}}
+function drawSpread(){
+ const c=$('spreadChart'),r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);
+ const x=c.getContext('2d');x.scale(dpr,dpr);const w=r.width,h=r.height;
+ x.clearRect(0,0,w,h);const arr=state.history[state.selected]||[];const vals=arr.map(a=>a.v);
+ let max=Math.max(.5,...vals.map(Math.abs));max=Math.ceil(max*2)/2||.5;
+ x.strokeStyle='#243550';x.lineWidth=1;x.fillStyle='#91a0bb';x.font='11px system-ui';
+ for(let i=0;i<=4;i++){const y=12+(h-30)*i/4;x.beginPath();x.moveTo(42,y);x.lineTo(w-8,y);x.stroke();x.fillText((max-max*2*i/4).toFixed(2)+'%',4,y+4)}
+ const zero=12+(h-30)/2;x.strokeStyle='#d2a64e';x.setLineDash([5,4]);x.beginPath();x.moveTo(42,zero);x.lineTo(w-8,zero);x.stroke();x.setLineDash([]);
+ if(vals.length<2){x.fillStyle='#91a0bb';x.fillText('Очікування історії котирувань…',52,h/2);return}
+ x.beginPath();vals.forEach((v,i)=>{const px=42+(w-52)*i/(vals.length-1),py=12+(h-30)*(max-v)/(2*max);i?x.lineTo(px,py):x.moveTo(px,py)});x.strokeStyle='#55cda0';x.lineWidth=2;x.stroke();
+}
+async function openDetail(s=state.selected){
+ selectPair(s);$('dialogTitle').textContent=s+' · деталі';$('detailModal').classList.add('open');updateCalc();$('candleStatus').textContent='Завантаження свічок Binance Spot…';
+ try{const res=await fetch(`https://api.binance.com/api/v3/klines?symbol=${s}&interval=5m&limit=60`);if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();drawCandles(data);$('candleStatus').textContent='Останні 60 свічок · 5 хв · Binance Spot'}
+ catch(e){$('candleStatus').textContent='Не вдалося завантажити свічки: '+e.message}
+}
+function updateCalc(){
+ const s=state.selected,q=state.quotes[s],sp=spreadFor(s),dir=$('tradeDirection').value,amount=Math.max(0,num('tradeAmount'));
+ const buy=dir==='b2y'?q.binance?.ask:q.bybit?.ask,sell=dir==='b2y'?q.bybit?.bid:q.binance?.bid;
+ $('buyPrice').textContent=Number.isFinite(buy)?fmt(buy):'—';$('sellPrice').textContent=Number.isFinite(sell)?fmt(sell):'—';
+ if(!Number.isFinite(buy)||!Number.isFinite(sell)||!sp){$('calcGross').textContent='—';$('calcCosts').textContent='—';$('calcPnl').textContent='Немає актуальних даних';return}
+ const gross=(sell/buy-1)*100,costPct=num('feeBinance')+num('feeBybit')+2*num('slippage'),net=gross-costPct,pnl=amount*net/100;
+ $('calcGross').textContent=pct(gross);$('calcCosts').textContent=pct(costPct);$('calcPnl').textContent=fmt(pnl,2)+' USDT ('+pct(net)+')';$('calcPnl').className=pnl>=0?'positive':'negative';
+}
+function drawCandles(data){
+ if(data.length)state.candles=data;
+ data=state.candles;
+ if(!data.length)return;
+ const c=$('candleChart'),r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);
+ const x=c.getContext('2d');x.scale(dpr,dpr);const w=r.width,h=r.height;x.clearRect(0,0,w,h);
+ const lo=Math.min(...data.map(a=>+a[3])),hi=Math.max(...data.map(a=>+a[2])),pad=(hi-lo)*.08||1,min=lo-pad,max=hi+pad;
+ x.strokeStyle='#263550';x.fillStyle='#91a0bb';x.font='10px system-ui';
+ for(let i=0;i<4;i++){const y=10+(h-20)*i/3;x.beginPath();x.moveTo(34,y);x.lineTo(w-4,y);x.stroke();x.fillText((max-(max-min)*i/3).toPrecision(5),2,y+3)}
+ const cw=(w-42)/data.length;
+ data.forEach((a,i)=>{const o=+a[1],high=+a[2],low=+a[3],cl=+a[4],up=cl>=o,px=35+i*cw+cw/2,Y=v=>10+(h-20)*(max-v)/(max-min);x.strokeStyle=x.fillStyle=up?'#39d69a':'#ff737d';x.beginPath();x.moveTo(px,Y(high));x.lineTo(px,Y(low));x.stroke();const top=Y(Math.max(o,cl)),bh=Math.max(1,Math.abs(Y(o)-Y(cl)));x.fillRect(px-Math.max(1,cw*.28),top,Math.max(2,cw*.56),bh)});
+}
+$('marketRows').addEventListener('click',e=>{const calc=e.target.closest('[data-calc]');if(calc){openDetail(calc.dataset.calc);return}const row=e.target.closest('[data-symbol]');if(row)selectPair(row.dataset.symbol)});
+$('marketRows').addEventListener('contextmenu',e=>{const row=e.target.closest('[data-symbol]');if(row){e.preventDefault();openDetail(row.dataset.symbol)}});
+$('calcBtn').onclick=()=>openDetail();$('closeModal').onclick=()=>$('detailModal').classList.remove('open');
+$('detailModal').addEventListener('click',e=>{if(e.target===$('detailModal'))$('detailModal').classList.remove('open')});
+$('tradeAmount').oninput=updateCalc;$('tradeDirection').onchange=updateCalc;
+['feeBinance','feeBybit','slippage','minNet','upperAlert','lowerAlert'].forEach(id=>$(id).addEventListener('input',()=>{render();updateCalc()}));
+$('soundBtn').onclick=()=>{state.sound=!state.sound;$('soundBtn').textContent='Звук: '+(state.sound?'увімкнено':'вимкнено');$('soundBtn').setAttribute('aria-pressed',String(state.sound));if(state.sound)beep()};
+$('reconnectBtn').onclick=()=>{if(state.reconnectTimer){clearTimeout(state.reconnectTimer);state.reconnectTimer=null}connectAll()};
+window.addEventListener('resize',()=>{drawSpread();if($('detailModal').classList.contains('open'))drawCandles(state.candles)});
+render();connectAll();setInterval(renderLoop,1000);
+</script>
+</body>
+</html>

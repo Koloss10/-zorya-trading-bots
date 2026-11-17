@@ -31,7 +31,7 @@ npm run verify   # check + test
   - `runner`: `verify_jwt false`. `exchange`: `verify_jwt true`.
   - У `deploy_edge_function` завжди передаються **всі** файли функції. Після розгортання — `verify.py` і перевірка запуску розкладу (200, усі боти оброблено, без `error`).
 - Міграції: новий файл `supabase/migrations/<YYYYMMDDHHMMSS>_<назва>.sql`, застосування через `apply_migration`. Наявні міграції не змінювати.
-- Стабільний реліз: тег `orbix-<дата>-<назва>` на коміті злиття й рядок у `archive/README.md` (див. «Архів»).
+- Стабільний реліз: рядок у таблиці релізів `archive/README.md` (коміт злиття, версії `runner`/`exchange`). Теги з хмарної сесії не пушаться (дозволена лише робоча гілка).
 
 ## Тести й перевірка змін
 - Біржі в тестах підставні: `fakeEx` у `tests/mirror.test.mjs`, `simEx` у `tests/sim.test.mjs`. Ручні ордери й збої мережі там уже змодельовані (`flaky`, `chaos`, `manual`).

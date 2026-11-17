@@ -41,13 +41,15 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
     if (ct <= lt) continue;
     lt = ct;
     if (!act(ct)) continue;
-    const n0 = b.tr.length, p0 = b.pos, o0 = p0 ? p0.n : 0, c0 = p0 ? p0.cost : 0;
+    const n0 = b.tr.length, p0 = b.pos, o0 = p0 ? p0.n : 0, c0 = p0 ? p0.cost : 0, q0 = p0 ? p0.q : 0, h0 = p0 ? !!p0.t1 : false;
     b.step(Math.floor(c.t / W), c, e[i]);
     const v = b.eqv(c); pk = Math.max(pk, v); dd = Math.min(dd, v - pk);
     const p = b.pos;
     if (b.tr.length > n0) { const l = b.tr[b.tr.length - 1]; events.push({ kind: l.liq ? "liq" : l.sl ? "sl" : "close", pnl: l.pnl, price: l.f[l.f.length - 1].p, t: ct }); }
     else if (!p0 && p) events.push({ kind: "open", notional: p.cost, price: c.c, t: ct });
     else if (p0 && p && p.n > o0) events.push({ kind: "dca", notional: p.cost - c0, price: p.last, n: p.n, t: ct });
+    // часткова фіксація TP (g.s1): модель зменшила позицію — цю частку треба закрити й на біржі
+    else if (p0 && p && !h0 && p.t1 && q0 > 0) events.push({ kind: "part", share: 1 - p.q / q0, price: p.f[p.f.length - 1].p, t: ct });
   }
   const tr = b.tr.slice(-keepTrades);
   return { state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum }, pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events };
@@ -59,6 +61,7 @@ export function eventText(ev, g) {
   const f = (x) => (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x).toFixed(2);
   if (ev.kind === "open") return `Orbix (сервер): ${pair} — відкрито позицію по ${ev.price}`;
   if (ev.kind === "dca") return `Orbix (сервер): ${pair} — докупівля №${ev.n} по ${ev.price}`;
+  if (ev.kind === "part") return `Orbix (сервер): ${pair} — часткова фіксація TP: закрито ${Math.round(ev.share * 100)} % позиції по ${ev.price}`;
   if (ev.kind === "close") return `Orbix (сервер): ${pair} — угоду закрито, PnL ${f(ev.pnl)} USDT`;
   return `Orbix (сервер): ${pair} — ${ev.kind === "liq" ? "ліквідація" : "Stop-Loss"}, PnL ${f(ev.pnl)} USDT`;
 }

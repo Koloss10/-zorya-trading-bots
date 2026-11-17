@@ -71,3 +71,15 @@ test('Пауза: свічки, що закрилися під час паузи
   assert.ok(full.events.some((e) => e.t > pA && e.t <= pB), 'без пауз події в цей час були б');
   assert.equal(r.state.lt, cs.at(-1).t + H);
 });
+
+test('Часткова фіксація TP (s1) дає подію «part» з часткою — щоб закрити її й на біржі', () => {
+  const gp = botConfig({ pair: 'BTC/USDT', tf: 1, d: 1, fut: 1, lev: 1, sg: ['rsi'], k: 1, orders: 3, base: 20, tp: 0.01, s1: 0.5, tp2: 0.02, sl: 0.06 });
+  const pos = { q: 0.2, cost: 20, n: 1, last: 100, first: 100, peak: 100, real: 0, fd: 0, t1: 0, f: [{ t: T0, p: 100, k: 'e' }] };
+  const c = { t: T0 + H, o: 100, h: 101.2, l: 99.9, c: 100.8, v: 1 };
+  const r = processBot({ g: gp, state: { b: { pos, tr: [], cd: 0, cum: 0 }, lt: T0 + H }, candles: [c], now: T0 + 2 * H });
+  assert.equal(r.events.length, 1);
+  const ev = r.events[0];
+  assert.equal(ev.kind, 'part'); assert.ok(Math.abs(ev.share - 0.5) < 1e-9); assert.equal(ev.price, 101);
+  assert.ok(r.state.b.pos.t1 && Math.abs(r.state.b.pos.q - 0.1) < 1e-12, 'у моделі лишилась половина');
+  assert.match(eventText(ev, gp), /часткова фіксація TP: закрито 50 %/);
+});

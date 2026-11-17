@@ -1,7 +1,7 @@
 // Виконання угод серверного бота на демо-біржі: ордери на біржі й захист від повторів (фейкова біржа).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actionsFor, execute, guard, handleBot, ladder, linkBase, linkId, onReconcile, park, protect, reconcile, restore, sync, MAX_TRIES, RUN_GAP } from '../supabase/functions/runner/mirror.js';
+import { actionsFor, execute, guard, handleBot, ladder, linkBase, linkId, onReconcile, park, protect, reconcile, restore, snapshot, sync, MAX_TRIES, RUN_GAP } from '../supabase/functions/runner/mirror.js';
 import { botConfig } from '../supabase/functions/runner/core.js';
 import { Bot } from '../supabase/functions/runner/engine.js';
 
@@ -377,4 +377,32 @@ test('handleBot: після паузи драбина відновлюється
   ex.S.pos = null; ex.S.orders = [];
   await go(st, null);
   const f2 = saved.at(-1).fl; assert.equal(f2.lb, undefined); assert.equal(f2.e0, undefined); assert.equal(f2.rg, undefined);
+});
+
+test('Моніторинг: у стані бота знімок біржі (позиція, захист, ордери бота) і остання помилка біржі', async () => {
+  const ex = fakeEx(), saved = [];
+  const go = (state, pos, events = [], t = T) => handleBot({ bot: { id: BOT, state }, g, r: { state: { b: { pos }, lt: t }, events }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: t,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
+  await go(null, { q: 24, n: 1, first: 2.5, f: [{ t: T }] }, [{ kind: 'open', notional: 60, price: 2.5, t: T }]);
+  let st = saved.at(-1);
+  assert.equal(st.xs.amt, 24); assert.equal(st.xs.entry, 2.5); assert.equal(st.xs.ord, 3);
+  assert.ok(st.xs.sl > 0 && st.xs.tp > 0); assert.equal(st.xe, undefined);
+  // біржа недоступна — знімок лишається попередній, з'являється помилка
+  const pos0 = ex.positions; ex.positions = async () => { throw new Error('timeout'); };
+  const n0 = saved.length; await go(st, st.b.pos); st = saved.at(-1);
+  assert.ok(saved.length > n0, 'помилка біржі зберігається'); assert.equal(st.xe.m, 'timeout'); assert.equal(st.xs.amt, 24);
+  // біржа знову відповідає — помилку знято
+  ex.positions = pos0; await go(st, st.b.pos); st = saved.at(-1); assert.equal(st.xe, undefined);
+  // без змін на біржі — зайвого збереження немає
+  const n1 = saved.length; await go(st, st.b.pos); assert.equal(saved.length, n1 + 1, 'лише обов\'язкове перше збереження');
+  // позицію закрито — знімок порожній
+  ex.S.pos = null; await go(st, null); st = saved.at(-1); assert.equal(st.xs, null);
+  assert.equal(snapshot({ pos: null }), null);
+});
+
+test('Моніторинг: без дублювання на біржу знімка й помилки біржі немає', async () => {
+  const saved = [];
+  await handleBot({ bot: { id: BOT, state: { xs: { amt: 1 }, xe: { m: 'x', at: 1 } } }, g, r: { state: { b: { pos: null }, lt: T }, events: [] }, symbol: 'TONUSDT', mirror: false, native: false, ex: null, now: T,
+    save: async (x) => { saved.push(JSON.parse(JSON.stringify(x))); return true; }, log: async () => {}, notify: async () => {} });
+  assert.equal(saved.at(-1).xs, undefined); assert.equal(saved.at(-1).xe, undefined);
 });

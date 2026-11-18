@@ -1,0 +1,29 @@
+/* ---------- Адмін: статистика бета-тесту (лише для адміністратора) ----------
+   Дані дає серверна функція admin_stats(): без пошти, ключів, паролів і сум — лише кількості,
+   налаштування ботів і результати у %. Пункт меню видно, якщо is_admin() повернула true (CLOUD.adm). */
+const ADM={d:null,busy:0,err:'',sort:'id'};
+const AK=(l,v)=>`<div><span>${l}</span><b>${v}</b></div>`;
+const SGL=k=>(typeof SGN!=='undefined'&&SGN[k])||k;
+const admPct=(v,d=2)=>v==null?'—':`<span class="${cls(+v)}">${(+v>0?'+':'')+n2(+v,d)} %</span>`;
+function admBars(list,lab=x=>x.k){if(!list||!list.length)return'<p class="mu">Ще немає даних.</p>';const mx=Math.max(...list.map(x=>x.n))||1;
+return`<div class="abars">${list.map(x=>`<div class="abar"><span class="abl">${esc(String(lab(x)))}</span><span class="abt"><i style="width:${Math.max(4,x.n/mx*100).toFixed(1)}%"></i></span><b class="mono">${x.n}</b></div>`).join('')}</div>`}
+async function admLoad(){if(!SB||!CLOUD.u||ADM.busy)return;ADM.busy=1;ADM.err='';admR();
+try{const r=await SB.rpc('admin_stats');if(r.error)throw r.error;ADM.d=r.data}catch(e){ADM.err=e.message||String(e)}finally{ADM.busy=0;admR()}}
+function admR(load){const el=$('#adm');if(!el)return;if(load&&!ADM.busy){admLoad();return}
+if(!CLOUD.adm){el.innerHTML='<div class="card"><p class="mu">Розділ доступний лише адміністратору.</p></div>';return}
+const d=ADM.d,head=`<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Адмін · бета-тест</h2><button class="b sm" id="admr"${ADM.busy?' disabled':''}>${ADM.busy?'Оновлюю…':'Оновити'}</button></div>
+<p class="mu" style="margin:8px 0 0">Пошта, ключі, паролі й суми сюди не потрапляють: лише кількості, налаштування ботів і результати у %.${d?' Дані на '+new Date(d.at).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'.':''}</p>${ADM.err?`<p class="dn" style="margin-top:8px">${esc(ADM.err)}</p>`:''}</div>`;
+if(!d){el.innerHTML=head;$('#admr').onclick=()=>admLoad();return}
+const U=d.users,B=d.bots,R=d.results,tfN=k=>tfl(+k)||k+' год',sideN=k=>k==='short'?'Short':'Long';
+const acc=[...d.accounts].sort((a,b)=>ADM.sort==='roi'?((b.roi??-1e9)-(a.roi??-1e9)):a.id-b.id);
+el.innerHTML=head+`<div class="card"><h2>Користувачі й боти</h2><div class="akp">${AK('Користувачів',U.total)}${AK('Активні, 7 днів',U.active7)}${AK('Нові, 7 днів',U.new7)}${AK('З 2FA',U.mfa)}${AK('З демо-рахунком',U.demo)}${AK('Ботів',B.total)}${AK('Працюють',B.running)}${AK('Сервер 24/7',B.srv)}${AK('Тестнет',B.tn)}</div></div>
+<div class="card"><h2>Результати серверних ботів</h2><p class="mu" style="margin-bottom:10px">Рахуються лише боти «Сервер 24/7»: paper-боти в браузері рахуються на пристрої користувача. ROI — реалізований результат від повної драбини бота.</p>
+<div class="akp">${AK('Ботів з угодами',`${R.traded} з ${R.bots}`)}${AK('Угод',R.trades)}${AK('Середній ROI',admPct(R.avg_roi))}${AK('Медіанний ROI',admPct(R.med_roi))}${AK('Прибуткових ботів',R.win_bots==null?'—':n2(R.win_bots,1)+' %')}${AK('Win rate угод',R.win_trades==null?'—':n2(R.win_trades,1)+' %')}</div>
+${R.pairs.length?`<div class="tw"><table class="atb"><thead><tr><th>Пара</th><th>Ботів</th><th>ROI</th></tr></thead><tbody>${R.pairs.map(p=>`<tr><td>${esc(p.k)}</td><td class="mono">${p.n}</td><td class="mono">${admPct(p.roi)}</td></tr>`).join('')}</tbody></table></div>`:''}</div>
+<div class="card"><h2>Популярні налаштування</h2>
+<h3>Пари</h3>${admBars(B.pairs)}<h3>Сигнали входу</h3>${admBars(B.sg,x=>SGL(x.k))}<h3>Таймфрейм</h3>${admBars(B.tf,x=>tfN(x.k))}<h3>Напрямок</h3>${admBars(B.side,x=>sideN(x.k))}<h3>Плече</h3>${admBars(B.lev)}</div>
+<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Акаунти</h2><div class="row" style="gap:6px"><button class="b sm tg" data-as="id" aria-pressed="${ADM.sort==='id'}">За ID</button><button class="b sm tg" data-as="roi" aria-pressed="${ADM.sort==='roi'}">За ROI</button></div></div>
+<div class="tw" style="margin-top:10px"><table class="atb"><thead><tr><th>ID</th><th>Нік</th><th>З</th><th>Вхід</th><th>Ботів</th><th>Сервер</th><th>Угод</th><th>ROI</th><th>Win</th></tr></thead><tbody>${acc.map(a=>`<tr><td class="mono">#${String(a.id??'—').padStart(4,'0')}</td><td>${esc(a.nick||'—')}</td><td class="mono">${esc(a.since||'')}</td><td class="mono">${esc(a.seen||'—')}</td><td class="mono">${a.run}/${a.bots}</td><td class="mono">${a.srv}${a.tn?` · ${a.tn} тн`:''}</td><td class="mono">${a.trades}</td><td class="mono">${admPct(a.roi)}</td><td class="mono">${a.win==null?'—':n2(a.win,0)+' %'}</td></tr>`).join('')}</tbody></table></div></div>`;
+$('#admr').onclick=()=>admLoad();$$('#adm [data-as]').forEach(b=>b.onclick=()=>{ADM.sort=b.dataset.as;admR()})}
+/* після входу: чи адмін (пункт меню «Адмін»); помилка — просто без пункту */
+async function admCheck(){CLOUD.adm=0;if(!SB||!CLOUD.u)return mnuR();try{const r=await SB.rpc('is_admin');CLOUD.adm=!r.error&&r.data===true?1:0}catch(e){CLOUD.adm=0}mnuR();if(CUR==='adm')admR(1)}

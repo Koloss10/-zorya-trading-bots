@@ -213,3 +213,18 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .fvp{background:none;border:0;padding:4px;margin:-4px 0 -4px -4px;font-size:18px;line-height:1;color:var(--mu);cursor:pointer}
 .fvp[aria-pressed=true]{color:var(--warn)}
 #mkt{margin-bottom:4px}
+/* ---------- адмін ---------- */
+#adm .card{margin-bottom:12px}
+.akp{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:10px}
+.akp>div{background:var(--pan2);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;min-width:0}
+.akp>div>span{display:block;font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.akp b{font:600 17px 'JetBrains Mono',monospace}
+.abars{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.abar{display:grid;grid-template-columns:minmax(70px,120px) 1fr auto;align-items:center;gap:8px;font-size:13px}
+.abl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.abt{height:8px;border-radius:4px;background:var(--pan2);overflow:hidden}
+.abt i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--ac),var(--ac2))}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.atb{width:100%;min-width:0;border-collapse:collapse;font-size:13px;white-space:nowrap}
+.atb th{text-align:left;color:var(--mu);font-weight:500;padding:6px 10px 6px 0;border-bottom:1px solid var(--ln)}
+.atb td{padding:7px 10px 7px 0;border-bottom:1px solid var(--ln)}

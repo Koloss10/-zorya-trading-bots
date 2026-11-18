@@ -12,7 +12,7 @@ import { limitsOf, riskBlock } from "./risk.js";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const BYIV: Record<string, string> = { "1h": "60", "4h": "240", "12h": "720", "1d": "D", "1w": "W" };
-type C = { t: number; o: number; h: number; l: number; c: number; v: number; ml?: number; mh?: number };
+type C = { t: number; o: number; h: number; l: number; c: number; v: number; bv?: number; nt?: number; ml?: number; mh?: number };
 
 async function getJson(u: string) { const r = await fetch(u); if (!r.ok) throw new Error(`HTTP ${r.status} ${u.split("?")[0]}`); return r.json(); }
 /* ринкові дані: Binance (ф'ючерси з mark price і funding або спот), резерв — Bybit */
@@ -20,7 +20,7 @@ async function market(symbol: string, iv: string, fut: boolean) {
   try {
     const base = fut ? "https://fapi.binance.com/fapi/v1" : "https://api.binance.com/api/v3";
     const k = await getJson(`${base}/klines?symbol=${symbol}&interval=${iv}&limit=400`);
-    const candles: C[] = k.map((r: any[]) => ({ t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] }));
+    const candles: C[] = k.map((r: any[]) => ({ t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5], bv: +r[9], nt: +r[8] })); // bv — об'єм покупців (taker buy) для фільтра китів, nt — кількість угод (сплеск активності)
     let funding: { t: number; r: number }[] | null = null;
     if (fut) {
       const m = await getJson(`${base}/markPriceKlines?symbol=${symbol}&interval=${iv}&limit=400`).catch(() => []);

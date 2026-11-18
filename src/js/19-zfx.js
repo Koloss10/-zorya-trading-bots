@@ -1,4 +1,4 @@
-/* ---------- анімація фону тем (canvas#fx) і заставка ---------- */
+/* ---------- анімація фону тем (canvas#bgfx) і заставка ---------- */
 /* Кожна тема має свій ефект. Малюється ~30 кадрів/с, пауза у прихованій вкладці,
    вимикається перемикачем «Анімація фону» (SET.anim) або системним «зменшити рух». */
 const FX={c:null,x:null,w:0,h:0,dpr:1,raf:0,last:0,st:null,k:''};
@@ -44,7 +44,7 @@ light:{init:(w,h)=>({b:Array.from({length:12},()=>({x:fxRnd(0,w),y:fxRnd(0,h),r:
 function fxLoop(t){FX.raf=requestAnimationFrame(fxLoop);if(document.hidden||t-FX.last<33)return;FX.last=t;const e=FXE[FX.k];if(!e)return;const x=FX.x,T=TH();if(!FX.st)FX.st=e.init(FX.w,FX.h,T);if(!e.trail)x.clearRect(0,0,FX.w,FX.h);e.draw(x,FX.st,FX.w,FX.h,T,t)}
 /* увімкнути/вимкнути анімацію під поточну тему (викликається з applyTheme і перемикача) */
 function fxApply(){const on=SET.anim!==0&&!fxRM()&&!!FXE[SET.theme],r=document.documentElement;
- if(!FX.c){FX.c=document.getElementById('fx');if(!FX.c)return;FX.x=FX.c.getContext('2d');if(!FX.x)return;addEventListener('resize',()=>{if(FX.raf)fxSize()})}
+ if(!FX.c){FX.c=document.getElementById('bgfx');if(!FX.c)return;FX.x=FX.c.getContext('2d');if(!FX.x)return;addEventListener('resize',()=>{if(FX.raf)fxSize()})}
  cancelAnimationFrame(FX.raf);FX.raf=0;FX.x.setTransform(1,0,0,1,0,0);FX.x.clearRect(0,0,FX.c.width,FX.c.height);
  r.classList.toggle('fx-on',on);if(!on)return;FX.k=SET.theme;fxSize();FX.raf=requestAnimationFrame(fxLoop)}
 /* заставка: прибрати після завантаження даних, не раніше ніж за 1,6 с від старту */

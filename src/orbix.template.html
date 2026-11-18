@@ -8,7 +8,7 @@
 <style>/*@css*/</style>
 </head>
 <body>
-<canvas id="fx" aria-hidden="true"></canvas>
+<canvas id="bgfx" aria-hidden="true"></canvas>
 <div id="splash" role="presentation" aria-hidden="true">
 <div class="sp-orb"><i class="r1"></i><i class="r2"></i><i class="r3"></i><b class="sat"></b><b class="core"></b></div>
 <div class="sp-name"><span>O</span><span>R</span><span>B</span><span>I</span><span>X</span></div>
@@ -42,7 +42,7 @@
 
 <section id="v-mk" class="s" hidden>
 <div class="card"><h2>Ринок</h2><input class="srch" id="mq" list="pl" placeholder="Пара, напр. ETH/USDT" autocomplete="off"><div class="row" id="mkm" style="margin-bottom:8px"><button class="b sm tg" data-mm="F">Ф'ючерси USDⓈ-M</button><button class="b sm tg" data-mm="S">Спот</button></div><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
-<div class="card"><h2>Усі пари</h2><div id="mkl"></div></div>
+<div class="card"><h2>Пари</h2><div class="pft" id="mkt" role="tablist" aria-label="Список пар"><button class="b sm tg" role="tab" data-mt="all">Усі</button><button class="b sm tg" role="tab" data-mt="up">Ростуть</button><button class="b sm tg" role="tab" data-mt="dn">Падають</button><button class="b sm tg" role="tab" data-mt="fav">★ Обрані</button></div><div id="mkl"></div></div>
 </section>
 
 <section id="v-aw" class="s" hidden>
@@ -53,9 +53,7 @@
 <section id="v-bd" class="s" hidden>
 <div class="card"><h2>Налаштування бота</h2>
 <div class="row" style="margin-bottom:12px"><button class="b" data-m="0">Консервативний</button><button class="b" data-m="1">Помірний</button><button class="b" data-m="2">Агресивний</button></div>
-<label style="margin-bottom:12px">Готова стратегія<select id="fst"></select></label>
-<h3>Сигнали входу</h3><div class="sgr" id="fsg"></div>
-<div class="fg" id="fg"></div>
+<div id="fg"></div>
 <p class="mu" id="flh" style="margin-bottom:12px"></p>
 <div class="row"><button class="b p" id="bt">Запустити бектест</button><button class="b" id="ad">Додати paper-бота</button><button class="b" id="sxb">Стрес-тест</button></div></div>
 <div class="card"><h2>Графік і сітка ордерів</h2><div id="gv"></div><p class="mu" id="gs" style="margin-top:8px"></p></div>
@@ -87,16 +85,17 @@
 </section>
 
 <section id="v-pf" class="s" hidden>
-<div class="card" id="pfme"><h2>Мій профіль</h2><div class="pfh"><span id="pfav"></span><label style="flex:1">Нік профілю<input id="pfn" type="text" maxlength="40" autocomplete="off" placeholder="Трейдер"></label></div>
+<div class="pft" id="pft" role="tablist" aria-label="Розділи профілю"><button class="b sm tg" role="tab" data-pft="a">Акаунт</button><button class="b sm tg" role="tab" data-pft="x">Біржі й ризик</button><button class="b sm tg" role="tab" data-pft="n">Сповіщення</button></div>
+<div class="card" id="pfme" data-pt="a"><h2>Мій профіль</h2><div class="pfh"><span id="pfav"></span><label style="flex:1">Нік профілю<input id="pfn" type="text" maxlength="40" autocomplete="off" placeholder="Трейдер"></label></div>
 <h3>Картинка профілю</h3><div class="avg" id="avl" role="group" aria-label="Оберіть логотип профілю"></div>
 <div class="row"><button class="b" id="avu">Завантажити своє фото чи логотип</button><button class="b d" id="avx" hidden>Прибрати фото</button><input type="file" id="avf" accept="image/*" hidden></div><p class="mu" id="avm" style="margin-top:8px"></p>
 <div id="pfs" style="margin-top:12px"></div></div>
-<div class="card" id="acc"></div>
-<div class="card" id="tnc"></div>
-<div class="card" id="rkc"></div>
-<div class="card"><h2>Біржі та ключі API</h2><div id="exl"></div><p class="mu" style="margin-top:10px">У демо ключі не потрібні й не зберігаються. Кількість пар і ліміти плеча демонстраційні, у реальній версії їх треба брати з API біржі. Ключ API створюється без права виведення, а кошти лишаються на біржі.</p></div>
-<div class="card"><h2>Месенджери</h2><p class="mu" style="margin-bottom:10px">Повідомлення про відкриття ордера, докупівлю, закриття угоди, стоп і помилки. Telegram надсилає сервер Orbix: токен бота зберігається в зашифрованому сховищі, браузер його не бачить. Для WhatsApp, Viber і Signal потрібен окремий сервер, тому тут вони працюють у демо.</p><div id="msg"></div></div>
-<div class="card"><h2>Безпека</h2><div id="sec"></div></div>
+<div class="card" id="acc" data-pt="a"></div>
+<div class="card" id="tnc" data-pt="x"></div>
+<div class="card" id="rkc" data-pt="x"></div>
+<div class="card" data-pt="x"><h2>Біржі для paper-ботів і бектесту</h2><div id="exl"></div><p class="mu" style="margin-top:10px">Це лише вибір біржі для симуляції (комісії, пари, плече) у конструкторі, бектесті й paper-ботах. Ключі тут не потрібні й не зберігаються. Справжні ордери на демо-рахунку — у картці «Демо-торгівля на біржі» вище.</p></div>
+<div class="card" data-pt="n"><h2>Сповіщення в Telegram</h2><p class="mu" style="margin-bottom:10px">Повідомлення про відкриття угоди, докупівлю, закриття, стоп і помилки. Надсилає сервер Orbix: токен бота зберігається в зашифрованому сховищі, браузер його не бачить.</p><div id="msg"></div></div>
+<div class="card" data-pt="a"><h2>Безпека</h2><div id="sec"></div></div>
 </section>
 
 <section id="v-help" class="s" hidden>

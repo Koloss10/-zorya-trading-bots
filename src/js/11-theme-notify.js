@@ -25,7 +25,7 @@ let tt;function toast(m){if(!SET.toast)return;const e=$('#ts');e.textContent=m;e
 let FEED=ld('zfeed',[]);
 function feedR(){const el=$('#feed');if(el)el.innerHTML=FEED.length?FEED.slice(0,12).map(e=>`<div><time>${e.t}</time><span>${esc(e.m)}</span></div>`).join(''):'<p class="mu">Подій ще немає.</p>'}
 let MS=ld('zms',{tg:{on:0,token:'',chat:'',tpl:'normal'},wa:{on:0,to:'',tpl:'normal'},vb:{on:0,to:'',tpl:'normal'},sg:{on:0,to:'',tpl:'normal'}});
-const MSN={tg:'Telegram',wa:'WhatsApp',vb:'Viber',sg:'Signal'},EVN={open:'Відкрито позицію',dca:'DCA-ордер',close:'Угоду закрито',sl:'Stop-Loss або ліквідація',err:'Помилка'};
+const MSN={tg:'Telegram'},EVN={open:'Відкрито позицію',dca:'DCA-ордер',close:'Угоду закрито',sl:'Stop-Loss або ліквідація',err:'Помилка'};
 function msgText(ev,x,tpl,d){const g=x.g,p=x.b.pos,b=BRANDS[SET.brand].n,hd=`${b}: ${ttl(x)} на ${x.ex}`;
 const line={open:`відкрито позицію по ${px(d.price||0)}`,dca:`DCA-ордер ${p?p.n:d.n} з ${g.orders} по ${px(d.price||0)}`,close:`угоду закрито, PnL ${f(d.pnl)} USDT`,sl:`${d.liq?'ліквідація':'спрацював Stop-Loss'}, PnL ${f(d.pnl)} USDT`,err:`помилка: ${d.text||''}`}[ev];
 if(tpl==='short')return `${g.pair} ${dir(g)}: ${line}`;
@@ -51,5 +51,5 @@ if(r.error){let m=r.error.message;try{const j=await r.error.context.json();m=j.e
 function notify(ev,x,d){const m=msgText(ev,x,'short',d);FEED.unshift({t:now(),m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR();if(!SET.ev[ev])return;toast(m);beep(ev==='close'?(d.pnl>0?'win':'loss'):ev);
 if(SET.vib&&navigator.vibrate)try{navigator.vibrate(ev==='sl'?[80,60,80]:40)}catch(e){}
 if(SET.push&&'Notification'in window&&Notification.permission==='granted')try{new Notification(BRANDS[SET.brand].n,{body:m})}catch(e){}
-for(const k in MS){const c=MS[k];if(!c.on||!(c.ev||SET.ev)[ev])continue;const text=msgText(ev,x,c.tpl,d);if(k==='tg'){if(CLOUD.u&&TG.st)tgSend(text).catch(e=>{FEED.unshift({t:now(),m:'Telegram: '+e.message});sv('zfeed',FEED);feedR()})}else{FEED.unshift({t:now(),m:`${MSN[k]} (демо): `+(text.split('\n')[1]||text)});sv('zfeed',FEED)}}}
+{const c=MS.tg;if(c&&c.on&&(c.ev||SET.ev)[ev]&&CLOUD.u&&TG.st)tgSend(msgText(ev,x,c.tpl,d)).catch(e=>{FEED.unshift({t:now(),m:'Telegram: '+e.message});sv('zfeed',FEED);feedR()})}}
 

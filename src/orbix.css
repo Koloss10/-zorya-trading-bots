@@ -124,8 +124,8 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .xw.xfs .lwc.full{height:calc(100vh - 210px)!important;min-height:300px}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 /* ---------- анімація фону ---------- */
-#fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;opacity:.55}
-:root[data-light] #fx{opacity:.8}
+#bgfx{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;opacity:.55}
+:root[data-light] #bgfx{opacity:.8}
 #wrap{position:relative;z-index:1}
 .fx-on .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0)),color-mix(in srgb,var(--pan) 84%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 /* ---------- заставка ---------- */
@@ -191,3 +191,25 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .h-btn{gap:8px}
 @media (max-width:560px){.h-chips{grid-template-columns:repeat(2,minmax(0,1fr))}.h-ring{width:72px;height:72px}}
 @media (prefers-reduced-motion:reduce){.hero2 .h-orb,.h-pill.on i,.hdot,.hch .hln,.sp-orb *,.sp-bar i,.sp-name span{animation:none!important}.hch .hln{stroke-dashoffset:0}.sp-name span,.sp-tag{opacity:1;transform:none}}
+/* ---------- вкладки профілю ---------- */
+.pft{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;scrollbar-width:none}
+.pft::-webkit-scrollbar{display:none}
+.pft .b{flex:none}
+.bwait{margin:0;font-size:13px}
+.bc .ac .bmore{min-width:40px;font-weight:700;letter-spacing:.1em}
+.bc .bmo{margin-top:6px;padding-top:8px;border-top:1px dashed var(--ln)}
+/* ---------- конструктор: розділи ---------- */
+.fgs{border:1px solid var(--ln);border-radius:12px;background:var(--pan2);margin-bottom:10px}
+.fgs>summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:10px 36px 10px 12px;position:relative}
+.fgs>summary::-webkit-details-marker{display:none}
+.fgs>summary::after{content:"";position:absolute;right:14px;top:50%;width:8px;height:8px;border-right:2px solid var(--mu);border-bottom:2px solid var(--mu);transform:translateY(-70%) rotate(45deg);transition:transform .2s}
+.fgs[open]>summary::after{transform:translateY(-30%) rotate(-135deg)}
+.fgs>summary .mu{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fgs[open]>summary .mu{display:none}
+.fgs>.fg{padding:0 12px 12px}
+.fg .fw{grid-column:1/-1}
+/* ---------- ринок: обрані пари ---------- */
+.plh{display:flex;align-items:center;gap:8px;min-width:0}
+.fvp{background:none;border:0;padding:4px;margin:-4px 0 -4px -4px;font-size:18px;line-height:1;color:var(--mu);cursor:pointer}
+.fvp[aria-pressed=true]{color:var(--warn)}
+#mkt{margin-bottom:4px}

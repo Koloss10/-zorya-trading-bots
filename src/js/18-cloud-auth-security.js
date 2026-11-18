@@ -32,7 +32,7 @@ const AUTHM={'Invalid login credentials':'Невірний email або паро
 const authMsg=e=>{const m=(e&&e.message)||String(e);return AUTHM[m]||(/rate limit|too many/i.test(m)?'Забагато спроб, спробуйте трохи пізніше.':/invalid.*(code|totp)|expired/i.test(m)?'Код неправильний або застарів.':m)};
 const RURL=()=>location.origin+location.pathname;
 let AF={mode:'',email:''};
-function accR(){const el=$('#acc'),ch=$('#chip');if(ch){ch.textContent=(MD.mode==='live'?'Live · '+MD.src+(MD.fut?' · F':''):MD.mode==='init'?'Підключення…':'Демо-дані')+(CLOUD.u?' · ☁':'');ch.title=MD.mode==='demo'&&MD.err?'Біржі недоступні: '+MD.err:''}if(!el)return;
+function accR(){if((CLOUD.pend||CLOUD.rec)&&CUR==='pf')pfTab('a',1);const el=$('#acc'),ch=$('#chip');if(ch){ch.textContent=(MD.mode==='live'?'Live · '+MD.src+(MD.fut?' · F':''):MD.mode==='init'?'Підключення…':'Демо-дані')+(CLOUD.u?' · ☁':'');ch.title=MD.mode==='demo'&&MD.err?'Біржі недоступні: '+MD.err:''}if(!el)return;
 if(!SB){el.innerHTML='<h2>Акаунт Orbix</h2><p class="mu">Хмара зараз недоступна (немає з’єднання). Дані зберігаються в цьому браузері.</p>';return}
 const u=CLOUD.u;
 /* другий крок входу: код з Google Authenticator */

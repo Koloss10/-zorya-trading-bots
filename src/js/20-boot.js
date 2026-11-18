@@ -2,7 +2,7 @@
 applyTheme();mnuR();
 $('#home-aw').hidden=true;$('#home-eq').hidden=true;SET.brand='orbix';$('#brl').closest('.card').hidden=true;applyTheme();mnuR();
 MD.ip=mdInit();pfr();tfilter();favs();feedR();lst();go('ov');accR();boot();
-async function boot(){await MD.ip;accR();mnuR();
+async function boot(){try{await MD.ip}finally{splashEnd()}accR();mnuR();
 $('#fp').innerHTML=PK.map(k=>`<option value="${k}">${k}</option>`).join('');$('#pl').innerHTML=PK.map(k=>`<option value="${k}">`).join('');if(!PAIRS[MKP])MKP=PK[0];
 const saved=ld('zorya3',[]).filter(x=>x&&x.g),ps=[...new Set(saved.map(x=>x.g.pair).filter(p=>PAIRS[p]))];
 $('#tops').textContent=MD.mode==='live'?`Завантажую реальні дані ${MD.src}…`:'Біржі недоступні, працюю на демо-даних.';

@@ -130,9 +130,86 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .xw.xfs{position:fixed;inset:0;z-index:30;background:var(--bg);padding:calc(10px + env(safe-area-inset-top,0px)) 10px 10px;overflow:auto;margin:0}
 .xw.xfs .lwc.full{height:calc(100vh - 210px)!important;min-height:300px}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+/* ---------- анімація фону ---------- */
+#fx{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;opacity:.55}
+:root[data-light] #fx{opacity:.8}
+#wrap{position:relative;z-index:1}
+.fx-on .card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,0)),color-mix(in srgb,var(--pan) 84%,transparent);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* ---------- заставка ---------- */
+#splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(600px 400px at 50% 40%,var(--glow2),transparent 70%),radial-gradient(500px 300px at 50% 70%,var(--glow1),transparent 70%),var(--bg);color:var(--tx);cursor:pointer;transition:opacity .6s ease,transform .6s ease}
+#splash.out{opacity:0;transform:scale(1.06);pointer-events:none}
+.sp-orb{position:relative;width:132px;height:132px}
+.sp-orb i{position:absolute;inset:0;border-radius:50%;border:2px solid transparent}
+.sp-orb .r1{border-top-color:var(--ac);border-right-color:var(--ac);animation:sp-rot 1.6s linear infinite;filter:drop-shadow(0 0 8px var(--ac))}
+.sp-orb .r2{inset:16px;border-bottom-color:var(--ac2);border-left-color:var(--ac2);animation:sp-rot 2.4s linear infinite reverse;filter:drop-shadow(0 0 6px var(--ac2))}
+.sp-orb .r3{inset:34px;border-color:color-mix(in srgb,var(--tx) 70%,transparent);animation:sp-pulse 1.8s ease-in-out infinite}
+.sp-orb .core{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:var(--ac);box-shadow:0 0 18px 4px var(--ac);animation:sp-pulse 1.8s ease-in-out infinite}
+.sp-orb .sat{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px;border-radius:50%;background:var(--ac2);box-shadow:0 0 14px 3px var(--ac2);animation:sp-orbit 2.2s linear infinite}
+.sp-name{display:flex;gap:6px;font:700 34px 'Space Grotesk',Inter,sans-serif;letter-spacing:.14em}
+.sp-name span{opacity:0;transform:translateY(12px);animation:sp-in .5s cubic-bezier(.2,.8,.2,1) forwards;background:linear-gradient(90deg,var(--tx),var(--ac),var(--ac2),var(--tx));background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
+.sp-name span:nth-child(1){animation-delay:.15s}.sp-name span:nth-child(2){animation-delay:.25s}.sp-name span:nth-child(3){animation-delay:.35s}.sp-name span:nth-child(4){animation-delay:.45s}.sp-name span:nth-child(5){animation-delay:.55s}
+.sp-name span{animation:sp-in .5s cubic-bezier(.2,.8,.2,1) forwards,sp-shine 2.8s linear 1s infinite}
+.sp-tag{font-size:13px;color:var(--mu);opacity:0;animation:sp-in .6s ease .8s forwards}
+.sp-bar{width:180px;height:3px;border-radius:3px;background:var(--ln);overflow:hidden}
+.sp-bar i{display:block;height:100%;width:40%;border-radius:3px;background:linear-gradient(90deg,var(--ac),var(--ac2));animation:sp-load 1.2s ease-in-out infinite}
+.sp-skip{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom,0px));font-size:12px;color:var(--mu);opacity:0;animation:sp-in .6s ease 2s forwards}
+@keyframes sp-rot{to{transform:rotate(360deg)}}
+@keyframes sp-orbit{from{transform:rotate(0) translateX(60px)}to{transform:rotate(360deg) translateX(60px)}}
+@keyframes sp-pulse{0%,100%{transform:scale(.9);opacity:.75}50%{transform:scale(1.08);opacity:1}}
+@keyframes sp-in{to{opacity:1;transform:none}}
+@keyframes sp-shine{to{background-position:-300% 0}}
+@keyframes sp-load{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+/* ---------- верх головної ---------- */
+.hero2{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;border-color:color-mix(in srgb,var(--ac) 30%,var(--ln));box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 8%,transparent) inset,0 20px 50px -30px var(--ac)}
+.hero2>*{position:relative}
+.hero2 .h-orb{position:absolute;inset:auto;right:-80px;top:-90px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle at 30% 30%,var(--ac2),transparent 60%),radial-gradient(circle at 70% 70%,var(--ac),transparent 60%);opacity:.22;filter:blur(30px);animation:h-orb 12s ease-in-out infinite alternate;pointer-events:none}
+@keyframes h-orb{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-40px,30px) scale(1.15)}100%{transform:translate(-90px,10px) scale(.95)}}
+.h-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.h-pill{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:999px;font:600 12px Inter,sans-serif;border:1px solid var(--ln);background:var(--pan2)}
+.h-pill i{width:8px;height:8px;border-radius:50%;background:var(--mu)}
+.h-pill.on{color:var(--up);border-color:color-mix(in srgb,var(--up) 40%,transparent);background:color-mix(in srgb,var(--up) 10%,transparent)}
+.h-pill.on i{background:var(--up);box-shadow:0 0 0 0 var(--up);animation:h-ping 1.8s ease-out infinite}
+@keyframes h-ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 70%,transparent)}100%{box-shadow:0 0 0 8px transparent}}
+.h-up{font-size:12px}
+.h-main{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.h-l{min-width:0}
+.h-big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.hv{font:600 clamp(30px,8vw,44px)/1.1 'JetBrains Mono',monospace;letter-spacing:-.03em}
+.hv.up{color:var(--up);text-shadow:0 0 24px color-mix(in srgb,var(--up) 40%,transparent)}
+.hv.dn{color:var(--dn);text-shadow:0 0 24px color-mix(in srgb,var(--dn) 40%,transparent)}
+.h-pct[hidden]{display:none}.h-pct{font:600 13px 'JetBrains Mono',monospace;padding:2px 8px;border-radius:8px;background:var(--pan2);border:1px solid var(--ln)}
+.h-sub{font-size:13px;margin-top:2px}
+.h-ring{position:relative;width:84px;height:84px;flex:none}
+.h-ring svg{width:100%;height:100%}
+.h-ring .h-arc{transition:stroke-dasharray .8s ease;filter:drop-shadow(0 0 4px var(--ac))}
+.h-ring div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.h-ring b{font:600 17px 'JetBrains Mono',monospace}
+.h-ring span{font-size:9px;color:var(--mu)}
+.h-chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.h-chip{padding:8px 10px;border-radius:12px;background:color-mix(in srgb,var(--pan2) 80%,transparent);border:1px solid var(--ln);min-width:0}
+.h-chip span{display:block;font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h-chip b{font-size:14px;white-space:nowrap}
+.h-chart{position:relative;min-height:64px}
+.hch{width:100%;height:110px;display:block}
+.hch .hln{filter:drop-shadow(0 0 6px var(--ac));stroke-dasharray:3000;stroke-dashoffset:3000;animation:h-draw 1.4s ease forwards}
+@keyframes h-draw{to{stroke-dashoffset:0}}
+.hdot{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;box-shadow:0 0 12px 3px currentColor;animation:sp-pulse 1.6s ease-in-out infinite}
+.hch-e{height:64px;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px dashed var(--ln);border-radius:12px}
+.h-btn{gap:8px}
+@media (max-width:560px){.h-chips{grid-template-columns:repeat(2,minmax(0,1fr))}.h-ring{width:72px;height:72px}}
+@media (prefers-reduced-motion:reduce){.hero2 .h-orb,.h-pill.on i,.hdot,.hch .hln,.sp-orb *,.sp-bar i,.sp-name span{animation:none!important}.hch .hln{stroke-dashoffset:0}.sp-name span,.sp-tag{opacity:1;transform:none}}
 </style>
 </head>
 <body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div id="splash" role="presentation" aria-hidden="true">
+<div class="sp-orb"><i class="r1"></i><i class="r2"></i><i class="r3"></i><b class="sat"></b><b class="core"></b></div>
+<div class="sp-name"><span>O</span><span>R</span><span>B</span><span>I</span><span>X</span></div>
+<div class="sp-tag">Торгові боти · Demo / Testnet</div>
+<div class="sp-bar"><i></i></div>
+<div class="sp-skip">Торкніться, щоб пропустити</div>
+</div>
+<script>try{var z=JSON.parse(localStorage.getItem('zset')||'{}');if(z&&z.splash===0){var e=document.getElementById('splash');e&&e.remove()}}catch(e){}</script>
 <div class="w" id="wrap">
 <header>
 <button class="brand" id="brand" aria-label="На головну"><span id="logo"></span><h1 id="bname"></h1></button>
@@ -196,7 +273,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 </section>
 
 <section id="v-set" class="s" hidden>
-<div class="card"><h2>Тема оформлення</h2><div class="th" id="thl"></div></div>
+<div class="card"><h2>Тема оформлення</h2><div class="th" id="thl"></div><div id="thx"></div></div>
 <div class="card"><h2>Назва та логотип</h2><div class="br" id="brl"></div><p class="mu" style="margin-top:10px">Перед використанням назви перевірте вільність домену й торгової марки.</p></div>
 <div class="card"><h2>Звук і сповіщення</h2><div id="snd"></div></div>
 <div class="card"><h2>Дані</h2><p class="mu" style="margin-bottom:10px">Без входу боти й бектести зберігаються в цьому браузері. Після входу в акаунт (Профіль) вони зберігаються в хмарі Orbix і доступні з будь-якого пристрою. Тема, звук і месенджери завжди лишаються на цьому пристрої.</p><div class="row"><button class="b" id="exp">Експорт налаштувань</button><button class="b d" id="rs">Скинути демо</button></div></div>
@@ -540,14 +617,19 @@ tech:{n:'Техно (графіт + ціан)',v:{'--bg':'#0B0D12','--pan':'#121
 cyber:{n:'Кіберпанк (неон)',v:{'--bg':'#07060C','--pan':'#110E1C','--pan2':'#0C0A14','--ln':'#2A2140','--tx':'#F3E9FF','--mu':'#9A8DB8','--ac':'#FF2BD6','--ac2':'#00F0FF','--up':'#39FF88','--dn':'#FF3D5A','--warn':'#FFE23D','--actx':'#1A0514','--glow1':'rgba(255,43,214,.14)','--glow2':'rgba(0,240,255,.14)','--r':'10px'}},
 matrix:{n:'Матриця (зелений термінал)',v:{'--bg':'#040806','--pan':'#0A120D','--pan2':'#070E09','--ln':'#163A22','--tx':'#D8F5E0','--mu':'#6FA383','--ac':'#2BFF6A','--ac2':'#19C26B','--up':'#4DFF88','--dn':'#FF5C5C','--warn':'#E3FF4D','--actx':'#03140A','--glow1':'rgba(43,255,106,.10)','--glow2':'rgba(25,194,107,.08)','--r':'8px'}},
 midnight:{n:'Північ (синій, як у бірж)',v:{'--bg':'#0B1220','--pan':'#121C2E','--pan2':'#0E1627','--ln':'#203049','--tx':'#E7EEF8','--mu':'#8EA0BC','--ac':'#F0B90B','--ac2':'#3B82F6','--up':'#0ECB81','--dn':'#F6465D','--warn':'#F0B90B','--actx':'#1A1400','--glow1':'rgba(240,185,11,.08)','--glow2':'rgba(59,130,246,.12)','--r':'14px'}},
+quantum:{n:'Квантум (індиго + фіолетове сяйво)',v:{'--bg':'#070A1F','--pan':'#0E1230','--pan2':'#0B0F28','--ln':'#232A5C','--tx':'#E8EAFF','--mu':'#8D93C7','--ac':'#7C6CFF','--ac2':'#22D3EE','--up':'#34D399','--dn':'#FB7185','--warn':'#FBBF24','--actx':'#0A0820','--glow1':'rgba(124,108,255,.18)','--glow2':'rgba(34,211,238,.10)','--r':'14px'}},
+aurora:{n:'Аврора (північне сяйво)',v:{'--bg':'#05121A','--pan':'#0A1C26','--pan2':'#08161F','--ln':'#17323F','--tx':'#E3F6F4','--mu':'#86A9AE','--ac':'#2EE6A6','--ac2':'#A78BFA','--up':'#34D399','--dn':'#F87171','--warn':'#FCD34D','--actx':'#032018','--glow1':'rgba(46,230,166,.13)','--glow2':'rgba(167,139,250,.13)','--r':'16px'}},
+synth:{n:'Синтвейв (ретро 80-х)',v:{'--bg':'#120720','--pan':'#1C0E30','--pan2':'#170A28','--ln':'#3A1F55','--tx':'#FCE7F3','--mu':'#B48AC8','--ac':'#FF6EC7','--ac2':'#FFB86B','--up':'#5EF2B5','--dn':'#FF5577','--warn':'#FFD166','--actx':'#2A0820','--glow1':'rgba(255,110,199,.16)','--glow2':'rgba(255,184,107,.10)','--r':'12px'}},
+ocean:{n:'Глибина (океан)',v:{'--bg':'#031524','--pan':'#072238','--pan2':'#051C30','--ln':'#0F3A57','--tx':'#E0F2FE','--mu':'#7FA7C2','--ac':'#38BDF8','--ac2':'#2DD4BF','--up':'#34D399','--dn':'#FB7185','--warn':'#FBBF24','--actx':'#021422','--glow1':'rgba(56,189,248,.14)','--glow2':'rgba(45,212,191,.10)','--r':'16px'}},
+magma:{n:'Магма (вулкан)',v:{'--bg':'#120806','--pan':'#1D0E0A','--pan2':'#170B08','--ln':'#3A1A12','--tx':'#FDEDE6','--mu':'#B88A7A','--ac':'#FF7A2F','--ac2':'#FFC93C','--up':'#4ADE80','--dn':'#F43F5E','--warn':'#FFC93C','--actx':'#1F0A03','--glow1':'rgba(255,122,47,.15)','--glow2':'rgba(255,201,60,.08)','--r':'12px'}},
 light:{n:'Світла (денна)',v:{'--bg':'#F3F5FA','--pan':'#FFFFFF','--pan2':'#F7F8FC','--ln':'#DEE3EE','--tx':'#121826','--mu':'#5B667E','--ac':'#0EA5E9','--ac2':'#7C3AED','--up':'#059669','--dn':'#E11D48','--warn':'#D97706','--actx':'#FFFFFF','--glow1':'rgba(14,165,233,.12)','--glow2':'rgba(124,58,237,.10)','--r':'16px'}}};
 const BRANDS={
 orbix:{n:'ORBIX',t:'Орбіта: ринок обертається навколо вашої стратегії',svg:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--ac)"/><stop offset="1" stop-color="var(--ac2)"/></linearGradient></defs><circle cx="24" cy="24" r="19" fill="none" stroke="url(#lg1)" stroke-width="3" stroke-dasharray="86 34" stroke-linecap="round" transform="rotate(-30 24 24)"/><circle cx="24" cy="24" r="8" fill="none" stroke="var(--tx)" stroke-width="2.5"/><circle cx="24" cy="24" r="2.6" fill="var(--ac)"/><circle cx="40" cy="12" r="3.2" fill="var(--ac2)"/></svg>'},
 kvantix:{n:'KVANTIX',t:'Квант: точні кроки сітки замість емоцій',svg:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="var(--ac2)"/><stop offset="1" stop-color="var(--ac)"/></linearGradient></defs><path d="M24 3 42 13.5v21L24 45 6 34.5v-21Z" fill="none" stroke="url(#lg2)" stroke-width="3" stroke-linejoin="round"/><path d="M14 30 20 20l5 7 4-5 5 8" fill="none" stroke="var(--tx)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="30" r="2.4" fill="var(--ac)"/></svg>'},
 nexora:{n:'NEXORA',t:'Нексус: усі біржі й боти в одній точці',svg:'<svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--ac)"/><stop offset="1" stop-color="var(--ac2)"/></linearGradient></defs><rect x="6" y="6" width="36" height="36" rx="11" fill="none" stroke="url(#lg3)" stroke-width="3"/><path d="M15 32V16l18 16V16" fill="none" stroke="var(--tx)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="33" cy="32" r="2.6" fill="var(--ac)"/></svg>'}};
-let SET=ld('zset',{theme:'tech',brand:'orbix',snd:1,vib:1,toast:1,push:0,ev:{open:1,dca:1,close:1,sl:1,err:1}});
+let SET=ld('zset',{theme:'tech',brand:'orbix',anim:1,splash:1,snd:1,vib:1,toast:1,push:0,ev:{open:1,dca:1,close:1,sl:1,err:1}});
 function applyTheme(){const t=THEMES[SET.theme]||THEMES.tech,r=document.documentElement;for(const k in t.v)r.style.setProperty(k,t.v[k]);if(SET.theme==='light')r.setAttribute('data-light','');else r.removeAttribute('data-light');
-const b=BRANDS[SET.brand]||BRANDS.orbix;$('#logo').innerHTML=b.svg;$('#bname').textContent=b.n;document.title=b.n.charAt(0)+b.n.slice(1).toLowerCase()+' — торгові боти';$$('.chv').forEach(c=>c._d&&c._d())}
+const b=BRANDS[SET.brand]||BRANDS.orbix;$('#logo').innerHTML=b.svg;$('#bname').textContent=b.n;document.title=b.n.charAt(0)+b.n.slice(1).toLowerCase()+' — торгові боти';$$('.chv').forEach(c=>c._d&&c._d());fxApply()}
 const TH=()=>{const s=getComputedStyle(document.documentElement),g=k=>s.getPropertyValue(k).trim()||'#888';return{up:g('--up'),dn:g('--dn'),ac:g('--ac'),ac2:g('--ac2'),mu:g('--mu'),ln:g('--ln'),tx:g('--tx'),pan:g('--pan2'),warn:g('--warn')}};
 
 /* ---------- звук, сповіщення, події, месенджери ---------- */
@@ -719,10 +801,31 @@ function upd(){let pnl=0,all=[];
 bots.forEach(x=>{const v=bv(x);pnl+=v;all.push(...x.b.tr);const c=$$(`[data-bot="${x.id}"]`);for(const el of c){const p=x.b.pos,s=x.b.tr,w=s.filter(t=>t.pnl>0).length,b=el.querySelectorAll('.bm b');if(b.length>=4){b[0].textContent=f(v);b[0].className=cls(v);b[1].textContent=`${s.length} / ${s.length?Math.round(w/s.length*100):0}%`;b[2].textContent=p?p.n+' з '+x.g.orders+' орд.':'немає';b[3].textContent=f(x.dd,0)}}
 const j=$('#jr'+x.id);if(j&&!j.hidden)j.innerHTML=jrn(x)});
 all.sort((a,b)=>a.i-b.i);let e=0;const cur=all.map(t=>e+=t.pnl);if($('#ch'))$('#ch').innerHTML=chart(cur);
-hero(pnl,cur);$$('.chv').forEach(c=>{if(c.offsetParent)c._d()});if($('#v-st')&&!$('#v-st').hidden)sta()}
-function hero(pnl,cur){const h=$('#hero');if(!h)return;const inv=bots.reduce((a,x)=>a+x.g.base*ladder(x.g),0);
-if(VARIANT===2)h.innerHTML=`<div class="card hero"><div class="mu">Капітал у ботах</div><div class="big">${n2(inv,0)} <span class="mu" style="font-size:14px">USDT</span></div><div class="row" style="gap:16px"><span>PnL всього <b class="mono ${cls(pnl)}">${f(pnl)}</b></span><span>Ботів <b class="mono">${bots.filter(x=>x.on).length}/${bots.length}</b></span></div><div style="margin-top:10px">${chart(cur,120)}</div><div class="row" style="margin-top:12px"><button class="b p" id="h-aw">Авто-майстер</button><button class="b" id="h-nb">Новий бот</button><button class="b" id="h-mk">Ринок</button></div></div>`;
-else h.innerHTML='';const a=$('#h-aw'),b=$('#h-nb'),c=$('#h-mk');if(a)a.onclick=()=>go('aw');if(b)b.onclick=()=>go('bd');if(c)c.onclick=()=>go('mk')}
+hero(pnl,cur,all);$$('.chv').forEach(c=>{if(c.offsetParent)c._d()});if($('#v-st')&&!$('#v-st').hidden)sta()}
+/* верх головної: стан, PnL з анімацією лічби, кільце win-rate, крива капіталу */
+const HERO={v:null,raf:0};
+function heroNum(el,to){const from=HERO.v==null?0:HERO.v;HERO.v=to;cancelAnimationFrame(HERO.raf);const t0=performance.now(),D=from===to?0:700;
+const st=t=>{const k=D?Math.min(1,(t-t0)/D):1,e=1-Math.pow(1-k,3),v=from+(to-from)*e;el.textContent=(v>0?'+':v<0?'−':'')+n2(Math.abs(v),2);el.className='hv '+cls(to);if(k<1)HERO.raf=requestAnimationFrame(st)};
+if(!D||document.hidden)st(t0+D);else HERO.raf=requestAnimationFrame(st)}
+function heroChart(v){const W=640,H=110;if(v.length<2)return'<div class="hch-e mu">Крива капіталу з’явиться після перших угод</div>';const mn=Math.min(0,...v),mx=Math.max(0,...v),sp=(mx-mn)||1,X=i=>(i/(v.length-1)*W).toFixed(1),Y=y=>(H-6-(y-mn)/sp*(H-12)).toFixed(1),P=v.map((y,i)=>X(i)+' '+Y(y)),up=v[v.length-1]>=0,c=up?'var(--up)':'var(--dn)';
+return`<svg class="hch" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Крива капіталу"><defs><linearGradient id="hg-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--ac)" stop-opacity=".35"/><stop offset="1" stop-color="var(--ac)" stop-opacity="0"/></linearGradient><linearGradient id="hg-l" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--ac2)"/><stop offset="1" stop-color="var(--ac)"/></linearGradient></defs><path d="M0 ${Y(0)}H${W}" stroke="var(--ln)" stroke-dasharray="4 6" vector-effect="non-scaling-stroke"/><path d="M${P.join('L')}V${H}H0Z" fill="url(#hg-a)"/><path class="hln" d="M${P.join('L')}" fill="none" stroke="url(#hg-l)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg><i class="hdot" style="left:calc(100% - 6px);top:${(Y(v[v.length-1])/H*100).toFixed(1)}%;background:${c}"></i>`}
+function hero(pnl,cur,all=[]){const h=$('#hero');if(!h)return;if(VARIANT!==2){h.innerHTML='';return}
+if(!$('#h-pnl')){h.innerHTML=`<div class="card hero2"><div class="h-orb" aria-hidden="true"></div><div class="h-top"><span class="h-pill" id="h-st"></span><span class="mu h-up" id="h-upd"></span></div>
+<div class="h-main"><div class="h-l"><div class="mu">Прибуток ботів, USDT</div><div class="h-big"><span class="hv" id="h-pnl">0,00</span><span class="h-pct" id="h-pct"></span></div><div class="h-sub" id="h-day"></div></div>
+<div class="h-ring" id="h-ring"></div></div>
+<div class="h-chips" id="h-chips"></div><div class="h-chart" id="h-ch"></div>
+<div class="row h-btn"><button class="b p" id="h-aw">Авто-майстер</button><button class="b" id="h-nb">Новий бот</button><button class="b" id="h-mk">Ринок</button></div></div>`;
+HERO.ck=null;$('#h-aw').onclick=()=>go('aw');$('#h-nb').onclick=()=>go('bd');$('#h-mk').onclick=()=>go('mk')}
+const inv=bots.reduce((a,x)=>a+x.g.base*ladder(x.g),0),on=bots.filter(x=>x.on).length,srv=bots.filter(x=>x.on&&x.srv).length,open=bots.filter(x=>x.b&&x.b.pos).length;
+const d0=Math.floor(Date.now()/864e5)*864e5,day=all.reduce((a,t)=>a+((+t.ts||0)>=d0?+t.pnl||0:0),0),dn=all.filter(t=>(+t.ts||0)>=d0).length;
+const w=all.filter(t=>t.pnl>0).length,wr=all.length?w/all.length:0;
+$('#h-st').className='h-pill '+(on?'on':'off');$('#h-st').innerHTML=`<i></i>${on?(srv?`Сервер 24/7 · ${srv} з ${on} ботів`:`Працюють ${on} з ${bots.length} ботів`):(bots.length?'Усі боти на паузі':'Ботів ще немає')}`;
+$('#h-upd').textContent=MD.mode==='live'?'дані біржі наживо':'демо-дані';
+heroNum($('#h-pnl'),pnl);$('#h-pct').textContent=inv?`${pnl>=0?'+':'−'}${n2(Math.abs(pnl/inv*100),2)}%`:'';$('#h-pct').className='h-pct '+cls(pnl);$('#h-pct').hidden=!inv;
+$('#h-day').innerHTML=`Сьогодні <b class="mono ${cls(day)}">${f(day)}</b> <span class="mu">· ${dn} ${dn%10===1&&dn%100!==11?'угода':dn%10>=2&&dn%10<=4&&(dn%100<12||dn%100>14)?'угоди':'угод'}</span>`;
+const R=30,C=2*Math.PI*R;$('#h-ring').innerHTML=`<svg viewBox="0 0 76 76" aria-hidden="true"><defs><linearGradient id="hg-r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--ac)"/><stop offset="1" stop-color="var(--ac2)"/></linearGradient></defs><circle cx="38" cy="38" r="${R}" fill="none" stroke="var(--ln)" stroke-width="7"/><circle class="h-arc" cx="38" cy="38" r="${R}" fill="none" stroke="url(#hg-r)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C*wr).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 38 38)"/></svg><div><b>${Math.round(wr*100)}%</b><span>у плюсі</span></div>`;
+$('#h-chips').innerHTML=[['Капітал у ботах',n2(inv,0)+' USDT'],['Ботів активно',`${on} / ${bots.length}`],['Відкрито угод',String(open)],['Закрито угод',String(all.length)]].map(([k,v])=>`<div class="h-chip"><span>${k}</span><b class="mono">${v}</b></div>`).join('');
+const ck=cur.length+':'+(cur.length?cur[cur.length-1].toFixed(4):'')+':'+SET.theme;if(HERO.ck!==ck){HERO.ck=ck;$('#h-ch').innerHTML=heroChart(cur)}}
 function chart(v,H=200){if(v.length<2)return'<p class="mu">Недостатньо угод для графіка.</p>';const W=640,mn=Math.min(0,...v),mx=Math.max(0,...v),sp=(mx-mn)||1,Y=y=>(H-8-(y-mn)/sp*(H-16)).toFixed(1),P=v.map((y,i)=>(i/(v.length-1)*W).toFixed(1)+' '+Y(y));
 return`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Крива капіталу" preserveAspectRatio="none" style="height:${H>150?'auto':H+'px'}"><path d="M0 ${Y(0)}H${W}" stroke="var(--ln)"/><path d="M${P.join('L')}V${H}H0Z" fill="var(--ac)" fill-opacity=".12"/><path d="M${P.join('L')}" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`}
 function stepBots(k){bots.filter(x=>dk(x.g)===k&&x.on).forEach(x=>advance(x,1))}
@@ -934,10 +1037,12 @@ const m=Math.max(1,...R.map(r=>Math.abs(r.v)));$('#sb').innerHTML=R.map(r=>`<div
 
 /* ---------- налаштування ---------- */
 function setR(){$('#thl').innerHTML=Object.entries(THEMES).map(([k,t])=>`<button data-th="${k}" aria-pressed="${SET.theme===k}"><i style="background:linear-gradient(90deg,${t.v['--bg']} 0 30%,${t.v['--pan']} 30% 55%,${t.v['--ac']} 55% 75%,${t.v['--ac2']} 75% 90%,${t.v['--up']} 90%)"></i>${t.n}</button>`).join('');
+$('#thx').innerHTML=SW('Анімація фону',SET.anim!==0,'anim',fxRM()?'Вимкнено системою: «зменшити рух» у налаштуваннях пристрою':'Своя для кожної теми: код «Матриці», зорі, сяйво, жарини…')+SW('Екран запуску',SET.splash!==0,'splash','Анімована заставка під час відкриття Orbix');
 $('#brl').innerHTML=Object.entries(BRANDS).map(([k,b])=>`<button data-br="${k}" aria-pressed="${SET.brand===k}">${b.svg}<span>${b.n}<div class="mu" style="font:400 12px Inter,sans-serif;letter-spacing:0">${b.t}</div></span></button>`).join('');
 $('#snd').innerHTML=SW('Звукові сигнали',SET.snd,'snd','Різні тони для відкриття, DCA, прибутку, збитку й помилок')+SW('Вібрація',SET.vib,'vib')+SW('Спливаючі повідомлення',SET.toast,'toast')+SW('Системні сповіщення браузера',SET.push,'push','Запитає дозвіл; працюють, коли вкладка у фоні')+`<h3>Які події сповіщати</h3>`+Object.entries(EVN).map(([k,l])=>SW(l,SET.ev[k],'ev:'+k)).join('')+`<div class="row" style="margin-top:12px"><button class="b" id="sndt">Перевірити звук</button></div>`;
 $('#sndt').onclick=()=>{const s=SET.snd;SET.snd=1;beep('win');SET.snd=s;toast('Перевірка: так виглядає сповіщення')}}
 $('#thl').onclick=e=>{const b=e.target.closest('[data-th]');if(!b)return;SET.theme=b.dataset.th;sv('zset',SET);applyTheme();setR();upd()};
+$('#thx').onclick=e=>{const b=e.target.closest('[data-sw]');if(!b)return;const k=b.dataset.sw;SET[k]=SET[k]===0?1:0;sv('zset',SET);if(k==='anim')fxApply();setR()};
 $('#brl').onclick=e=>{const b=e.target.closest('[data-br]');if(!b)return;SET.brand=b.dataset.br;sv('zset',SET);applyTheme();setR()};
 $('#snd').onclick=e=>{const b=e.target.closest('[data-sw]');if(!b)return;const k=b.dataset.sw;if(k.startsWith('ev:'))SET.ev[k.slice(3)]=SET.ev[k.slice(3)]?0:1;else{SET[k]=SET[k]?0:1;if(k==='push'&&SET.push&&'Notification'in window&&Notification.permission!=='granted')Notification.requestPermission().then(p=>{if(p!=='granted'){SET.push=0;sv('zset',SET);setR()}})}sv('zset',SET);setR()};
 $('#exp').onclick=()=>{const d={set:SET,ms:{...MS,tg:{...MS.tg,token:'***'}},bots:bots.map(({g,ex,on})=>({g,ex,on})),ex:cx};const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(JSON.stringify(d,null,1));a.download=BRANDS[SET.brand].n.toLowerCase()+'-settings.json';a.click()};
@@ -1289,11 +1394,65 @@ RK.busy=1;b.disabled=true;try{const row={risk_max_pos:rd('#rk-p'),risk_max_total
 const r=await SB.from('profiles').update(row).eq('id',CLOUD.u.id).select('risk_max_pos,risk_max_total,risk_day_loss').single();if(r.error)throw r.error;
 rkSet(r.data);RK.msg='Ліміти збережено. Сервер застосує їх під час наступного запуску (до 5 хвилин).'+(!row.risk_max_pos||!row.risk_max_total||!row.risk_day_loss?' Частину лімітів вимкнено — це менш безпечно.':'')}
 catch(er){RK.msg='Помилка: '+(er.message||er)}finally{RK.busy=0;rkR()}};
+/* ---------- анімація фону тем (canvas#fx) і заставка ---------- */
+/* Кожна тема має свій ефект. Малюється ~30 кадрів/с, пауза у прихованій вкладці,
+   вимикається перемикачем «Анімація фону» (SET.anim) або системним «зменшити рух». */
+const FX={c:null,x:null,w:0,h:0,dpr:1,raf:0,last:0,st:null,k:''};
+const fxRM=()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}};
+const fxRnd=(a,b)=>a+Math.random()*(b-a);
+const fxA=(c,a)=>{c=String(c).trim();if(c[0]==='#'){let h=c.slice(1);if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h.slice(0,6),16);return`rgba(${n>>16&255},${n>>8&255},${n&255},${a})`}return c};
+function fxSize(){const c=FX.c;if(!c)return;FX.dpr=Math.min(1.5,window.devicePixelRatio||1);FX.w=innerWidth;FX.h=innerHeight;c.width=Math.round(FX.w*FX.dpr);c.height=Math.round(FX.h*FX.dpr);FX.x.setTransform(FX.dpr,0,0,FX.dpr,0,0);FX.st=null}
+/* ефекти: init(w,h,T) → стан; draw(ctx,s,w,h,T,t) */
+const FXE={
+matrix:{init:(w,h)=>{const f=15,n=Math.ceil(w/f);return{f,y:Array.from({length:n},()=>fxRnd(-h,0)/f),v:Array.from({length:n},()=>fxRnd(.35,1))}},
+ draw:(x,s,w,h,T)=>{x.fillStyle=fxA(getComputedStyle(document.documentElement).getPropertyValue('--bg')||'#000',.16);x.fillRect(0,0,w,h);x.font=`${s.f-1}px 'JetBrains Mono',monospace`;const ch='01アイウエオカキクケコサシスセソタチツテトナニ₿$Ξ<>{}=+';
+  for(let i=0;i<s.y.length;i++){const y=s.y[i]*s.f;x.fillStyle=fxA(T.ac,.95);x.fillText(ch[Math.random()*ch.length|0],i*s.f,y);x.fillStyle=fxA(T.ac2,.5);x.fillText(ch[Math.random()*ch.length|0],i*s.f,y-s.f);s.y[i]+=s.v[i];if(y>h&&Math.random()>.975)s.y[i]=fxRnd(-20,0)}},trail:1},
+tech:{init:(w,h)=>({p:Array.from({length:Math.min(70,w*h/16000|0)},()=>({x:fxRnd(0,w),y:fxRnd(0,h),vx:fxRnd(-.25,.25),vy:fxRnd(-.4,-.1),r:fxRnd(.6,1.8)}))}),
+ draw:(x,s,w,h,T)=>{for(const p of s.p){p.x+=p.vx;p.y+=p.vy;if(p.y<-5){p.y=h+5;p.x=fxRnd(0,w)}if(p.x<-5)p.x=w+5;if(p.x>w+5)p.x=-5;x.fillStyle=fxA(T.ac,.55);x.fillRect(p.x,p.y,p.r*1.6,p.r*1.6)}
+  for(let i=0;i<s.p.length;i+=7){const p=s.p[i];x.strokeStyle=fxA(T.ac2,.25);x.beginPath();x.moveTo(p.x,p.y);x.lineTo(p.x+14,p.y);x.stroke()}}},
+cyber:{init:()=>({y:0,g:[]}),
+ draw:(x,s,w,h,T,t)=>{s.y=(s.y+2.2)%h;const gr=x.createLinearGradient(0,s.y-60,0,s.y);gr.addColorStop(0,fxA(T.ac,0));gr.addColorStop(1,fxA(T.ac,.16));x.fillStyle=gr;x.fillRect(0,s.y-60,w,60);
+  x.strokeStyle=fxA(T.ac2,.05);for(let y=0;y<h;y+=4){x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke()}
+  if(Math.random()<.08)s.g.push({x:fxRnd(0,w),y:fxRnd(0,h),w:fxRnd(20,140),h:fxRnd(2,10),l:fxRnd(4,12),c:Math.random()<.5?T.ac:T.ac2});
+  s.g=s.g.filter(g=>g.l-->0);for(const g of s.g){x.fillStyle=fxA(g.c,.35);x.fillRect(g.x,g.y,g.w,g.h)}}},
+midnight:{init:(w,h)=>({s:Array.from({length:Math.min(140,w*h/7000|0)},()=>({x:fxRnd(0,w),y:fxRnd(0,h),r:fxRnd(.4,1.4),p:fxRnd(0,6.3)})),m:null}),
+ draw:(x,s,w,h,T,t)=>{for(const p of s.s){const a=.35+.35*Math.sin(t/900+p.p);x.fillStyle=fxA(T.tx,a);x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fill()}
+  if(!s.m&&Math.random()<.006)s.m={x:fxRnd(w*.2,w),y:fxRnd(0,h*.4),l:1};if(s.m){const m=s.m,gr=x.createLinearGradient(m.x,m.y,m.x+90,m.y-45);gr.addColorStop(0,fxA(T.ac,.9));gr.addColorStop(1,fxA(T.ac,0));x.strokeStyle=gr;x.lineWidth=1.6;x.beginPath();x.moveTo(m.x,m.y);x.lineTo(m.x+90,m.y-45);x.stroke();x.lineWidth=1;m.x-=9;m.y+=4.5;m.l-=.02;if(m.l<=0||m.x<-100)s.m=null}}},
+quantum:{init:(w,h)=>({p:Array.from({length:Math.min(55,w*h/18000|0)},()=>({x:fxRnd(0,w),y:fxRnd(0,h),vx:fxRnd(-.3,.3),vy:fxRnd(-.3,.3)}))}),
+ draw:(x,s,w,h,T)=>{const P=s.p,D=130;for(const p of P){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1}
+  for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){const dx=P[i].x-P[j].x,dy=P[i].y-P[j].y,d=Math.hypot(dx,dy);if(d<D){x.strokeStyle=fxA(T.ac,.22*(1-d/D));x.beginPath();x.moveTo(P[i].x,P[i].y);x.lineTo(P[j].x,P[j].y);x.stroke()}}
+  for(const p of P){x.fillStyle=fxA(T.ac2,.8);x.beginPath();x.arc(p.x,p.y,1.6,0,7);x.fill()}}},
+aurora:{init:()=>({}),
+ draw:(x,s,w,h,T,t)=>{x.globalCompositeOperation='lighter';[[T.ac,.0006,.30,.12],[T.ac2,.0004,.42,.10],[T.up,.0005,.22,.07]].forEach(([c,sp,yy,a],k)=>{x.beginPath();x.moveTo(0,h);for(let X=0;X<=w;X+=16){const y=h*yy+Math.sin(X/180+t*sp*3+k)*40+Math.sin(X/70+t*sp*5)*14;x.lineTo(X,y)}x.lineTo(w,h);x.closePath();const gr=x.createLinearGradient(0,h*yy-60,0,h*yy+260);gr.addColorStop(0,fxA(c,a));gr.addColorStop(1,fxA(c,0));x.fillStyle=gr;x.fill()});x.globalCompositeOperation='source-over'}},
+synth:{init:()=>({o:0}),
+ draw:(x,s,w,h,T,t)=>{const hz=h*.62;s.o=(s.o+.6)%40;const sx=w/2,sy=hz-70,R=Math.min(110,w*.22);const gr=x.createLinearGradient(0,sy-R,0,sy+R);gr.addColorStop(0,fxA(T.ac2,.55));gr.addColorStop(1,fxA(T.ac,.35));x.fillStyle=gr;x.beginPath();x.arc(sx,sy,R,Math.PI,0);x.fill();
+  x.fillStyle=fxA(getComputedStyle(document.documentElement).getPropertyValue('--bg')||'#000',1);for(let i=0;i<5;i++){const yy=sy-R*.55+i*R*.14;x.fillRect(sx-R,yy,R*2,2+i*1.2)}
+  x.strokeStyle=fxA(T.ac,.35);for(let i=0;i<14;i++){const z=(i*40+s.o)/560,y=hz+(h-hz)*z*z;x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke()}
+  for(let i=-12;i<=12;i++){x.beginPath();x.moveTo(sx+i*20,hz);x.lineTo(sx+i*w*.18,h);x.stroke()}}},
+ocean:{init:(w,h)=>({b:Array.from({length:Math.min(40,w/14|0)},()=>({x:fxRnd(0,w),y:fxRnd(0,h),r:fxRnd(1.5,5),v:fxRnd(.3,1),p:fxRnd(0,6)}))}),
+ draw:(x,s,w,h,T,t)=>{for(let i=0;i<4;i++){const X=w*(.15+i*.25)+Math.sin(t/3000+i)*40,gr=x.createLinearGradient(X,0,X+120,h);gr.addColorStop(0,fxA(T.ac,.08));gr.addColorStop(1,fxA(T.ac,0));x.fillStyle=gr;x.beginPath();x.moveTo(X-30,0);x.lineTo(X+50,0);x.lineTo(X+200,h);x.lineTo(X+60,h);x.fill()}
+  for(const b of s.b){b.y-=b.v;b.p+=.03;if(b.y<-10){b.y=h+10;b.x=fxRnd(0,w)}x.strokeStyle=fxA(T.ac2,.45);x.beginPath();x.arc(b.x+Math.sin(b.p)*6,b.y,b.r,0,7);x.stroke()}}},
+magma:{init:(w,h)=>({e:Array.from({length:Math.min(60,w/9|0)},()=>({x:fxRnd(0,w),y:fxRnd(0,h),r:fxRnd(.8,2.6),v:fxRnd(.4,1.4),l:fxRnd(.3,1)}))}),
+ draw:(x,s,w,h,T,t)=>{const gr=x.createLinearGradient(0,h*.7,0,h);gr.addColorStop(0,fxA(T.ac,0));gr.addColorStop(1,fxA(T.ac,.12+.04*Math.sin(t/700)));x.fillStyle=gr;x.fillRect(0,h*.7,w,h*.3);
+  x.globalCompositeOperation='lighter';for(const e of s.e){e.y-=e.v;e.x+=Math.sin((e.y+t/20)/40)*.4;e.l-=.003;if(e.y<-10||e.l<=0){e.y=h+5;e.x=fxRnd(0,w);e.l=fxRnd(.5,1)}x.fillStyle=fxA(e.r>1.8?T.ac2:T.ac,.75*e.l);x.beginPath();x.arc(e.x,e.y,e.r,0,7);x.fill()}x.globalCompositeOperation='source-over'}},
+light:{init:(w,h)=>({b:Array.from({length:12},()=>({x:fxRnd(0,w),y:fxRnd(0,h),r:fxRnd(40,120),vx:fxRnd(-.2,.2),vy:fxRnd(-.15,.15),k:Math.random()<.5}))}),
+ draw:(x,s,w,h,T)=>{for(const b of s.b){b.x+=b.vx;b.y+=b.vy;if(b.x<-b.r)b.x=w+b.r;if(b.x>w+b.r)b.x=-b.r;if(b.y<-b.r)b.y=h+b.r;if(b.y>h+b.r)b.y=-b.r;const g=x.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);g.addColorStop(0,fxA(b.k?T.ac:T.ac2,.10));g.addColorStop(1,fxA(b.k?T.ac:T.ac2,0));x.fillStyle=g;x.beginPath();x.arc(b.x,b.y,b.r,0,7);x.fill()}}}};
+function fxLoop(t){FX.raf=requestAnimationFrame(fxLoop);if(document.hidden||t-FX.last<33)return;FX.last=t;const e=FXE[FX.k];if(!e)return;const x=FX.x,T=TH();if(!FX.st)FX.st=e.init(FX.w,FX.h,T);if(!e.trail)x.clearRect(0,0,FX.w,FX.h);e.draw(x,FX.st,FX.w,FX.h,T,t)}
+/* увімкнути/вимкнути анімацію під поточну тему (викликається з applyTheme і перемикача) */
+function fxApply(){const on=SET.anim!==0&&!fxRM()&&!!FXE[SET.theme],r=document.documentElement;
+ if(!FX.c){FX.c=document.getElementById('fx');if(!FX.c)return;FX.x=FX.c.getContext('2d');if(!FX.x)return;addEventListener('resize',()=>{if(FX.raf)fxSize()})}
+ cancelAnimationFrame(FX.raf);FX.raf=0;FX.x.setTransform(1,0,0,1,0,0);FX.x.clearRect(0,0,FX.c.width,FX.c.height);
+ r.classList.toggle('fx-on',on);if(!on)return;FX.k=SET.theme;fxSize();FX.raf=requestAnimationFrame(fxLoop)}
+/* заставка: прибрати після завантаження даних, не раніше ніж за 1,6 с від старту */
+const SPL={t0:performance.now(),done:0};
+function splashHide(){const s=document.getElementById('splash');if(SPL.done||!s)return;SPL.done=1;s.classList.add('out');setTimeout(()=>s.remove(),650)}
+function splashEnd(){const wait=Math.max(0,1600-(performance.now()-SPL.t0));setTimeout(splashHide,wait)}
+(()=>{const s=document.getElementById('splash');if(!s)return;if(SET.splash===0||fxRM()){s.remove();SPL.done=1;return}s.addEventListener('click',splashHide);setTimeout(splashHide,6000)})();
 /* ---------- старт ---------- */
 applyTheme();mnuR();
 $('#home-aw').hidden=true;$('#home-eq').hidden=true;SET.brand='orbix';$('#brl').closest('.card').hidden=true;applyTheme();mnuR();
 MD.ip=mdInit();pfr();tfilter();favs();feedR();lst();go('ov');accR();boot();
-async function boot(){await MD.ip;accR();mnuR();
+async function boot(){try{await MD.ip}finally{splashEnd()}accR();mnuR();
 $('#fp').innerHTML=PK.map(k=>`<option value="${k}">${k}</option>`).join('');$('#pl').innerHTML=PK.map(k=>`<option value="${k}">`).join('');if(!PAIRS[MKP])MKP=PK[0];
 const saved=ld('zorya3',[]).filter(x=>x&&x.g),ps=[...new Set(saved.map(x=>x.g.pair).filter(p=>PAIRS[p]))];
 $('#tops').textContent=MD.mode==='live'?`Завантажую реальні дані ${MD.src}…`:'Біржі недоступні, працюю на демо-даних.';

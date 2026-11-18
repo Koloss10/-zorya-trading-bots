@@ -8,6 +8,15 @@
 <style>/*@css*/</style>
 </head>
 <body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div id="splash" role="presentation" aria-hidden="true">
+<div class="sp-orb"><i class="r1"></i><i class="r2"></i><i class="r3"></i><b class="sat"></b><b class="core"></b></div>
+<div class="sp-name"><span>O</span><span>R</span><span>B</span><span>I</span><span>X</span></div>
+<div class="sp-tag">Торгові боти · Demo / Testnet</div>
+<div class="sp-bar"><i></i></div>
+<div class="sp-skip">Торкніться, щоб пропустити</div>
+</div>
+<script>try{var z=JSON.parse(localStorage.getItem('zset')||'{}');if(z&&z.splash===0){var e=document.getElementById('splash');e&&e.remove()}}catch(e){}</script>
 <div class="w" id="wrap">
 <header>
 <button class="brand" id="brand" aria-label="На головну"><span id="logo"></span><h1 id="bname"></h1></button>
@@ -71,7 +80,7 @@
 </section>
 
 <section id="v-set" class="s" hidden>
-<div class="card"><h2>Тема оформлення</h2><div class="th" id="thl"></div></div>
+<div class="card"><h2>Тема оформлення</h2><div class="th" id="thl"></div><div id="thx"></div></div>
 <div class="card"><h2>Назва та логотип</h2><div class="br" id="brl"></div><p class="mu" style="margin-top:10px">Перед використанням назви перевірте вільність домену й торгової марки.</p></div>
 <div class="card"><h2>Звук і сповіщення</h2><div id="snd"></div></div>
 <div class="card"><h2>Дані</h2><p class="mu" style="margin-bottom:10px">Без входу боти й бектести зберігаються в цьому браузері. Після входу в акаунт (Профіль) вони зберігаються в хмарі Orbix і доступні з будь-якого пристрою. Тема, звук і месенджери завжди лишаються на цьому пристрої.</p><div class="row"><button class="b" id="exp">Експорт налаштувань</button><button class="b d" id="rs">Скинути демо</button></div></div>

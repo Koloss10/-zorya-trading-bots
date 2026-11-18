@@ -24,7 +24,7 @@ $('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div 
 <div class="fg" style="margin-bottom:8px">${k==='tg'?tgF():F(k,'to',k==='vb'?'ID чату або номер':'Номер телефону','+380…')}${sel(k+'-tpl','Формат повідомлень',[['short','Короткий'],['normal','Звичайний'],['detailed','Детальний']],c.tpl)}</div>
 <h3>Події</h3><div class="sgr">${Object.entries(EVN).map(([e,l])=>`<label class="ck"><input type="checkbox" data-ms="${k}" data-ev="${e}"${(c.ev||SET.ev)[e]?' checked':''}>${l}</label>`).join('')}</div>
 <div class="ac"><button class="b sm ${c.on?'d':'p'}" data-ms-on="${k}">${c.on?'Вимкнути':'Увімкнути'}</button><button class="b sm" data-ms-t="${k}">Надіслати тест</button></div><pre class="mu" id="${k}-pv" style="white-space:pre-wrap;font:400 12px Inter,sans-serif;margin:6px 0 0"></pre></div>`}).join('');
-secR();secLoad().catch(()=>{});tnR();accR()}
+secR();secLoad().catch(()=>{});tnR();rkR();accR()}
 $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF);mnuR();nameQ()};
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);pfr();tfilter()};
 $('#msg').oninput=$('#msg').onchange=e=>{const t=e.target;const m=t.id&&t.id.match(/^(tg|wa|vb|sg)-(token|chat|to|tpl)$/);if(m){MS[m[1]][m[2]]=t.value.trim();sv('zms',MS)}if(t.dataset.ms){const c=MS[t.dataset.ms];c.ev=c.ev||{...SET.ev};c.ev[t.dataset.ev]=t.checked?1:0;sv('zms',MS)}};

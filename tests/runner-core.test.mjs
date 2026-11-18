@@ -83,3 +83,27 @@ test('Часткова фіксація TP (s1) дає подію «part» з ч
   assert.ok(r.state.b.pos.t1 && Math.abs(r.state.b.pos.q - 0.1) < 1e-12, 'у моделі лишилась половина');
   assert.match(eventText(ev, gp), /часткова фіксація TP: закрито 50 %/);
 });
+
+test('Ліміт ризику (entryOk: false): нових угод немає, пропущені сигнали пораховано; відкрита позиція веде себе як завжди', () => {
+  const cs = series(900), start = 400;
+  const one = processBot({ g, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H });
+  const free = processBot({ g, state: one.state, candles: cs, now: cs.at(-1).t + H });
+  const opens = free.events.filter((e) => e.kind === 'open').length;
+  assert.ok(opens >= 3, 'без ліміту бот відкриває угоди');
+  assert.equal(free.skipped, 0);
+  const blk = processBot({ g, state: one.state, candles: cs, now: cs.at(-1).t + H, entryOk: false });
+  assert.equal(blk.events.filter((e) => e.kind === 'open').length, 0, 'з лімітом нових угод немає');
+  assert.ok(blk.skipped >= opens, 'сигнали входу пораховано як пропущені');
+  assert.equal(blk.state.b.tr.length, 0); assert.equal(blk.state.b.pos, null);
+  // позиція, відкрита до ліміту, докуповується й закривається як без ліміту
+  let st = one.state, i0 = start;
+  for (; i0 < cs.length && !st.b.pos; i0++) st = processBot({ g, state: st, candles: cs.slice(0, i0 + 1), now: cs[i0].t + H }).state;
+  assert.ok(st.b.pos, 'знайшовся відкритий вхід');
+  const a = processBot({ g, state: st, candles: cs, now: cs.at(-1).t + H });
+  const b = processBot({ g, state: st, candles: cs, now: cs.at(-1).t + H, entryOk: false });
+  const firstClose = (r) => r.events.findIndex((e) => e.kind === 'close' || e.kind === 'sl' || e.kind === 'liq');
+  const ia = firstClose(a), ib = firstClose(b);
+  assert.ok(ia >= 0 && ib >= 0, 'угоду закрито');
+  assert.deepEqual(b.events.slice(0, ib + 1), a.events.slice(0, ia + 1), 'до закриття відкритої угоди події ті самі');
+  assert.equal(b.events.slice(ib + 1).filter((e) => e.kind === 'open').length, 0, 'після закриття нових угод немає');
+});

@@ -13,17 +13,18 @@ function srvToggle(x){if(!CLOUD.u)return toast('Увійдіть в акаунт
 if(!x.srv&&x.b.pos&&!confirm('У бота '+x.g.pair+' зараз відкрита позиція в браузері. Сервер почне з нуля — ця позиція (і її копія на демо-біржі, якщо увімкнено «Тестнет») далі не супроводжуватиметься. Перенести бота на сервер?'))return;
 if(x.srv&&srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);
 x.srv=!x.srv;if(x.srv)x.srvEx=TN.ex||'bybit';else{x.srvSt=0;x.srvAt=null}sbots();lst();
-toast(x.srv?'Бот '+x.g.pair+' переходить на сервер (до 5 хвилин). Сервер торгує з цього моменту, навіть коли застосунок закритий.':'Бот '+x.g.pair+' знову працює лише в браузері.')}
+toast(x.srv?'Бот '+x.g.pair+' переходить на сервер (до 5 хвилин). Сервер торгує з цього моменту, навіть коли застосунок закритий.'+(x.tn?rkWarn(x):''):'Бот '+x.g.pair+' знову працює лише в браузері.')}
 async function srvLoad(){if(!SB||!CLOUD.u||SRV.busy)return;const L=bots.filter(x=>x.srv&&x.rid);if(!L.length)return;SRV.busy=1;try{
 const ids=L.map(x=>x.rid),s=await SB.from('bot_state').select('bot_id,state,updated_at').in('bot_id',ids);
 if(!s.error)for(const r of s.data||[]){const x=L.find(y=>y.rid===r.bot_id),st=r.state||{};if(!x||!st.b)continue;
-const b=new Bot(x.g);b.pos=st.b.pos||null;b.tr=Array.isArray(st.b.tr)?st.b.tr:[];b.cd=st.b.cd||0;b.cum=st.b.cum||0;x.b=b;x.pk=st.pk||0;x.dd=st.dd||0;x.lt=st.lt||x.lt;x.srvSt=1;x.srvAt=Date.parse(r.updated_at);x.srvMis=st.fl&&st.fl.mis||null;x.srvXs=st.xs;x.srvXe=st.xe||null;x.srvXr=st.xr||null;x.srvPend=Array.isArray(st.pend)?st.pend.length:0}
+const b=new Bot(x.g);b.pos=st.b.pos||null;b.tr=Array.isArray(st.b.tr)?st.b.tr:[];b.cd=st.b.cd||0;b.cum=st.b.cum||0;x.b=b;x.pk=st.pk||0;x.dd=st.dd||0;x.lt=st.lt||x.lt;x.srvSt=1;x.srvAt=Date.parse(r.updated_at);x.srvMis=st.fl&&st.fl.mis||null;x.srvRl=st.fl&&st.fl.rl||null;x.srvXs=st.xs;x.srvXe=st.xe||null;x.srvXr=st.xr||null;x.srvPend=Array.isArray(st.pend)?st.pend.length:0}
 const e=await SB.from('bot_events').select('id,bot_id,level,message,created_at').in('bot_id',ids).order('created_at',{ascending:false}).limit(30);
 if(!e.error){let add=0;for(const r of (e.data||[]).slice().reverse()){if(SRV.seen.has(r.id))continue;SRV.seen.add(r.id);FEED.unshift({t:new Date(r.created_at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}),m:'☁ '+r.message});add++}
 if(add){FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()}}
 lst();upd();if(CUR==='mon')monR()}catch(er){}finally{SRV.busy=0}}
 const srvMisL=x=>{const m=x.srvMis;if(!x.tn||!m||!m.t||(m.k!=='xc'&&!m.on))return'';return`<p class="${m.k==='xc'?'mu':'dn'}" style="margin:0">${m.k==='xc'?'ℹ':'⚠'} Звірка з біржею: ${esc(m.t)}${m.k==='orphan'?' — перевірте позицію в Bybit Demo':''}</p>`};
-const srvLine=x=>x.srv?srvMisL(x)+`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?((x.srvEx||'bybit')==='bybit'?' · угоди на Bybit Demo: докупівлі, TP і SL стоять на самій біржі':' · угоди дублюються на Binance Testnet (TP/SL — з сервера після закриття свічки)'):''}</p>`:'';
+const srvRlL=x=>x.srv&&x.tn&&x.srvRl&&x.srvRl.t?`<p class="dn" style="margin:0">⏸ Нові угоди призупинено лімітом ризику: ${esc(x.srvRl.t)}</p>`:'';
+const srvLine=x=>x.srv?srvMisL(x)+srvRlL(x)+`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?((x.srvEx||'bybit')==='bybit'?' · угоди на Bybit Demo: докупівлі, TP і SL стоять на самій біржі':' · угоди дублюються на Binance Testnet (TP/SL — з сервера після закриття свічки)'):''}</p>`:'';
 
 /* ---------- Моніторинг серверних ботів ----------
    Для кожного бота «Сервер 24/7»: коли сервер востаннє його обробляв, позиція моделі, стан на демо-біржі
@@ -53,6 +54,7 @@ ${ROW('Модель бота',mdl)}${ROW(x.tn?exn:'Біржа',exl,exk)}
 ${cmp}${x.srvPend?ROW('Черга дій для біржі',x.srvPend+' (сервер повторить)','dn'):''}
 ${x.srvXe?ROW('Помилка біржі',esc(x.srvXe.m)+' · '+ago(x.srvXe.at),'dn'):''}
 ${m&&m.t&&(m.on||m.k==='xc')?ROW('Звірка',(m.k==='xc'?'ℹ ':'⚠ ')+esc(m.t),m.on?'dn':''):on&&x.tn&&s!==undefined&&!x.srvXe&&!x.srvPend?ROW('Звірка','модель і біржа збігаються','up'):''}
+${x.tn&&x.srvRl&&x.srvRl.t?ROW('Ліміт ризику','⏸ нові угоди призупинено: '+esc(x.srvRl.t),'dn'):''}
 ${ROW('За 24 год',ev.err||ev.warn?`помилок ${ev.err}, попереджень ${ev.warn}`:'без помилок',ev.err?'dn':'')}${ev.last?`<p class="mu" style="margin:0">Останнє: ${esc(ev.last.message)} · ${ago(Date.parse(ev.last.created_at))}</p>`:''}</div>`}
 async function monR(load){const el=$('#mon');if(!el)return;
 if(!CLOUD.u){el.innerHTML='<div class="card"><h2>Моніторинг</h2><p class="mu">Увійдіть в акаунт (Профіль), щоб бачити ботів, які працюють на сервері 24/7.</p></div>';return}

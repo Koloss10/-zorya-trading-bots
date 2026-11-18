@@ -15,6 +15,7 @@
 import { lv, rnd } from "./engine.js";
 import { eventText } from "./core.js";
 import { floorStep } from "./sign.js";
+import { dayStart } from "./risk.js";
 
 export const MAX_TRIES = 5;
 /* вхід або докупівля за сигналом, старшим за цей час, на біржу не надсилається (сервер простоював) */
@@ -317,13 +318,24 @@ export async function results(ex, { symbol, xr }) {
  * Обробка бота після прогону рушія.
  * deps: save(state) → true, якщо стан збережено й ніхто інший його не змінив; log(level, text, data); notify(text);
  *       ex — адаптер біржі або null (немає ключів); mirror — чи дублювати угоди; native — рідний режим Bybit.
+ * risk — ліміти ризику для ботів, що торгують на біржі: { blk: null | { k, t } (runner/risk.js) }; r.skipped — скільки
+ *       сигналів входу модель пропустила через ліміт. fl.rl — діюче обмеження (для картки й моніторингу).
  */
-export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, log, notify, now = Date.now() }) {
+export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, log, notify, risk = null, now = Date.now() }) {
   const pend = [...(Array.isArray(bot.state?.pend) ? bot.state.pend : []), ...(mirror ? actionsFor(r.events, bot.id, native) : [])];
   const fl = { ...(bot.state?.fl || {}) }, fl0 = JSON.stringify(fl);
   if (fl.parked && native) fl.rs = 1; // бот знято з паузи — відновити драбину на біржі (повторюється, доки не вдасться)
   delete fl.parked; // бот знову працює
   if (!(mirror && native && ex)) clearMis(fl); // звірки немає — давнє попередження не лишається на картці
+  // ліміт ризику: про пропущений вхід — один запис і одне сповіщення на причину на добу; обмеження зняте — запис і прапорець прибрано
+  const rlMsg = [];
+  if (!risk || !risk.blk) {
+    if (fl.rl) { rlMsg.push(["info", `Ліміт ризику більше не діє — нові угоди знову дозволено (було: ${fl.rl.t})`, false]); delete fl.rl; }
+  } else if (r.skipped > 0) {
+    const day = dayStart(now);
+    if (!fl.rl || fl.rl.k !== risk.blk.k || fl.rl.day !== day) rlMsg.push(["warn", `Ліміт ризику: нову угоду не відкрито — ${risk.blk.t}`, true]);
+    fl.rl = { k: risk.blk.k, t: risk.blk.t, day, at: now };
+  }
   // xs — знімок біржі (моніторинг), xe — остання помилка біржі {m, at}; без дублювання на біржу обидва не потрібні
   const st = { ...r.state, pend, fl, ...(mirror && ex ? { xs: bot.state?.xs ?? null, ...(bot.state?.xe ? { xe: bot.state.xe } : {}) } : {}) };
   // xr — результати на біржі для порівняння з моделлю (лише рідний режим)
@@ -337,6 +349,7 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     await log(ev.kind === "liq" || ev.kind === "sl" ? "warn" : "info", text, ev);
     await notify(text);
   }
+  for (const [lvl, m, tg] of rlMsg) { await log(lvl, m); if (tg) await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
   if (!mirror) return { saved: true };
   if (!ex) {
     if (pend.length) await log("error", "Ключі біржі не підключено — угоди не продубльовано");

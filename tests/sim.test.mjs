@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { processBot, botConfig } from '../supabase/functions/runner/core.js';
 import { handleBot, ladder, owners, reconcile } from '../supabase/functions/runner/mirror.js';
+import { dayStart, riskBlock } from '../supabase/functions/runner/risk.js';
 
 const H = 36e5, T0 = Date.UTC(2026, 0, 5), BOT = '7a3fa244-1f54-4e8a-b91f-b66840e2d3b7';
 const F = { step: 0.1, minQty: 0.1, minN: 5, tick: 0.0001 };
@@ -85,7 +86,7 @@ function chaos(ex, rate, seed) {
 }
 const own = (ex) => ex.S.orders.filter((o) => o.status === 'New' && String(o.link).startsWith('ox'));
 
-async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], vol = 0.018, flaky = 0, manual = false } = {}) {
+async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], vol = 0.018, flaky = 0, manual = false, limits = null } = {}) {
   const g = botConfig({ pair: 'SIM/USDT', tf: 1, fut: 1, lev: 3, sg: ['rsi'], k: 1, rm: 45, orders: 4, base: 20, step: 0.02, smul: 1.2, mult: 1.5, tp: 0.012, sl: 0.08, ...cfg });
   const cs = series(n, seed, vol), ex = simEx(), logs = [], notes = [];
   if (flaky) chaos(ex, flaky, seed);
@@ -97,6 +98,11 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
   // інтервали роботи бота, як config._sp: пауза на свічках a…b-1, свічки, що закрились під час паузи, модель пропускає
   const sp = []; { let from = cs[hist].t - 1; for (const [a, b] of pauses) { sp.push([from, cs[a].t]); from = cs[b].t; } sp.push([from, null]); }
   const spans = pauses.length ? sp : null;
+  // ліміти ризику, як у runner: перевірка перед кожним прогоном моделі; dayOpens — входи, відкриті, коли збиток доби за даними біржі вже досяг ліміту
+  let skipped = 0, blocked = 0, badOpen = '';
+  const riskAt = (at) => (limits ? riskBlock({ limits, self: { g, state: stored }, now: at }) : null);
+  const exDay = (at) => ex.S.closed.reduce((a, x) => a + (x.t >= dayStart(at) && x.t <= at ? x.pnl : 0), 0);
+  const checkOpens = (r, at) => { if (limits && limits.dayLoss && r.events.some((e) => e.kind === 'open') && exDay(at) <= -limits.dayLoss - 1e-9) badOpen ||= `вхід о ${new Date(at).toISOString()} при збитку доби ${exDay(at).toFixed(2)}`; skipped += r.skipped || 0; };
   for (let i = hist; i < n; i++) {
     const c = cs[i], now = c.t + H + 3e5, win = cs.slice(Math.max(0, i - 300), i);
     if (paused(i)) { ex.S.t = c.t; ex.candle(c); }
@@ -106,8 +112,9 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
       for (let k = 0; k < pts.length; k++) {
         ex.S.t = c.t + k * 15 * 60e3; ex.at(pts[k]);
         if (k === pts.length - 1) break;
-        const at = c.t + (k + 1) * 15 * 60e3, ri = processBot({ g, state: stored, candles: win.concat([c]), now: at, spans });
-        await handleBot({ bot: { id: BOT, state: stored }, g, r: ri, symbol: 'SIMUSDT', mirror: true, native: true, ex, now: at,
+        const at = c.t + (k + 1) * 15 * 60e3, bk = riskAt(at), ri = processBot({ g, state: stored, candles: win.concat([c]), now: at, spans, entryOk: !bk });
+        checkOpens(ri, at); if (bk) blocked++;
+        await handleBot({ bot: { id: BOT, state: stored }, g, r: ri, symbol: 'SIMUSDT', mirror: true, native: true, ex, now: at, risk: limits ? { blk: bk } : null,
           save: async (x) => { stored = JSON.parse(JSON.stringify(x)); return true; }, log: async (l, m) => logs.push([l, m]), notify: async (m) => notes.push(m) });
         if (stored.fl?.mis?.on) { alarms++; alarm ||= `свічка ${i}: ${stored.fl.mis.t}`; }
         // біржа вже закрила угоду (xc), а позиція на біржі є — зайва позиція від залишкової лімітної докупівлі
@@ -115,7 +122,8 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
       }
     }
     if (paused(i)) { stored = { ...stored, fl: { ...stored.fl, parked: 1 } }; if (paused(i) && !paused(i - 1)) for (const o of own(ex)) o.status = 'Cancelled'; continue; }
-    const r = processBot({ g, state: stored, candles: cs.slice(Math.max(0, i - 299), i + 1), now, spans });
+    const bk = riskAt(now), r = processBot({ g, state: stored, candles: cs.slice(Math.max(0, i - 299), i + 1), now, spans, entryOk: !bk });
+    checkOpens(r, now); if (bk) blocked++;
     // збій: на 1-му збереженні (до біржі) або на 2-му (ордери вже на біржі, а черга дій ще не очищена)
     let saves = 0;
     const save = async (s) => {
@@ -126,13 +134,14 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
       }
       stored = JSON.parse(JSON.stringify(s)); ver++; return true;
     };
-    const run = (rr, at, sv) => handleBot({ bot: { id: BOT, state: stored }, g, r: rr, symbol: 'SIMUSDT', mirror: true, native: true, ex, now: at, save: sv, log: async (l, m) => logs.push([l, m]), notify: async (m) => notes.push(m) });
+    const run = (rr, at, sv) => handleBot({ bot: { id: BOT, state: stored }, g, r: rr, symbol: 'SIMUSDT', mirror: true, native: true, ex, now: at, save: sv, risk: limits ? { blk: bk } : null, log: async (l, m) => logs.push([l, m]), notify: async (m) => notes.push(m) });
     try { await run(r, now, save); }
     catch (e) {
       if (e.message !== 'worker killed') throw e;
       // збій: наступний запуск розкладу через 5 хвилин — нових свічок немає, дії беруться з черги в стані
       crashes++;
-      const r2 = processBot({ g, state: stored, candles: cs.slice(Math.max(0, i - 299), i + 1), now: now + 3e5, spans });
+      const b2 = riskAt(now + 3e5), r2 = processBot({ g, state: stored, candles: cs.slice(Math.max(0, i - 299), i + 1), now: now + 3e5, spans, entryOk: !b2 });
+      checkOpens(r2, now + 3e5);
       await run(r2, now + 3e5, async (x) => { stored = JSON.parse(JSON.stringify(x)); return true; });
     }
     trades += r.events.filter((e) => e.kind === 'open').length;
@@ -157,7 +166,7 @@ async function simulate(cfg, { n = 600, seed = 7, crashEvery = 0, pauses = [], v
   // облік результатів на біржі (Demo проти моделі): кожне закриття на біржі записано один раз, нічого не загублено
   const xr = stored.xr, want = ex.S.closed.filter((x) => x.t >= xr.from).slice(-50).map((x) => x.id), got = xr.l.map((x) => x.id);
   const xrBad = new Set(got).size !== got.length ? 'повторний запис закриття' : want.join() !== got.join() ? `закриття на біржі ${want.length}, записано ${got.length}` : '';
-  return { g, ex, logs, notes, alarms, alarm, trades, errs, maxGap, stored, crashes, beBad, ladBad, xrBad, xr, ghostLive };
+  return { g, ex, logs, notes, alarms, alarm, trades, errs, maxGap, stored, crashes, beBad, ladBad, xrBad, xr, ghostLive, skipped, blocked, badOpen };
 }
 
 for (const [name, cfg] of [
@@ -201,6 +210,24 @@ test('Симуляція з ненадійною біржею: перевірк�
     assert.equal(s.ghostLive, 0, `seed ${seed}: зайва позиція`);
     assert.ok(!s.logs.some(([, m]) => /знято після/.test(m)), `seed ${seed}: дію загублено після ${'MAX_TRIES'} спроб`);
   }
+});
+
+test('Симуляція з денним лімітом збитку: після збитку доби нових входів немає, з нової доби UTC бот торгує знову; без тривог і дублів', async () => {
+  // сценарії, де трапляються збиткові доби (стоп-лос близько −38 USDT); денний ліміт 3 USDT
+  let hit = 0;
+  for (const [seed, d] of [[31, 1], [17, -1], [19, 1]]) {
+    const free = await simulate({ d }, { seed, n: 900 });
+    const s = await simulate({ d }, { seed, n: 900, limits: { dayLoss: 3 } });
+    assert.equal(s.badOpen, '', `seed ${seed}: ${s.badOpen}`);
+    assert.equal(s.ex.S.dup, 0); assert.deepEqual(s.errs, []); assert.equal(s.alarms, 0, `seed ${seed}: тривога звірки — ${s.alarm}`); assert.equal(s.ghostLive, 0); assert.equal(s.xrBad, '');
+    if (s.skipped) {
+      hit++;
+      assert.ok(s.trades >= 3 && free.trades >= 3, `seed ${seed}: угоди є`);
+      assert.ok(s.logs.some(([l, m]) => l === 'warn' && /Ліміт ризику: нову угоду не відкрито — збиток за сьогодні/.test(m)), `seed ${seed}: попередження в журналі`);
+      assert.ok(s.logs.some(([l, m]) => l === 'info' && /Ліміт ризику більше не діє/.test(m)), `seed ${seed}: з нової доби обмеження зняте`);
+    }
+  }
+  assert.equal(hit, 3, `ліміт мав спрацювати в усіх трьох сценаріях (спрацював у ${hit})`);
 });
 
 test('Симуляція з паузами: після зняття з паузи драбина повертається, модель і біржа не розходяться', async () => {

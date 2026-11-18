@@ -209,6 +209,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <div id="pfs" style="margin-top:12px"></div></div>
 <div class="card" id="acc"></div>
 <div class="card" id="tnc"></div>
+<div class="card" id="rkc"></div>
 <div class="card"><h2>Біржі та ключі API</h2><div id="exl"></div><p class="mu" style="margin-top:10px">У демо ключі не потрібні й не зберігаються. Кількість пар і ліміти плеча демонстраційні, у реальній версії їх треба брати з API біржі. Ключ API створюється без права виведення, а кошти лишаються на біржі.</p></div>
 <div class="card"><h2>Месенджери</h2><p class="mu" style="margin-bottom:10px">Повідомлення про відкриття ордера, докупівлю, закриття угоди, стоп і помилки. Telegram надсилає сервер Orbix: токен бота зберігається в зашифрованому сховищі, браузер його не бачить. Для WhatsApp, Viber і Signal потрібен окремий сервер, тому тут вони працюють у демо.</p><div id="msg"></div></div>
 <div class="card"><h2>Безпека</h2><div id="sec"></div></div>
@@ -737,10 +738,15 @@ if(a==='g'){const g=t.closest('.bc').querySelector('.gr');g.hidden=!g.hidden;if(
 if(a==='j'){const j=t.closest('.bc').querySelectorAll('.gr')[1];j.hidden=!j.hidden;j.innerHTML=jrn(x);return}
 if(a==='c'){fill(x.g,x.ex);go('bd');return}
 if(a==='srv'){srvToggle(x);return}
-if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на демо-рахунку біржі'+(x.srv?' — сервером, цілодобово':' (поки застосунок відкритий)'):'Тестнет для бота вимкнено');return}
+if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на демо-рахунку біржі'+(x.srv?' — сервером, цілодобово.'+rkWarn(x):' (поки застосунок відкритий)'):'Тестнет для бота вимкнено');return}
 if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;if(srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);bots=bots.filter(b=>b!==x)}else{setOn(x,!x.on);if(!x.on&&srvLive(x))toast('Бот '+x.g.pair+' на паузі: сервер зніме його лімітні докупівлі на біржі (до 5 хв). Відкрита позиція лишиться зі своїм стопом.')}sbots();lst()}
 $('#bl').onclick=botClick;$('#bl2').onclick=botClick;
-const killAll=()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;const L=bots.filter(srvLive);if(L.length&&confirm(FLATQ('ботів ('+L.map(x=>x.g.pair).join(', ')+')')))L.forEach(srvFlat);bots.forEach(x=>setOn(x,false));sbots();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR()};
+const killAll=async()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;const L=bots.filter(srvLive);if(L.length&&confirm(FLATQ('ботів ('+L.map(x=>x.g.pair).join(', ')+')')))L.forEach(srvFlat);bots.forEach(x=>setOn(x,false));sloc();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR();
+/* пауза має дійти до сервера одразу (без відкладеного збереження): інакше серверні боти торгуватимуть далі */
+const S=bots.filter(x=>x.srv&&x.rid);if(!CLOUD.u||!S.length){toast('Усі боти на паузі.');return}
+toast('Зберігаю паузу на сервері…');clearTimeout(csT);CLOUD.err='';await (csQ=csQ.then(()=>cloudSave()));
+if(CLOUD.err){toast('НЕ збережено на сервері: '+CLOUD.err+' — серверні боти ще працюють. Натисніть «Аварійна зупинка» ще раз.');FEED.unshift({t:now(),m:'⚠ Аварійна зупинка не дійшла до сервера: '+CLOUD.err});sv('zfeed',FEED);feedR()}
+else toast('Усі боти на паузі — збережено на сервері. Сервер зніме лімітні ордери ботів на біржі протягом 5 хвилин.')};
 $('#ks').onclick=killAll;$('#ks2').onclick=killAll;$('#nb2').onclick=()=>go('bd');$('#bq').oninput=lst;
 
 /* ---------- форма конструктора ---------- */
@@ -952,7 +958,7 @@ $('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div 
 <div class="fg" style="margin-bottom:8px">${k==='tg'?tgF():F(k,'to',k==='vb'?'ID чату або номер':'Номер телефону','+380…')}${sel(k+'-tpl','Формат повідомлень',[['short','Короткий'],['normal','Звичайний'],['detailed','Детальний']],c.tpl)}</div>
 <h3>Події</h3><div class="sgr">${Object.entries(EVN).map(([e,l])=>`<label class="ck"><input type="checkbox" data-ms="${k}" data-ev="${e}"${(c.ev||SET.ev)[e]?' checked':''}>${l}</label>`).join('')}</div>
 <div class="ac"><button class="b sm ${c.on?'d':'p'}" data-ms-on="${k}">${c.on?'Вимкнути':'Увімкнути'}</button><button class="b sm" data-ms-t="${k}">Надіслати тест</button></div><pre class="mu" id="${k}-pv" style="white-space:pre-wrap;font:400 12px Inter,sans-serif;margin:6px 0 0"></pre></div>`}).join('');
-secR();secLoad().catch(()=>{});tnR();accR()}
+secR();secLoad().catch(()=>{});tnR();rkR();accR()}
 $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF);mnuR();nameQ()};
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);pfr();tfilter()};
 $('#msg').oninput=$('#msg').onchange=e=>{const t=e.target;const m=t.id&&t.id.match(/^(tg|wa|vb|sg)-(token|chat|to|tpl)$/);if(m){MS[m[1]][m[2]]=t.value.trim();sv('zms',MS)}if(t.dataset.ms){const c=MS[t.dataset.ms];c.ev=c.ev||{...SET.ev};c.ev[t.dataset.ev]=t.checked?1:0;sv('zms',MS)}};
@@ -1127,10 +1133,10 @@ const b=await SB.from('backtests').select('id,exchange,config,results,created_at
 if(!b.error){BT=b.data.filter(x=>x.config&&PAIRS[x.config.pair]).map(x=>{const s=x.results||{};return{rid:x.id,ex:x.exchange,g:x.config,per:s.per||8760,dep:s.dep||1000,n:s.n||0,wr:s.wr||0,pnl:s.pnl||0,roi:s.roi||0,dd:s.dd||0,t:Date.parse(x.created_at)}});sv('zbt',BT)}
 const fv=await SB.from('favorite_presets').select('preset_id');
 if(!fv.error){const have=new Set(fv.data.map(x=>x.preset_id)),up=[...FAVP].filter(id=>!have.has(id)&&PRE.some(p=>p.id===id));if(up.length)await SB.from('favorite_presets').upsert(up.map(id=>({user_id:u.id,preset_id:id})),{onConflict:'user_id,preset_id',ignoreDuplicates:true});FAVP=new Set([...have,...up]);sv('zfavp',[...FAVP]);presR()}
-const p=await SB.from('profiles').select('display_name,avatar').eq('id',u.id).single();
-if(!p.error&&p.data){if(p.data.display_name)PF.n=p.data.display_name;else if(PF.n)nameQ();sv('zpf',PF);const a=avFrom(p.data.avatar);if(a){AV=a;try{localStorage.setItem('zav',JSON.stringify(AV))}catch(e){}}else if(AV.img||AV.k!=='orbit')avQ();if(CUR==='pf')avR();mnuR()}
+const p=await SB.from('profiles').select('display_name,avatar,risk_max_pos,risk_max_total,risk_day_loss').eq('id',u.id).single();
+if(!p.error&&p.data){rkSet(p.data);if(p.data.display_name)PF.n=p.data.display_name;else if(PF.n)nameQ();sv('zpf',PF);const a=avFrom(p.data.avatar);if(a){AV=a;try{localStorage.setItem('zav',JSON.stringify(AV))}catch(e){}}else if(AV.img||AV.k!=='orbit')avQ();if(CUR==='pf')avR();mnuR()}
 CLOUD.ok=Date.now();accR();srvLoad();if(CUR==='bs')bsl();if(CUR==='pf')pfr();toast('Увійшли: дані синхронізовано')}
-function cloudOut(){TN={...TN,c:null,cs:{},loaded:0,bal:null,pos:null,msg:'',busy:0,q:Promise.resolve()};TG={st:null,loaded:0,err:''};if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
+function cloudOut(){TN={...TN,c:null,cs:{},loaded:0,bal:null,pos:null,msg:'',busy:0,q:Promise.resolve()};RK={l:null,msg:'',busy:0};TG={st:null,loaded:0,err:''};if(CUR==='pf')setTimeout(()=>{secR();accR()},0);CLOUD.u=null;CLOUD.pend=null;SEC.f=null;SEC.enr=null;SEC.msg='';CLOUD.known=new Set();CLOUD.ok=0;CLOUD.err='';bots=[];BT=[];FAVP=new Set();['zorya3','zbt','zfavp','zuid'].forEach(k=>sv(k,k==='zuid'?'':[]));lst();presR();accR();if(CUR==='bs')bsl()}
 function cloudStart(){accR();presLoad().catch(()=>{}).finally(()=>{if(!SB)return;
 SB.auth.onAuthStateChange((ev,s)=>{const u=s&&s.user;if(ev==='PASSWORD_RECOVERY'){CLOUD.rec=1;setTimeout(()=>go('pf'),0)}
 if(u){if(ev!=='TOKEN_REFRESHED'||CLOUD.pend)setTimeout(()=>gate(u).catch(cloudFail),0)}else if(CLOUD.u||CLOUD.pend||CLOUD.rec){CLOUD.pend=null;CLOUD.rec=0;setTimeout(cloudOut,0)}})})}
@@ -1150,17 +1156,18 @@ function srvToggle(x){if(!CLOUD.u)return toast('Увійдіть в акаунт
 if(!x.srv&&x.b.pos&&!confirm('У бота '+x.g.pair+' зараз відкрита позиція в браузері. Сервер почне з нуля — ця позиція (і її копія на демо-біржі, якщо увімкнено «Тестнет») далі не супроводжуватиметься. Перенести бота на сервер?'))return;
 if(x.srv&&srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);
 x.srv=!x.srv;if(x.srv)x.srvEx=TN.ex||'bybit';else{x.srvSt=0;x.srvAt=null}sbots();lst();
-toast(x.srv?'Бот '+x.g.pair+' переходить на сервер (до 5 хвилин). Сервер торгує з цього моменту, навіть коли застосунок закритий.':'Бот '+x.g.pair+' знову працює лише в браузері.')}
+toast(x.srv?'Бот '+x.g.pair+' переходить на сервер (до 5 хвилин). Сервер торгує з цього моменту, навіть коли застосунок закритий.'+(x.tn?rkWarn(x):''):'Бот '+x.g.pair+' знову працює лише в браузері.')}
 async function srvLoad(){if(!SB||!CLOUD.u||SRV.busy)return;const L=bots.filter(x=>x.srv&&x.rid);if(!L.length)return;SRV.busy=1;try{
 const ids=L.map(x=>x.rid),s=await SB.from('bot_state').select('bot_id,state,updated_at').in('bot_id',ids);
 if(!s.error)for(const r of s.data||[]){const x=L.find(y=>y.rid===r.bot_id),st=r.state||{};if(!x||!st.b)continue;
-const b=new Bot(x.g);b.pos=st.b.pos||null;b.tr=Array.isArray(st.b.tr)?st.b.tr:[];b.cd=st.b.cd||0;b.cum=st.b.cum||0;x.b=b;x.pk=st.pk||0;x.dd=st.dd||0;x.lt=st.lt||x.lt;x.srvSt=1;x.srvAt=Date.parse(r.updated_at);x.srvMis=st.fl&&st.fl.mis||null;x.srvXs=st.xs;x.srvXe=st.xe||null;x.srvXr=st.xr||null;x.srvPend=Array.isArray(st.pend)?st.pend.length:0}
+const b=new Bot(x.g);b.pos=st.b.pos||null;b.tr=Array.isArray(st.b.tr)?st.b.tr:[];b.cd=st.b.cd||0;b.cum=st.b.cum||0;x.b=b;x.pk=st.pk||0;x.dd=st.dd||0;x.lt=st.lt||x.lt;x.srvSt=1;x.srvAt=Date.parse(r.updated_at);x.srvMis=st.fl&&st.fl.mis||null;x.srvRl=st.fl&&st.fl.rl||null;x.srvXs=st.xs;x.srvXe=st.xe||null;x.srvXr=st.xr||null;x.srvPend=Array.isArray(st.pend)?st.pend.length:0}
 const e=await SB.from('bot_events').select('id,bot_id,level,message,created_at').in('bot_id',ids).order('created_at',{ascending:false}).limit(30);
 if(!e.error){let add=0;for(const r of (e.data||[]).slice().reverse()){if(SRV.seen.has(r.id))continue;SRV.seen.add(r.id);FEED.unshift({t:new Date(r.created_at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}),m:'☁ '+r.message});add++}
 if(add){FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()}}
 lst();upd();if(CUR==='mon')monR()}catch(er){}finally{SRV.busy=0}}
 const srvMisL=x=>{const m=x.srvMis;if(!x.tn||!m||!m.t||(m.k!=='xc'&&!m.on))return'';return`<p class="${m.k==='xc'?'mu':'dn'}" style="margin:0">${m.k==='xc'?'ℹ':'⚠'} Звірка з біржею: ${esc(m.t)}${m.k==='orphan'?' — перевірте позицію в Bybit Demo':''}</p>`};
-const srvLine=x=>x.srv?srvMisL(x)+`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?((x.srvEx||'bybit')==='bybit'?' · угоди на Bybit Demo: докупівлі, TP і SL стоять на самій біржі':' · угоди дублюються на Binance Testnet (TP/SL — з сервера після закриття свічки)'):''}</p>`:'';
+const srvRlL=x=>x.srv&&x.tn&&x.srvRl&&x.srvRl.t?`<p class="dn" style="margin:0">⏸ Нові угоди призупинено лімітом ризику: ${esc(x.srvRl.t)}</p>`:'';
+const srvLine=x=>x.srv?srvMisL(x)+srvRlL(x)+`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?((x.srvEx||'bybit')==='bybit'?' · угоди на Bybit Demo: докупівлі, TP і SL стоять на самій біржі':' · угоди дублюються на Binance Testnet (TP/SL — з сервера після закриття свічки)'):''}</p>`:'';
 
 /* ---------- Моніторинг серверних ботів ----------
    Для кожного бота «Сервер 24/7»: коли сервер востаннє його обробляв, позиція моделі, стан на демо-біржі
@@ -1190,6 +1197,7 @@ ${ROW('Модель бота',mdl)}${ROW(x.tn?exn:'Біржа',exl,exk)}
 ${cmp}${x.srvPend?ROW('Черга дій для біржі',x.srvPend+' (сервер повторить)','dn'):''}
 ${x.srvXe?ROW('Помилка біржі',esc(x.srvXe.m)+' · '+ago(x.srvXe.at),'dn'):''}
 ${m&&m.t&&(m.on||m.k==='xc')?ROW('Звірка',(m.k==='xc'?'ℹ ':'⚠ ')+esc(m.t),m.on?'dn':''):on&&x.tn&&s!==undefined&&!x.srvXe&&!x.srvPend?ROW('Звірка','модель і біржа збігаються','up'):''}
+${x.tn&&x.srvRl&&x.srvRl.t?ROW('Ліміт ризику','⏸ нові угоди призупинено: '+esc(x.srvRl.t),'dn'):''}
 ${ROW('За 24 год',ev.err||ev.warn?`помилок ${ev.err}, попереджень ${ev.warn}`:'без помилок',ev.err?'dn':'')}${ev.last?`<p class="mu" style="margin:0">Останнє: ${esc(ev.last.message)} · ${ago(Date.parse(ev.last.created_at))}</p>`:''}</div>`}
 async function monR(load){const el=$('#mon');if(!el)return;
 if(!CLOUD.u){el.innerHTML='<div class="card"><h2>Моніторинг</h2><p class="mu">Увійдіть в акаунт (Профіль), щоб бачити ботів, які працюють на сервері 24/7.</p></div>';return}
@@ -1231,7 +1239,7 @@ const opts=PK.filter(p=>!MD.fset||MD.fset.has(p)).slice(0,40).map(p=>`<option va
 h+=`<h3>Пробний ордер</h3><div class="fg" style="margin-bottom:8px"><label>Пара<select id="tn-p">${opts}</select></label><label>Сума, USDT (з плечем)<input id="tn-n" type="number" inputmode="decimal" value="150"></label><label>Плече<select id="tn-l">${[1,2,3,5,10,20].map(v=>`<option value="${v}">${v}×</option>`).join('')}</select></label></div>
 <div class="row"><button class="b sm p" data-tn="buy">Купити (Long)</button><button class="b sm d" data-tn="sell">Продати (Short)</button><button class="b sm" data-tn="close">Закрити позицію</button><button class="b sm" data-tn="pos">Позиції</button></div>`;
 if(TN.pos)h+=TN.pos.length?'<div class="sc" style="margin-top:10px"><table><tr><th>Пара</th><th>Кількість</th><th>Вхід</th><th>Mark</th><th>PnL</th><th>Ліквідація</th></tr>'+TN.pos.map(x=>`<tr><td>${esc(x.symbol)}</td><td class="mono ${cls(x.amt)}">${x.amt}</td><td class="mono">${px(x.entry)}</td><td class="mono">${px(x.mark)}</td><td class="mono ${cls(x.pnl)}">${f(x.pnl)}</td><td class="mono">${x.liq?px(x.liq):'—'}</td></tr>`).join('')+'</table></div>':'<p class="mu" style="margin-top:10px">Відкритих позицій немає.</p>';
-h+=`<p class="mu" style="margin-top:10px">Щоб бот торгував на ${TNX[TN.ex].s}, натисніть «Тестнет» на картці ф'ючерсного бота: кожен його вхід, докупівля й закриття дублюватимуться ринковим ордером на вибраній біржі. Поки це працює, лише коли Orbix відкритий у браузері.</p>`}
+h+=`<p class="mu" style="margin-top:10px">Щоб бот торгував на ${TNX[TN.ex].s}, натисніть «Тестнет» на картці ф'ючерсного бота: кожен його вхід, докупівля й закриття дублюватимуться на вибраній біржі. Разом із «Сервер 24/7» бот торгує й тоді, коли Orbix закритий. Обмеження розміру угод — у картці «Ліміти ризику» нижче.</p>`}
 el.innerHTML=h+`<p class="mu" id="tnm" style="margin-top:10px">${esc(TN.msg)}</p>`}
 const tnm=t=>{TN.msg=t;const m=$('#tnm');if(m)m.textContent=t};
 $('#tnc').onclick=async e=>{const xb=e.target.closest('[data-tnx]');if(xb&&!TN.busy){TN.ex=xb.dataset.tnx;sv('ztnex',TN.ex);TN.c=TN.cs[TN.ex]||null;TN.bal=null;TN.pos=null;TN.msg='';tnR();lst();return}const b=e.target.closest('[data-tn]');if(!b||TN.busy)return;const a=b.dataset.tn;TN.busy=1;$$('#tnc [data-tn]').forEach(x=>x.disabled=true);try{
@@ -1247,6 +1255,40 @@ function tnMirror(x,kind,notional){if(x.srv||!x.tn||!x.g.fut||!CLOUD.u||!TN.c)re
 const job=kind==='close'?{action:'close',symbol}:{action:'order',symbol,side,notional:+(+notional).toFixed(2),...(kind==='open'?{leverage:x.g.lev||1}:{})};
 const log=m=>{FEED.unshift({t:now(),m:TNX[TN.ex].s+' '+x.g.pair+': '+m});FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()};
 TN.q=TN.q.then(()=>tnCall(job)).then(r=>log(kind==='close'?(r.closed?'позицію закрито за '+px(r.order.price):'позиції не було'):(kind==='open'?'вхід ':'докупівля ')+r.order.qty+' за '+(r.order.approx?'≈':'')+px(r.order.price))).catch(e=>log('помилка — '+e.message))}
+
+/* ---------- Ліміти ризику (profiles.risk_*; діють на сервері — runner/risk.js) ----------
+   Коли ліміт перевищено, серверний бот із «Тестнет» не відкриває НОВИХ угод; відкриті веде далі (SL, TP, докупівлі).
+   Порожнє поле — ліміт вимкнено. Ліміти за замовчуванням: угода 3000, разом 8000, збиток за добу 150 USDT. */
+let RK={l:null,msg:'',busy:0};
+const rkNum=v=>{const x=+v;return isFinite(x)&&x>0?x:0};
+function rkSet(d){RK.l={pos:rkNum(d.risk_max_pos),total:rkNum(d.risk_max_total),day:rkNum(d.risk_day_loss)}}
+/* повна драбина бота: вхід і всі докупівлі, з плечем — як на сервері */
+const rkLad=g=>(+g.base||0)*(+g.lev||1)*ladder(g);
+const rkTn=x=>!!(x.srv&&x.tn&&x.g.fut);
+/* зайнято: драбини серверних ботів із «Тестнет», що мають позицію; збиток за добу UTC — закриття на біржі або угоди моделі */
+function rkNow(){const L=bots.filter(rkTn),d0=Math.floor(Date.now()/864e5)*864e5;let busy=0,day=0;
+for(const x of L){if(x.b&&x.b.pos)busy+=rkLad(x.g);const xr=x.srvXr;if(xr&&Array.isArray(xr.l))day+=xr.l.reduce((a,r)=>a+(r.t>=d0?r.pnl:0),0);
+else{const W=tfMs(x.g.tf||1);day+=(x.b&&x.b.tr||[]).reduce((a,t)=>a+((+t.ts||0)+W>=d0?t.pnl:0),0)}}return{busy,day,n:L.length}}
+/* попередження при вмиканні сервера чи «Тестнет»: драбина бота більша за ліміт угоди — бот не відкриватиме угод */
+function rkWarn(x){const l=RK.l;if(!l||!l.pos||!x.g.fut)return'';const v=rkLad(x.g);return v>l.pos+1e-9?` Увага: повна драбина бота ${n2(v,0)} USDT більша за ваш ліміт угоди ${n2(l.pos,0)} USDT — на сервері він не відкриватиме нових угод (Профіль → «Ліміти ризику»).`:''}
+function rkR(){const el=$('#rkc');if(!el)return;
+let h=`<h2>Ліміти ризику</h2><p class="mu" style="margin-bottom:10px">Діють на сервері для ботів «Сервер 24/7» з «Тестнет». Коли ліміт перевищено, бот не відкриває <b>нових</b> угод, а вже відкриті веде як завжди (SL, TP, докупівлі); ви отримаєте сповіщення. Порожнє поле — без ліміту.</p>`;
+if(!CLOUD.u){el.innerHTML=h+'<p class="mu">Увійдіть в акаунт Orbix, щоб налаштувати ліміти.</p>';return}
+if(!RK.l){el.innerHTML=h+'<p class="mu">Завантажую…</p>';return}
+const l=RK.l,z=rkNow(),v=x=>x?String(x):'';
+h+=`<div class="fg" style="margin-bottom:8px"><label>Угода, USDT (вхід + усі докупівлі, з плечем)<input id="rk-p" type="number" inputmode="decimal" min="0" step="any" value="${v(l.pos)}" placeholder="без ліміту"></label>
+<label>Усі угоди разом, USDT<input id="rk-t" type="number" inputmode="decimal" min="0" step="any" value="${v(l.total)}" placeholder="без ліміту"></label>
+<label>Збиток за добу (UTC), USDT<input id="rk-d" type="number" inputmode="decimal" min="0" step="any" value="${v(l.day)}" placeholder="без ліміту"></label></div>
+<div class="row"><button class="b sm p" data-rk="save">Зберегти ліміти</button></div>`;
+if(z.n){h+=KV('Зараз зайнято угодами',`${n2(z.busy,0)}${l.total?' з '+n2(l.total,0):''} USDT`)+KV('Результат за добу (UTC)',`<span class="${cls(z.day)}">${f(z.day)}</span>${l.day?' · ліміт −'+n2(l.day,0):''} USDT`);
+const big=bots.filter(x=>rkTn(x)&&l.pos&&rkLad(x.g)>l.pos+1e-9);if(big.length)h+=`<p class="dn" style="margin-top:8px">Не відкриватимуть нових угод через ліміт угоди: ${big.map(x=>esc(x.g.pair)+' ('+n2(rkLad(x.g),0)+' USDT)').join(', ')}.</p>`}
+el.innerHTML=h+`<p class="mu" id="rkm" style="margin-top:10px">${esc(RK.msg)}</p>`}
+$('#rkc').onclick=async e=>{const b=e.target.closest('[data-rk]');if(!b||RK.busy||!CLOUD.u||!SB)return;
+const rd=id=>{const s=$(id).value.trim();if(s==='')return null;const x=+s;if(!isFinite(x)||x<0)throw new Error('ліміт має бути додатним числом або порожнім');return x>0?x:null};
+RK.busy=1;b.disabled=true;try{const row={risk_max_pos:rd('#rk-p'),risk_max_total:rd('#rk-t'),risk_day_loss:rd('#rk-d')};
+const r=await SB.from('profiles').update(row).eq('id',CLOUD.u.id).select('risk_max_pos,risk_max_total,risk_day_loss').single();if(r.error)throw r.error;
+rkSet(r.data);RK.msg='Ліміти збережено. Сервер застосує їх під час наступного запуску (до 5 хвилин).'+(!row.risk_max_pos||!row.risk_max_total||!row.risk_day_loss?' Частину лімітів вимкнено — це менш безпечно.':'')}
+catch(er){RK.msg='Помилка: '+(er.message||er)}finally{RK.busy=0;rkR()}};
 /* ---------- старт ---------- */
 applyTheme();mnuR();
 $('#home-aw').hidden=true;$('#home-eq').hidden=true;SET.brand='orbix';$('#brl').closest('.card').hidden=true;applyTheme();mnuR();

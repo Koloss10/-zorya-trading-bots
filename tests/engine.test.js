@@ -417,13 +417,47 @@ test('Нові фільтри вимкнені — вхід такий сами�
   let s = 11; const R = () => (s = (s * 16807) % 2147483647) / 2147483647;
   let p = 100; const A = Array.from({ length: 300 }, (_, i) => { const o = p, c = o * (1 + (R() - 0.5) * 0.03); p = c; return { t: T0 + i * H1, o, c, h: Math.max(o, c) * 1.004, l: Math.min(o, c) * 0.996, v: 10 + R() * 20, nt: 100 }; });
   const g0 = G({ sg: ['rsi'], k: 1, rp: 5, rm: 45 }), base = E.entry(A, g0);
-  assert.equal(JSON.stringify(E.entry(A, { ...g0, lq: 0, ak: 0, lk: 0 })), JSON.stringify(base));
+  assert.equal(JSON.stringify(E.entry(A, { ...g0, lq: 0, ak: 0, lk: 0, htf: 0 })), JSON.stringify(base));
   const nb = base.filter(Boolean).length; assert.ok(nb > 20, 'базових входів досить');
-  for (const x of [{ lq: 1, lqt: 0.01 }, { lq: 2, lqt: 0.01 }, { ak: 1.5 }, { lk: 1.2 }]) { const e = E.entry(A, { ...g0, ...x }); e.forEach((v, i) => { if (v) assert.ok(base[i], `${JSON.stringify(x)}: вхід ${i} без базового сигналу`); }); assert.ok(e.filter(Boolean).length < nb, `${JSON.stringify(x)}: фільтр мав прибрати частину входів`); }
+  for (const x of [{ lq: 1, lqt: 0.01 }, { lq: 2, lqt: 0.01 }, { ak: 1.5 }, { lk: 1.2 }, { htf: 4, hte: 5 }]) { const e = E.entry(A, { ...g0, ...x }); e.forEach((v, i) => { if (v) assert.ok(base[i], `${JSON.stringify(x)}: вхід ${i} без базового сигналу`); }); assert.ok(e.filter(Boolean).length < nb, `${JSON.stringify(x)}: фільтр мав прибрати частину входів`); }
 });
 test('Кількість угод підсумовується при агрегації таймфреймів', () => {
   const a = [0, 1, 2, 3].map(i => ({ t: T0 + i * H1, o: 1, h: 1, l: 1, c: 1, v: 1, nt: 10 + i }));
   assert.equal(E.agg(a, 4)[0].nt, 46);
   const b = a.map((x, i) => { const y = { ...x }; if (i === 1) delete y.nt; return y; });
   assert.equal(E.agg(b, 4)[0].nt, undefined);
+});
+
+// ---------- тренд старшого таймфрейму ----------
+// годинні свічки від понеділка 00:00 UTC; ціна за годину h: up — росте, далі падає
+const HT = (days, f, start = 0) => Array.from({ length: days * 24 - start }, (_, k) => { const i = k + start, c = f(i); return { t: T0 + i * H1, o: c, h: c * 1.001, l: c * 0.999, c, v: 10 }; });
+const upDown = i => i < 30 * 24 ? 100 + i * 0.1 : 100 + 30 * 24 * 0.1 - (i - 30 * 24) * 0.2;
+test('Тренд старшого ТФ: Long дозволено у висхідному тренді й заборонено після розвороту вниз; Short — навпаки', () => {
+  const A = HT(45, upDown), gL = G({ htf: 24, hte: 10, tf: 1 }), gS = G({ htf: 24, hte: 10, tf: 1, d: -1 });
+  const L = E.htf(A, gL), S = E.htf(A, gS);
+  assert.equal(L[9 * 24 + 22], false, 'до 10 закритих днів EMA ще не готова');
+  assert.equal(L[9 * 24 + 23], true, 'на закритті 10-го дня — готова, тренд вгору');
+  assert.equal(L[25 * 24], true); assert.equal(S[25 * 24], false);
+  assert.equal(L[44 * 24], false, 'після 14 днів падіння — Long заборонено'); assert.equal(S[44 * 24], true);
+});
+test('Тренд старшого ТФ: свічка старшого ТФ враховується лише після закриття; неповна перша доба відкидається', () => {
+  const A = HT(20, i => 100 + i * 0.1), g = G({ htf: 24, hte: 5, tf: 1 });
+  const o = E.htf(A, g);
+  // зміна закриття свічок усередині доби (не останньої години) нічого не змінює — свічка доби закривається о 23:00
+  const B = A.map((c, i) => (i % 24 === 12 ? { ...c, c: c.c * 0.5 } : c));
+  assert.equal(JSON.stringify(E.htf(B, g)), JSON.stringify(o));
+  // перша доба неповна (дані з 05:00) — EMA готова на добу пізніше
+  const C = HT(20, i => 100 + i * 0.1, 5), oc = E.htf(C, g);
+  assert.equal(oc[4 * 24 + 23 - 5], false, 'без неповної першої доби 5 повних — лише на кінці 6-ї');
+  assert.equal(oc[5 * 24 + 23 - 5], true);
+  assert.equal(o[4 * 24 + 23], true, 'з повною першою добою — на кінці 5-ї');
+});
+test('Тренд старшого ТФ не зазирає в майбутнє; старший ТФ ≤ ТФ бота — фільтр не діє; потрібна історія для сервера', () => {
+  let s = 5; const R = () => (s = (s * 16807) % 2147483647) / 2147483647; let p = 100;
+  const A = Array.from({ length: 24 * 30 }, (_, i) => { const o = p, c = o * (1 + (R() - 0.5) * 0.02); p = c; return { t: T0 + i * H1, o, c, h: Math.max(o, c) * 1.002, l: Math.min(o, c) * 0.998, v: 10 }; });
+  const g = G({ htf: 4, hte: 8, tf: 1 }), full = E.htf(A, g);
+  assert.ok(full.some(Boolean) && full.some((x, i) => !x && i > 100), 'фільтр і дозволяє, і забороняє');
+  for (let i = 40; i < A.length; i += 7) assert.equal(E.htf(A.slice(0, i + 1), g)[i], full[i], `свічка ${i}`);
+  assert.ok(E.htf(A, G({ htf: 1, hte: 8, tf: 1 })).every(Boolean), 'htf = tf — без обмежень');
+  assert.equal(E.htfNeed(G({ htf: 24, hte: 50, tf: 1 })), 1248); assert.equal(E.htfNeed(G({ htf: 0 })), 0);
 });

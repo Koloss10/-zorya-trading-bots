@@ -129,7 +129,7 @@ lvl:A=>memo(A,'lvl',()=>A.map((x,i)=>{const n=100;if(i<n)return 0;let hi=-1/0,lo
 ta:A=>{const c=cl(A),R=memo(A,'r14',()=>rsi(c,14)),S=memo(A,'s',()=>stoch(A)),C=memo(A,'c20',()=>cci(A,20)),M=memo(A,'m',()=>macdH(c)),E1=memo(A,'e20',()=>ema(c,20)),E2=memo(A,'e50',()=>ema(c,50));
 return A.map((x,i)=>{const v=(R[i]<30?1:R[i]>70?-1:0)+(S[i]<20?1:S[i]>80?-1:0)+(C[i]<-100?1:C[i]>100?-1:0)+(M[i]>0?1:-1)+(x.c>E1[i]?1:-1)+(E1[i]>E2[i]?1:-1);return v>=3?1:v<=-3?-1:0})}};
 const SGN={rsi:'RSI',bb:'Bollinger',cci:'CCI',macd:'MACD',stoch:'Stochastic',ema:'EMA-тренд',pat:'Свічкові патерни',fib:'Fibonacci 0.618',lvl:'Рівні підтримки й опору',ta:'TA-рейтинг'};
-const DEF={tf:1,d:1,fut:1,lev:1,sg:['rsi','bb'],k:2,rp:14,rm:35,bn:20,bk:2,cn:20,cv:100,base:100,orders:5,step:.015,smul:1,mult:1.3,tp:.01,s1:0,tp2:.02,be:0,trail:0,sl:.04,cd:0,fm:0,wk:0,wn:0,wb:.6,lq:0,lqt:.003,lqn:2,lqd:.03,ak:0,lk:0,live:0,fee:.001,slip:.0005};
+const DEF={tf:1,d:1,fut:1,lev:1,sg:['rsi','bb'],k:2,rp:14,rm:35,bn:20,bk:2,cn:20,cv:100,base:100,orders:5,step:.015,smul:1,mult:1.3,tp:.01,s1:0,tp2:.02,be:0,trail:0,sl:.04,cd:0,fm:0,wk:0,wn:0,wb:.6,lq:0,lqt:.003,lqn:2,lqd:.03,ak:0,lk:0,htf:0,hte:50,live:0,fee:.001,slip:.0005};
 /* Фільтр китів (сплеск об'єму): свічка i — «кит», якщо її об'єм ≥ wk × середнього за попередні WHL свічок,
    оборот (об'єм × ціна) ≥ wn USDT і переважають покупці (Long) чи продавці (Short): частка taker-buy об'єму
    ≥ wb (Long) або ≤ 1 − wb (Short). Якщо біржа не дає taker-buy об'єму (Bybit, демо-дані), напрям — за кольором свічки.
@@ -173,9 +173,20 @@ function casc(A,g){const n=A.length,k=+g.lk||0;if(!(k>0))return new Array(n).fil
 for(let i=AVN;i<n;i++){let v=0,lo=Infinity,hi=-Infinity;for(let q=i-AVN;q<i;q++){v+=+A[q].v||0;if(A[q].l<lo)lo=A[q].l;if(A[q].h>hi)hi=A[q].h}
 const c=A[i],rg=c.h-c.l;if(!(rg>0)||!((+c.v||0)>=k*v/AVN-1e-9))continue;const pos=(c.c-c.l)/rg;
 hit[i]=d>0?c.l<lo&&pos>=.5:c.h>hi&&pos<=.5}return winOf(hit,n)}
+/* 4. Тренд старшого таймфрейму: htf — старший таймфрейм у годинах (4, 12, 24, 168), hte — період EMA за його свічками.
+   Свічки старшого ТФ складаються з закритих свічок бота; свічка старшого ТФ враховується лише тоді, коли закрилась
+   остання свічка бота в ній (без зазирання вперед). Неповна перша група відкидається. Long — закриття останньої
+   закритої свічки старшого ТФ не нижче EMA (тренд не спадний), Short — не вище. Поки EMA не набрала hte свічок — вхід заборонено. */
+const htfNeed=g=>{const H=+g.htf||0;return H>0?Math.ceil((Math.max(2,Math.round(+g.hte||50))+2)*H/(+g.tf||1)):0};
+function htf(A,g){const n=A.length,H=+g.htf||0,o=new Array(n).fill(false);if(!(H>0))return o.fill(true);
+const W=tfMs(H),off=tfOff(H),Wb=tfMs(+g.tf||1),p=Math.max(2,Math.round(+g.hte||50)),d=g.d<0?-1:1,a=2/(p+1);if(W<=Wb)return o.fill(true);
+let key=null,full=false,ema=null,cnt=0,last=null;
+for(let i=0;i<n;i++){const t=A[i].t,k=Math.floor((t-off)/W);if(k!==key){key=k;full=t===k*W+off}
+if(full&&t+Wb===(k+1)*W+off){const c=A[i].c;cnt++;ema=cnt===1?c:ema+(c-ema)*a;last=c;full=false}
+o[i]=cnt>=p&&(d>0?last>=ema-1e-12:last<=ema+1e-12)}return o}
 function entry(A,g){const S=g.sg.map(k=>SIG[k](A,g)),n=A.length,o=new Array(n).fill(false),f=PAIRS[g.pair],
 w=Math.max(g.rp,g.bn,g.cn,30,g.sg.includes('ema')?100:0,g.sg.includes('lvl')?100:0,g.sg.includes('fib')?50:0),k=Math.min(g.k||S.length,S.length);
-if(!S.length||(g.fm&&f&&f.f<g.fm))return o;const WH=+g.wk>0?whale(A,g):null,FL=[+g.lq>0?liq(A,g):null,+g.ak>0?act(A,g):null,+g.lk>0?casc(A,g):null].filter(Boolean);
+if(!S.length||(g.fm&&f&&f.f<g.fm))return o;const WH=+g.wk>0?whale(A,g):null,FL=[+g.lq>0?liq(A,g):null,+g.ak>0?act(A,g):null,+g.lk>0?casc(A,g):null,+g.htf>0?htf(A,g):null].filter(Boolean);
 for(let i=Math.max(w,WH?WHL:0,FL.length?AVN:0);i<n;i++){let c=0;for(const s of S)if(s[i]===g.d)c++;o[i]=c>=k&&(!WH||WH[i])&&FL.every(F=>F[i])}return o}
 /* Комісії: ftk — тейкер (ринковий вхід, стоп, трейлінг, ліквідація), fmk — мейкер (лімітні DCA і TP).
    Funding: події fr={t,r}; при r>0 Long платить, Short отримує, сума = r·кількість·ціна.
@@ -321,4 +332,4 @@ function qualityWF(g,ex,per,o={folds:6,ns:4}){normG(g);const c={pair:g.pair,ex,f
 const tS=w.F[0].trE,A=aggC(hist(dk(g)),g.tf||1),e=entry(A,g),j0=lbT(A,tS),dep=g.base*ladder(g),s=summ(run(A.slice(j0),e.slice(j0),g,0,0,dep),dep);
 return{...w,mine:s.roi,dep}}
 
-export { Bot, entry, aggT, aggC, normG, tfMs, tfOff, DEF, rnd, lbT, lv };
+export { Bot, entry, aggT, aggC, normG, tfMs, tfOff, DEF, rnd, lbT, lv, htfNeed };

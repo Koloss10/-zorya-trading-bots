@@ -44,9 +44,14 @@ if(a==='g'){const g=t.closest('.bc').querySelector('.gr');g.hidden=!g.hidden;if(
 if(a==='j'){const j=t.closest('.bc').querySelectorAll('.gr')[1];j.hidden=!j.hidden;j.innerHTML=jrn(x);return}
 if(a==='c'){fill(x.g,x.ex);go('bd');return}
 if(a==='srv'){srvToggle(x);return}
-if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на демо-рахунку біржі'+(x.srv?' — сервером, цілодобово':' (поки застосунок відкритий)'):'Тестнет для бота вимкнено');return}
+if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на демо-рахунку біржі'+(x.srv?' — сервером, цілодобово.'+rkWarn(x):' (поки застосунок відкритий)'):'Тестнет для бота вимкнено');return}
 if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;if(srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);bots=bots.filter(b=>b!==x)}else{setOn(x,!x.on);if(!x.on&&srvLive(x))toast('Бот '+x.g.pair+' на паузі: сервер зніме його лімітні докупівлі на біржі (до 5 хв). Відкрита позиція лишиться зі своїм стопом.')}sbots();lst()}
 $('#bl').onclick=botClick;$('#bl2').onclick=botClick;
-const killAll=()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;const L=bots.filter(srvLive);if(L.length&&confirm(FLATQ('ботів ('+L.map(x=>x.g.pair).join(', ')+')')))L.forEach(srvFlat);bots.forEach(x=>setOn(x,false));sbots();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR()};
+const killAll=async()=>{if(!confirm('Поставити всіх ботів на паузу?'))return;const L=bots.filter(srvLive);if(L.length&&confirm(FLATQ('ботів ('+L.map(x=>x.g.pair).join(', ')+')')))L.forEach(srvFlat);bots.forEach(x=>setOn(x,false));sloc();lst();FEED.unshift({t:now(),m:'Аварійна зупинка: усі боти на паузі'});sv('zfeed',FEED);feedR();
+/* пауза має дійти до сервера одразу (без відкладеного збереження): інакше серверні боти торгуватимуть далі */
+const S=bots.filter(x=>x.srv&&x.rid);if(!CLOUD.u||!S.length){toast('Усі боти на паузі.');return}
+toast('Зберігаю паузу на сервері…');clearTimeout(csT);CLOUD.err='';await (csQ=csQ.then(()=>cloudSave()));
+if(CLOUD.err){toast('НЕ збережено на сервері: '+CLOUD.err+' — серверні боти ще працюють. Натисніть «Аварійна зупинка» ще раз.');FEED.unshift({t:now(),m:'⚠ Аварійна зупинка не дійшла до сервера: '+CLOUD.err});sv('zfeed',FEED);feedR()}
+else toast('Усі боти на паузі — збережено на сервері. Сервер зніме лімітні ордери ботів на біржі протягом 5 хвилин.')};
 $('#ks').onclick=killAll;$('#ks2').onclick=killAll;$('#nb2').onclick=()=>go('bd');$('#bq').oninput=lst;
 

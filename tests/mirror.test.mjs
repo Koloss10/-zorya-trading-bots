@@ -606,3 +606,32 @@ test('Ручні ордери користувача на тій самій па
   assert.equal(ex.S.pos, null); assert.equal(alive(ex), 2, 'ручні лишились після закриття зайвої позиції');
   assert.equal(ex.S.calls.filter((c) => c === 'cancelAll').length, 0, 'cancelAll не викликається');
 });
+
+test('Ліміт ризику: про пропущений вхід — одне попередження й одне сповіщення на причину на добу; знято — запис і прапорець прибрано', async () => {
+  const ex = fakeEx(), logs = [], notes = [];
+  let st = null;
+  const go = (risk, skipped, t) => handleBot({ bot: { id: BOT, state: st }, g, r: { state: { b: { pos: null }, lt: t }, events: [], skipped }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: t, risk,
+    save: async (x) => { st = JSON.parse(JSON.stringify(x)); return true; }, log: async (l, m) => logs.push([l, m]), notify: async (m) => notes.push(m) });
+  const pos = { blk: { k: 'pos', t: 'драбина 2947 USDT більша за ліміт угоди 1000 USDT' } };
+  const warns = () => logs.filter(([l, m]) => l === 'warn' && /Ліміт ризику/.test(m)).length;
+  await go(pos, 1, T);
+  assert.equal(warns(), 1); assert.equal(notes.length, 1); assert.match(notes[0], /TON\/USDT — Ліміт ризику: нову угоду не відкрито — драбина 2947/);
+  assert.equal(st.fl.rl.k, 'pos');
+  await go(pos, 1, T + 5 * 60e3); await go(pos, 2, T + 3 * 3600e3);
+  assert.equal(warns(), 1, 'та сама причина тієї ж доби — без повторів'); assert.equal(notes.length, 1);
+  await go(pos, 0, T + 4 * 3600e3);
+  assert.equal(st.fl.rl.k, 'pos', 'сигналу не було — прапорець лишається');
+  await go({ blk: { k: 'day', t: 'збиток за сьогодні' } }, 1, T + 5 * 3600e3);
+  assert.equal(warns(), 2, 'інша причина — нове попередження'); assert.equal(notes.length, 2);
+  await go({ blk: { k: 'day', t: 'збиток за сьогодні' } }, 1, T + 864e5);
+  assert.equal(warns(), 3, 'нова доба — нове попередження');
+  await go({ blk: null }, 0, T + 864e5 + 60e3);
+  assert.equal(st.fl.rl, undefined, 'обмеження зняте');
+  assert.ok(logs.some(([l, m]) => l === 'info' && /Ліміт ризику більше не діє/.test(m)));
+  assert.equal(notes.length, 3, 'про зняття — без сповіщення в Telegram');
+  // бот перестав торгувати на біржі — давній прапорець не лишається
+  st = { ...st, fl: { ...st.fl, rl: { k: 'pos', t: 'x', day: 0 } } };
+  await handleBot({ bot: { id: BOT, state: st }, g, r: { state: { b: { pos: null }, lt: T }, events: [] }, symbol: 'TONUSDT', mirror: false, native: false, ex: null, now: T,
+    save: async (x) => { st = JSON.parse(JSON.stringify(x)); return true; }, log: async () => {}, notify: async () => {} });
+  assert.equal(st.fl.rl, undefined);
+});

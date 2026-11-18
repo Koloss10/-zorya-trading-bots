@@ -27,22 +27,27 @@ export function restoreBot(g, state, funding = null, filters = null) {
  * @param now      поточний час, мс (обробляються лише закриті свічки)
  * @param spans    інтервали роботи бота [[від, до|null], …] (config._sp): свічки, що закрилися під час паузи,
  *                 пропускаються — як і в браузері, після зняття з паузи нічого не «дограється» заднім числом
+ * @param entryOk  false — нових угод не відкривати (ліміт ризику, runner/risk.js): сигнал входу пропускається й рахується
+ *                 в skipped, а позиція, що вже є, обробляється як завжди (докупівлі, TP, SL, трейлінг)
  * Новий бот починає з поточного моменту: історія не «програється» заднім числом.
  */
-export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null }) {
+export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null, entryOk = true }) {
   const act = (t) => !Array.isArray(spans) || !spans.length || spans.some(([a, b]) => t > a && (b == null || t <= b));
   const W = tfMs(g.tf || 1), A = candles.filter((c) => c.t + W <= now);
   const b = restoreBot(g, state, funding, filters);
   let lt = state && Number.isFinite(state.lt) ? state.lt : (A.length ? A[A.length - 1].t + W : now);
   let pk = state?.pk ?? 0, dd = state?.dd ?? 0;
   const events = [], e = A.length ? entry(A, g) : [];
+  let skipped = 0;
   for (let i = 0; i < A.length; i++) {
     const c = A[i], ct = c.t + W;
     if (ct <= lt) continue;
     lt = ct;
     if (!act(ct)) continue;
     const n0 = b.tr.length, p0 = b.pos, o0 = p0 ? p0.n : 0, c0 = p0 ? p0.cost : 0, q0 = p0 ? p0.q : 0, h0 = p0 ? !!p0.t1 : false;
-    b.step(Math.floor(c.t / W), c, e[i]);
+    let en = e[i];
+    if (en && !p0 && !entryOk) { en = false; skipped++; } // ліміт ризику: нову угоду не відкривати
+    b.step(Math.floor(c.t / W), c, en);
     const v = b.eqv(c); pk = Math.max(pk, v); dd = Math.min(dd, v - pk);
     const p = b.pos;
     if (b.tr.length > n0) { const l = b.tr[b.tr.length - 1]; events.push({ kind: l.liq ? "liq" : l.sl ? "sl" : "close", pnl: l.pnl, price: l.f[l.f.length - 1].p, t: ct }); }
@@ -52,7 +57,7 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
     else if (p0 && p && !h0 && p.t1 && q0 > 0) events.push({ kind: "part", share: 1 - p.q / q0, price: p.f[p.f.length - 1].p, t: ct });
   }
   const tr = b.tr.slice(-keepTrades);
-  return { state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum }, pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events };
+  return { state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum }, pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events, skipped };
 }
 
 /* текст події для журналу й Telegram */

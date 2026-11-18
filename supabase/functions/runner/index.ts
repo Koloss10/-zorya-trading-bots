@@ -8,6 +8,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { botConfig, INTERVAL, processBot } from "./core.js";
 import { binance, bybit } from "./exchanges.ts";
 import { handleBot, owners, park } from "./mirror.js";
+import { limitsOf, riskBlock } from "./risk.js";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const BYIV: Record<string, string> = { "1h": "60", "4h": "240", "12h": "720", "1d": "D", "1w": "W" };
@@ -83,6 +84,20 @@ Deno.serve(async (req) => {
   let done = 0, evCount = 0;
   // один рахунок біржі — одна позиція на символ: другий бот із «Тестнет» на тій самій парі угод не дублює
   const owner = owners(rows ?? []);
+  // ліміти ризику (profiles.risk_*) і боти кожного користувача, що торгують на біржі, — для загального й денного ліміту
+  const lims = new Map<string, any>(), tnBots = new Map<string, { uid: string; g: any; state: any }>();
+  {
+    const uids = [...new Set((rows ?? []).map((b: any) => b.user_id))];
+    const { data: pr, error: pe } = uids.length ? await admin.from("profiles").select("id,risk_max_pos,risk_max_total,risk_day_loss").in("id", uids) : { data: [], error: null };
+    if (pe) console.warn("runner: profiles", pe.message); // ліміти за замовчуванням (limitsOf(undefined))
+    for (const p of pr ?? []) lims.set(p.id, p);
+    for (const b of rows ?? []) {
+      try {
+        const g: any = botConfig(b.config), cfg = b.config || {};
+        if (cfg._tn && g.fut && owner.get(`${b.user_id}|${cfg._ex === "binance" ? "binance" : "bybit"}|${g.pair}`) === b.id) tnBots.set(b.id, { uid: b.user_id, g, state: b.state });
+      } catch (_e) { /* бот із пошкодженим конфігом обробиться (і запишеться помилка) нижче */ }
+    }
+  }
   const saver = (bot: any) => async (state: unknown) => {
     const at = new Date().toISOString(), old = ver.get(bot.id);
     if (old) {
@@ -106,15 +121,19 @@ Deno.serve(async (req) => {
       const symbol = g.pair.replace("/", ""), mk = `${symbol}|${iv}|${g.fut ? 1 : 0}`;
       if (!mcache.has(mk)) mcache.set(mk, market(symbol, iv, !!g.fut));
       const m = await mcache.get(mk);
-      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp });
-      evCount += r.events.length;
       const exName = cfg._ex === "binance" ? "binance" : "bybit";
       const want = !!(cfg._tn && g.fut);
       const mirror = want && owner.get(`${bot.user_id}|${exName}|${g.pair}`) === bot.id;
+      // ліміт ризику: перевищено — нових угод не відкривати (позиції, що вже є, бот веде далі)
+      const peers = mirror ? [...tnBots.entries()].filter(([id, x]) => id !== bot.id && x.uid === bot.user_id).map(([, x]) => x) : [];
+      const blk = mirror ? riskBlock({ limits: limitsOf(lims.get(bot.user_id)), self: { g, state: bot.state }, peers, now: Date.now() }) : null;
+      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp, entryOk: !blk });
+      evCount += r.events.length;
+      if (tnBots.has(bot.id)) tnBots.get(bot.id)!.state = { ...(bot.state || {}), ...r.state }; // нова угода цього запуску займає ліміт для наступних ботів
       if (want && !mirror && r.events.length) await log(bot, "warn", `На демо-рахунку вже торгує інший бот ${g.pair} — угоду не продубльовано (позиції злилися б в одну)`);
       const ex = mirror ? await exFor(bot.user_id, exName) : null;
       await handleBot({
-        bot, g, r, symbol, mirror, native: !!ex?.native, ex,
+        bot, g, r, symbol, mirror, native: !!ex?.native, ex, risk: mirror ? { blk } : null,
         save: saver(bot),
         log: (level: string, text: string, data: unknown = null) => log(bot, level, text, data && typeof data === "object" ? { ...(data as object), src: m.src } : data),
         notify: async (text: string) => {

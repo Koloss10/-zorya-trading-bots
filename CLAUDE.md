@@ -24,7 +24,7 @@ npm run verify   # check + test
 - `supabase/functions/runner/engine.js` ← `src/js/01–06`
 - `supabase/functions/{exchange,runner}/{exchanges.ts,sign.js}` ← `supabase/functions/_shared/`
 
-Вручну пишуться: `runner/index.ts`, `runner/core.js`, `runner/mirror.js`, `exchange/index.ts`, `tg-notify/*`, `_shared/*`.
+Вручну пишуться: `runner/index.ts`, `runner/core.js`, `runner/mirror.js`, `runner/risk.js`, `exchange/index.ts`, `tg-notify/*`, `_shared/*`.
 
 ## Процес
 - Робота в гілці, злиття в `main` лише через PR після зеленого CI «Validate Orbix» (`.github/workflows/validate.yml`), злиття з `expectedHeadSha`, потім fast-forward робочої гілки до `main`.
@@ -45,6 +45,7 @@ npm run verify   # check + test
 - Ідентифікатор ордера: `ox<12 hex id бота>-<t36>-<вид>`. Знімаються лише ордери з префіксом бота (`cancelMine`, `cancelPrefix`); `cancelAll` біржі не викликати.
 - Якщо `byLink` упав, статус ордера невідомий: новий ордер не надсилати, дію лишити в черзі (`once` у `mirror.js`).
 - Стан бота зберігається з перевіркою версії (CAS) **до** будь-яких дій на біржі.
+- Ліміти ризику (`profiles.risk_*`, `runner/risk.js`) пригнічують вхід у самій моделі (`processBot`, `entryOk`), а не лише на біржі: так модель і біржа не розходяться. Без профілю діють ліміти за замовчуванням (`DEF_LIMITS`).
 - `auth`: адреса повернення = `location.origin + location.pathname`. Після зміни адреси сайту (наприклад, перейменування репозиторію) її треба додати в Supabase → Authentication → URL Configuration.
 
 ## Документи
@@ -55,5 +56,5 @@ npm run verify   # check + test
 ## Поточний етап
 План «перевірка надійності»:
 - етап A (ризики виконання ордерів) завершено — PR #33;
-- далі етап B: аварійна зупинка всіх ботів і ліміти ризику;
-- потім етап C: 7-денний тест на Demo/Testnet без змін коду.
+- етап B (ліміти ризику, аварійна зупинка) завершено — PR #36, `runner` v16;
+- далі етап C: 7-денний тест на Demo/Testnet без змін коду `runner` і `exchange`.

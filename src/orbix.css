@@ -228,3 +228,11 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .atb{width:100%;min-width:0;border-collapse:collapse;font-size:13px;white-space:nowrap}
 .atb th{text-align:left;color:var(--mu);font-weight:500;padding:6px 10px 6px 0;border-bottom:1px solid var(--ln)}
 .atb td{padding:7px 10px 7px 0;border-bottom:1px solid var(--ln)}
+/* ---------- відгуки ---------- */
+#fbx textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:120px;font:400 14px/1.5 Inter,system-ui,sans-serif}
+.fbi{padding:10px 0;border-top:1px solid var(--ln)}
+.fbi:first-of-type{border-top:0}
+.fbb{margin:6px 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.fbk{font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--ln)}
+.fbk-bug{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 40%,transparent)}
+.fbk-idea{color:var(--ac);border-color:color-mix(in srgb,var(--ac) 40%,transparent)}

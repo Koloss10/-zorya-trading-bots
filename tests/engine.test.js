@@ -313,3 +313,40 @@ test('Сітка на графіку (lv) з правилами біржі зб�
   const b = new E.Bot(g, null, F); [C(0, 100, 100, 100, 100), C(1, 100, 100, 93.5, 95)].forEach((r, i) => b.step(i, r, i === 0));
   assert.deepEqual(b.pos.f.map(x => x.p), L);
 });
+
+// ---------- фільтр китів (сплеск об'єму) ----------
+// 30 спокійних свічок з об'ємом 10 (середнє 10), потім свічка-кит з об'ємом V і часткою покупців bv/V
+const WHC = (V, bv, o = 100, c = 101) => { const a = []; for (let i = 0; i < 30; i++) a.push({ t: T0 + i * H1, o: 100, h: 101, l: 99, c: 100, v: 10, bv: 5 }); a.push({ t: T0 + 30 * H1, o, h: Math.max(o, c) + 1, l: Math.min(o, c) - 1, c, v: V, ...(bv == null ? {} : { bv }) }); for (let i = 31; i < 36; i++) a.push({ t: T0 + i * H1, o: 100, h: 101, l: 99, c: 100, v: 10, bv: 5 }); return a; };
+test('Кити: сплеск об\'єму ≥ k×середнього з перевагою покупців дає дозвіл на Long на 3 свічки', () => {
+  // середнє за 20 свічок = 10; кит V=30 (рівно 3×), покупці 18/30 = 60 % = wb
+  const w = E.whale(WHC(30, 18), G({ wk: 3, wb: 0.6 }));
+  assert.equal(w[29], false); assert.equal(w[30], true); assert.equal(w[31], true); assert.equal(w[32], true); assert.equal(w[33], false);
+});
+test('Кити: замалий сплеск, замала сума чи перевага продавців — дозволу немає', () => {
+  assert.equal(E.whale(WHC(29.9, 20), G({ wk: 3, wb: 0.6 }))[30], false, 'сплеск < 3×');
+  assert.equal(E.whale(WHC(30, 17.9), G({ wk: 3, wb: 0.6 }))[30], false, 'покупців < 60 %');
+  // оборот кита 30 × 101 = 3030 USDT
+  assert.equal(E.whale(WHC(30, 18), G({ wk: 3, wb: 0.6, wn: 3031 }))[30], false, 'оборот < мінімуму');
+  assert.equal(E.whale(WHC(30, 18), G({ wk: 3, wb: 0.6, wn: 3030 }))[30], true, 'оборот = мінімуму');
+});
+test('Кити: для Short потрібна перевага продавців; без taker-buy — напрям за кольором свічки', () => {
+  assert.equal(E.whale(WHC(30, 12), G({ wk: 3, wb: 0.6, d: -1 }))[30], true, 'продавців 60 %');
+  assert.equal(E.whale(WHC(30, 13), G({ wk: 3, wb: 0.6, d: -1 }))[30], false, 'продавців 56,7 %');
+  assert.equal(E.whale(WHC(30, null, 100, 101), G({ wk: 3 }))[30], true, 'зелена свічка — Long');
+  assert.equal(E.whale(WHC(30, null, 100, 101), G({ wk: 3, d: -1 }))[30], false, 'зелена свічка — не Short');
+  assert.equal(E.whale(WHC(30, null, 101, 100), G({ wk: 3, d: -1 }))[30], true, 'червона свічка — Short');
+});
+test('Кити: фільтр пригнічує входи без кита, а з wk = 0 вхід не змінюється', () => {
+  const A = WHC(30, 18); for (let i = 31; i < 36; i++) A[i].c = 100 - (i - 30) * 0.5; // падіння → RSI низький
+  const g0 = G({ sg: ['rsi'], k: 1, rp: 3, rm: 99 }); // поріг 99 — RSI-сигнал Long майже на кожній свічці
+  const base = E.entry(A, g0), wh = E.entry(A, { ...g0, wk: 3, wb: 0.6 }), wh0 = E.entry(A, { ...g0, wk: 0 });
+  assert.deepEqual(wh0, base, 'wk = 0 — без змін');
+  for (let i = 0; i < A.length; i++) if (wh[i]) assert.ok(base[i] && i >= 30 && i <= 32, 'вхід лише біля кита ' + i);
+  assert.ok(base.some((x, i) => x && (i < 30 || i > 32)), 'без фільтра є входи далеко від кита');
+});
+test('Кити: об\'єм покупців підсумовується при агрегації таймфреймів', () => {
+  const a = [0, 1, 2, 3].map(i => ({ t: T0 + i * H1, o: 1, h: 1, l: 1, c: 1, v: 10, bv: 1 + i }));
+  const g = E.agg(a, 4); assert.equal(g[0].v, 40); assert.equal(g[0].bv, 10);
+  const b = a.map((x, i) => i === 2 ? { ...x, bv: undefined } : x); delete b[2].bv;
+  assert.equal(E.agg(b, 4)[0].bv, undefined, 'якщо хоч однієї частки немає — bv не вигадується');
+});

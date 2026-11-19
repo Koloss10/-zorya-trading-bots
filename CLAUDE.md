@@ -90,4 +90,4 @@ npm run verify   # check + test
 
 Агенти (`.claude/agents/`): planner, architect, code-reviewer, typescript-reviewer (JS/TS), database-reviewer (Postgres/Supabase), security-reviewer, tdd-guide, build-error-resolver, refactor-cleaner, doc-updater, silent-failure-hunter, performance-optimizer.
 Команди: `/plan`, `/code-review`, `/build-fix`, `/refactor-clean`, `/test-coverage`, `/update-docs`, `/feature-dev`.
-Скіли: `postgres-patterns`, `database-migrations`, `security-review` (поряд із власним `orbix-deploy`).
+Скіли: `supabase` і `supabase-postgres-best-practices` (офіційні від Supabase, MIT; міграції в Orbix — як описано вище, через `apply_migration`), `security-review` (поряд із власним `orbix-deploy`).

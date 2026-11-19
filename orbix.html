@@ -287,7 +287,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 </section>
 
 <section id="v-mk" class="s" hidden>
-<div class="card"><h2>Ринок</h2><input class="srch" id="mq" list="pl" placeholder="Пара, напр. ETH/USDT" autocomplete="off"><div class="row" id="mkm" style="margin-bottom:8px"><button class="b sm tg" data-mm="F">Ф'ючерси USDⓈ-M</button><button class="b sm tg" data-mm="S">Спот</button></div><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
+<div class="card"><h2>Ринок</h2><input class="srch" id="mq" type="search" placeholder="Знайти пару, напр. ETH" autocomplete="off" aria-label="Знайти пару" aria-controls="mkl"><div class="row" id="mkm" style="margin-bottom:8px"><button class="b sm tg" data-mm="F">Ф'ючерси USDⓈ-M</button><button class="b sm tg" data-mm="S">Спот</button></div><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
 <div class="card"><h2>Пари</h2><div class="pft" id="mkt" role="tablist" aria-label="Список пар"><button class="b sm tg" role="tab" data-mt="all">Усі</button><button class="b sm tg" role="tab" data-mt="up">Ростуть</button><button class="b sm tg" role="tab" data-mt="dn">Падають</button><button class="b sm tg" role="tab" data-mt="fav">★ Обрані</button></div><div id="mkl"></div></div>
 </section>
 
@@ -1137,16 +1137,21 @@ const fT=MKM==='F'&&fOK,fr=fT&&MD.ftk[sym(MKP)];
 $('#mks').textContent=MD.mode!=='live'?'Біржі недоступні, показано демо-дані. Якщо файл відкрито в перегляді застосунку Claude, він блокує інтернет-запити: відкрийте файл у Chrome чи Safari, щоб бачити реальні ціни.'
 :fT?`Безстрокові ф'ючерси ${MD.fsrc}, свічки від 1 хвилини.${fr&&isFinite(fr.fr)?' Поточний funding: '+(fr.fr*100).toFixed(4)+'%.':''}${!MD.fset.has(MKP)?' Для цієї пари ф\'ючерсу немає — показано спот.':''}`
 :`Спот ${MD.src} у реальному часі, свічки від 1 хвилини.${MD.mode==='live'&&!MD.fut&&MD.ferr?' Ф\'ючерсні дані недоступні: '+MD.ferr:''}`;
+mkL()}
+/* список пар: усі пари (не лише перші 60); рядок пошуку над ринком фільтрує список на льоту (MKQ) */
+let MKQ='';
+function mkL(){const fT=MKM==='F'&&MD.mode==='live'&&MD.fut;
 const row=(p,c,d,x)=>`<div class="pl" data-p="${p}"><span class="plh"><button class="fvp" data-fv="${p}" aria-pressed="${FAVPAIR.has(p)}" aria-label="${FAVPAIR.has(p)?'Прибрати з обраних':'Додати в обрані'}">${FAVPAIR.has(p)?'★':'☆'}</button><b>${p}</b></span><span class="mono">${px(c)} <span class="${cls(d)}">${f(d,2)}%</span>${x||''}</span></div>`,T=fT?MD.ftk:MD.tk;
-const L=PK.slice(0,60).map(p=>{if(MD.mode==='live'){const t=T[sym(p)];return t?{p,c:t.c,d:t.o?(t.c/t.o-1)*100:0,x:fT&&isFinite(t.fr)&&t.fr?` <span class="mu">f ${(t.fr*100).toFixed(3)}%</span>`:''}:null}const a=D[p],l=a[a.length-1];return{p,c:l.c,d:(l.c/a[a.length-25].c-1)*100}}).filter(Boolean);
+const q=MKQ.trim().toUpperCase().replace(/[^A-Z0-9]/g,''),L=PK.filter(p=>!q||p.replace('/','').includes(q)).map(p=>{if(MD.mode==='live'){const t=T[sym(p)];return t?{p,c:t.c,d:t.o?(t.c/t.o-1)*100:0,x:fT&&isFinite(t.fr)&&t.fr?` <span class="mu">f ${(t.fr*100).toFixed(3)}%</span>`:''}:null}const a=D[p],l=a[a.length-1];return{p,c:l.c,d:(l.c/a[a.length-25].c-1)*100}}).filter(Boolean);
 $$('#mkt [data-mt]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mt===MKT));
-let V=MKT==='up'?L.filter(r=>r.d>0).sort((a,b)=>b.d-a.d).slice(0,MKN):MKT==='dn'?L.filter(r=>r.d<0).sort((a,b)=>a.d-b.d).slice(0,MKN):MKT==='fav'?L.filter(r=>FAVPAIR.has(r.p)):L;
-const more=MKT==='all'&&!MKA&&V.length>MKN;if(more)V=V.slice(0,MKN);
-$('#mkl').innerHTML=(V.length?V.map(r=>row(r.p,r.c,r.d,r.x)).join(''):`<p class="mu" style="margin:10px 0 0">${MKT==='fav'?'Обраних пар ще немає: натисніть ☆ біля пари.':'Зараз таких пар немає.'}</p>`)+(more?`<button class="b sm" id="mkall" style="margin-top:10px">Показати всі ${L.length}</button>`:'')}
+let V=q?L:MKT==='up'?L.filter(r=>r.d>0).sort((a,b)=>b.d-a.d).slice(0,MKN):MKT==='dn'?L.filter(r=>r.d<0).sort((a,b)=>a.d-b.d).slice(0,MKN):MKT==='fav'?L.filter(r=>FAVPAIR.has(r.p)):L;
+const more=!q&&MKT==='all'&&!MKA&&V.length>MKN;if(more)V=V.slice(0,MKN);
+$('#mkl').innerHTML=(V.length?V.map(r=>row(r.p,r.c,r.d,r.x)).join(''):`<p class="mu" style="margin:10px 0 0">${q?'Пару не знайдено.':MKT==='fav'?'Обраних пар ще немає: натисніть ☆ біля пари.':'Зараз таких пар немає.'}</p>`)+(more?`<button class="b sm" id="mkall" style="margin-top:10px">Показати всі ${L.length}</button>`:'')}
 $('#mkm').onclick=e=>{const b=e.target.closest('[data-mm]');if(!b)return;MKM=b.dataset.mm;sv('zmkm',MKM);mkt()};
 $('#mkt').onclick=e=>{const b=e.target.closest('[data-mt]');if(!b)return;MKT=b.dataset.mt;MKA=0;sv('zmkt',MKT);mkt()};
-$('#mkl').onclick=e=>{if(e.target.closest('#mkall')){MKA=1;mkt();return}const fv=e.target.closest('[data-fv]');if(fv){const p=fv.dataset.fv;FAVPAIR.has(p)?FAVPAIR.delete(p):FAVPAIR.add(p);sv('zfavpair',[...FAVPAIR]);mkt();return}const t=e.target.closest('[data-p]');if(!t)return;MKP=t.dataset.p;$('#mq').value=MKP;mkt();scrollTo(0,0)};
-$('#mq').onchange=()=>{let p=$('#mq').value.trim().toUpperCase();if(!p.includes('/'))p+='/USDT';if(PAIRS[p]){MKP=p;mkt()}};
+$('#mkl').onclick=e=>{if(e.target.closest('#mkall')){MKA=1;mkt();return}const fv=e.target.closest('[data-fv]');if(fv){const p=fv.dataset.fv;FAVPAIR.has(p)?FAVPAIR.delete(p):FAVPAIR.add(p);sv('zfavpair',[...FAVPAIR]);mkt();return}const t=e.target.closest('[data-p]');if(!t)return;MKP=t.dataset.p;$('#mq').value='';MKQ='';mkt();scrollTo(0,0)};
+$('#mq').oninput=()=>{MKQ=$('#mq').value;mkL()};
+$('#mq').onkeydown=e=>{if(e.key!=='Enter')return;e.preventDefault();let p=$('#mq').value.trim().toUpperCase();if(!p.includes('/'))p+='/USDT';const f=$('#mkl [data-p]');if(!PAIRS[p]&&f)p=f.dataset.p;if(PAIRS[p]){MKP=p;$('#mq').value='';MKQ='';$('#mq').blur();mkt()}};
 $('#mkb').onclick=()=>{fill({...DEF,pair:MKP},cx[0]);go('bd')};$('#mka').onclick=()=>{$('#awp').value=MKP;go('aw')};
 
 /* ---------- журнал угод ---------- */

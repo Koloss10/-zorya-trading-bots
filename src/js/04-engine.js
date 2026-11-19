@@ -102,6 +102,10 @@ bf(){return reinvestFactor(this.g,this.cum)}
 manual(k,px,t,n=0){const g=this.g,d=g.d,p=this.pos,L=g.lev||1;if(!p||!(px>0)||!isFinite(px))return null;
 if(k==='close'){const v=p.q*px,pnl=p.real+d*(v-p.cost)-this.ft*v;this.cum+=pnl;this.tr.push({i:-1,ts:t,pnl,n:p.n,liq:false,sl:false,mn:1,fd:p.fd,f:p.f.concat({t,p:px,k:'x'})});this.pos=null;this.nd++;return{kind:'close',pnl,price:px,t,mn:1}}
 if(k==='add'&&n>0&&isFinite(n)){const q=this.qty(n*L,px);if(!q)return null;const s=q*px;p.q+=q;p.cost+=s;p.real-=this.ft*s;p.f.push({t,p:px,k:'m'});return{kind:'madd',notional:s,price:px,t}}return null}
+/* підхопити позицію, що вже є на біржі (як «Include a position on the exchange in a trade» у Veles): модель починає угоду
+   з цієї кількості й ціни входу біржі (без комісії входу — її вже сплачено), як з першого ордера; далі — звичайна драбина й вихід */
+adopt(px,q,t){if(this.pos||this.pe||!(px>0)||!(q>0)||!isFinite(px*q))return null;const s=q*px;
+this.pos={q,bf:1,cost:s,n:1,last:px,first:px,peak:px,real:0,fd:0,t1:0,ad:1,f:[{t,p:px,k:'e'}]};return{kind:'adopt',notional:s,price:px,t}}
 /* кількість за сумою й ціною з урахуванням кроку, мін. кількості й мін. ордера; 0 — біржа не прийме ордер */
 qty(s,px){const F=this.F;if(!F)return s/px;const q=rnd(s/px,F.step,'floor');return q>0&&q>=(F.minQty||0)&&q*px>=(F.minN||0)-1e-9?q:0}
 lp(x,up){const F=this.F;return F&&F.tick?rnd(x,F.tick,up?'ceil':'floor'):x}

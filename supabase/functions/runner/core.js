@@ -30,7 +30,7 @@ export function restoreBot(g, state, funding = null, filters = null) {
  * @param entryOk  false — нових угод не відкривати (ліміт ризику, runner/risk.js): сигнал входу пропускається й рахується
  *                 в skipped, а позиція, що вже є, обробляється як завжди (докупівлі, TP, SL, трейлінг)
  * @param addCap   стеля вартості позиції (USDT, з плечем) для ручної докупівлі: 0 — без обмеження (ліміти ризику, runner/risk.js addCap)
- * @param cmd      ручна команда з інтерфейсу (config._cmd): {id, k: "close" | "add" | "resync", n?: маржа USDT, t: мс}.
+ * @param cmd      ручна команда з інтерфейсу (config._cmd): {id, k: "close" | "add" | "resync" | "adopt", n?: маржа USDT, q?, px?: позиція з біржі, t: мс}.
  *                 "resync" (перезапуск угоди після помилки) моделі не змінює — handleBot відновлює ордери бота на біржі. Виконується один раз
  *                 (id запам'ятовується в state.mc) після закритих свічок, за останньою ціною; старша за CMD_TTL ігнорується.
  * Новий бот починає з поточного моменту: історія не «програється» заднім числом.
@@ -67,10 +67,18 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
   }
   // ручна команда: після закритих свічок, за останньою ціною (свічка, що формується, теж дає поточну ціну)
   let mc = state?.mc ?? null, manual = null;
-  if (cmd && typeof cmd.id === "string" && cmd.id.length <= 40 && cmd.id !== mc && (cmd.k === "close" || cmd.k === "add" || cmd.k === "resync")
+  if (cmd && typeof cmd.id === "string" && cmd.id.length <= 40 && cmd.id !== mc && (cmd.k === "close" || cmd.k === "add" || cmd.k === "resync" || cmd.k === "adopt")
     && Number.isFinite(cmd.t) && cmd.t <= now + 6e4 && now - cmd.t <= CMD_TTL) {
     mc = cmd.id;
     if (cmd.k === "resync") manual = { id: cmd.id, k: cmd.k, ok: true, why: null }; // перезапуск угоди: модель не змінюється, біржею займається handleBot
+    else if (cmd.k === "adopt") { // позиція з біржі (кількість і ціна — зі знімка сервера state.xs, який показала картка)
+      const q = +cmd.q, px = +cmd.px, s = q * px;
+      const why = b.pos ? "бот уже веде угоду" : b.pe ? "бот чекає лімітного входу" : !(q > 0 && px > 0 && s <= 1e7) ? "некоректні дані позиції"
+        : addCap > 0 && s > addCap + 1e-9 ? "перевищить ліміт ризику (позиція не може бути більшою за " + Math.round(addCap) + " USDT)" : null;
+      const ev = why ? null : b.adopt(px, q, now);
+      if (ev) events.push(ev);
+      manual = { id: cmd.id, k: cmd.k, ok: !!ev, why: ev ? null : why || "некоректні дані позиції" };
+    }
     else {
       const px = candles.length ? +candles[candles.length - 1].c : 0, n = +cmd.n;
       const over = cmd.k === "add" && addCap > 0 && b.pos && b.pos.cost + n * (g.lev || 1) > addCap + 1e-9;
@@ -91,6 +99,7 @@ export function eventText(ev, g) {
   if (ev.kind === "dca") return `Orbix (сервер): ${pair} — докупівля №${ev.n} по ${ev.price}`;
   if (ev.kind === "part") return `Orbix (сервер): ${pair} — часткова фіксація TP: закрито ${Math.round(ev.share * 100)} % позиції по ${ev.price}`;
   if (ev.kind === "close") return `Orbix (сервер): ${pair} — угоду закрито${ev.mn ? " вручну за ринком по " + ev.price : ev.xs ? " за сигналом виходу по " + ev.price : ""}, PnL ${f(ev.pnl)} USDT`;
+  if (ev.kind === "adopt") return `Orbix (сервер): ${pair} — бот підхопив позицію з біржі: ${+(ev.notional / ev.price).toPrecision(6)} за ${ev.price}`;
   if (ev.kind === "pend") return `Orbix (сервер): ${pair} — сигнал входу: лімітний ордер по ${ev.price}, чекає на ціну`;
   if (ev.kind === "pcan") return `Orbix (сервер): ${pair} — лімітний вхід скасовано (ціна пішла або минув час), бот чекає новий сигнал`;
   if (ev.kind === "madd") return `Orbix (сервер): ${pair} — позапланова докупівля на ${ev.notional.toFixed(2)} USDT по ${ev.price}`;

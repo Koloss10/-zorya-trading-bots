@@ -183,3 +183,14 @@ test('Лімітний вхід для Short: рівень вище ціни, с
   b.step(1, C(1, 100, 101, 96.5, 97), false); assert.equal(b.pe, null, 'ціна впала на 3 % — скасовано');
   b.step(2, C(2, 97, 97, 97, 97), true); b.step(3, C(3, 97, 99, 96, 98), false); near(b.pos.first, 97 * 1.02, 1e-9);
 });
+
+test('Підхопити позицію з біржі: модель веде її як першу угоду, далі — звичайна драбина й TP', () => {
+  // позиція 2 за 50 (100 USDT), без комісії входу; 2 ордери, крок 2 %: докупівля по 49; TP 1 % від середньої
+  const b = new E.Bot(G({ orders: 2 }), null, null), ev = b.adopt(50, 2, T0);
+  assert.equal(ev.kind, 'adopt'); near(ev.notional, 100); near(b.pos.real, 0); assert.equal(b.pos.ad, 1);
+  b.step(1, C(1, 50, 50, 48.9, 49.2), false); assert.equal(b.pos.n, 2, 'докупівля сітки');
+  assert.equal(b.adopt(50, 1, T0), null, 'угода вже є — не підхоплює');
+  const c = new E.Bot(G({ fo: 0.02 }), null, null); c.step(0, C(0, 100, 100, 100, 100), true);
+  assert.equal(c.adopt(100, 1, T0), null, 'чекає лімітного входу — не підхоплює');
+  assert.equal(new E.Bot(G(), null, null).adopt(0, 1, T0), null);
+});

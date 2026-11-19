@@ -39,6 +39,7 @@ export function actionsFor(events, botId, native) {
   for (const ev of events) {
     if (ev.kind === "open") out.push({ id: linkId(botId, ev.pt ?? ev.t, "o"), kind: "open", t: ev.t, ...(ev.pt ? { pt: ev.pt } : {}), notional: ev.notional, price: ev.price, ...(ev.bf > 1 ? { bf: ev.bf } : {}), tries: 0 });
     else if (ev.kind === "dca") { if (!native) out.push({ id: linkId(botId, ev.t, "a" + ev.n), kind: "dca", t: ev.t, notional: ev.notional, tries: 0 }); }
+    else if (ev.kind === "adopt") { if (native) out.push({ id: linkId(botId, ev.t, "o"), kind: "adopt", t: ev.t, price: ev.price, notional: ev.notional, tries: 0 }); }
     else if (ev.kind === "pend") { if (native) out.push({ id: linkId(botId, ev.t, "o"), kind: "plim", t: ev.t, price: ev.price, notional: ev.notional, tries: 0 }); }
     else if (ev.kind === "pcan") { if (native) out.push({ id: linkId(botId, ev.pt, "o"), kind: "pcan", t: ev.t, tries: 0 }); }
     else if (ev.kind === "madd") out.push({ id: linkId(botId, ev.t, "m"), kind: "madd", t: ev.t, notional: ev.notional, tries: 0 });
@@ -160,8 +161,13 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
     }
     return `${name}: лімітний вхід скасовано (ціна пішла або минув час)`;
   }
-  if (a.kind === "open") {
-    let o = await ex.byLink(symbol, a.id);
+  if (a.kind === "open" || a.kind === "adopt") {
+    let o = a.kind === "adopt" ? null : await ex.byLink(symbol, a.id);
+    if (a.kind === "adopt") { // підхопити позицію, що вже є на біржі: далі — та сама драбина й захист, що й після входу
+      const p = (await ex.positions(symbol))[0];
+      if (!p || Math.sign(p.amt) !== Math.sign(g.d)) return `${name}: позиції ${symbol} на біржі вже немає — підхоплювати нічого`;
+      o = { qty: Math.abs(p.amt), price: p.entry, adopted: true };
+    }
     // модель зарахувала лімітний вхід (a.pt), а на біржі він не виконаний повністю чи знятий паузою: зняти й докупити решту ринком
     if (o && a.pt && o.status !== "Filled") {
       if (o.status === "New" || o.status === "PartiallyFilled") await ex.cancel(symbol, a.id);
@@ -179,7 +185,7 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
       await ex.leverage(symbol, lev(g));
       o = await once(ex, symbol, a.id, () => marketNotional(ex, symbol, side, a.notional, a.id));
     }
-    let msg = `${name}: вхід ${o.qty} за ${o.approx ? "≈" : ""}${o.price}`;
+    let msg = `${name}: ${o.adopted ? "підхоплено позицію" : "вхід"} ${o.qty} за ${o.approx ? "≈" : ""}${o.price}`;
     if (!native) return msg;
     const F = await ex.filt(symbol), p = (await ex.positions(symbol))[0];
     if (!p) return msg + " (позиції вже немає)";

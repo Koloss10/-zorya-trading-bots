@@ -29,6 +29,14 @@ const srvErr=x=>{if(!x.srv||!x.on||!x.srvSt)return null;const e=x.srvXe;if(e&&e.
 const m=x.srvMis;return m&&m.on&&m.t?{t:'Розбіжність з біржею: '+m.t}:null};
 const errLine=x=>{const e=srvErr(x);if(!e)return'';const busy=x.cmd&&x.cmd.k==='resync';
 return`${e.xe?`<p class="dn" style="margin:0">⚠ ${esc(e.t)} · ${ago(e.at)}</p>`:''}<div class="ac"><button class="b sm p" data-a="rs" data-id="${x.id}"${busy?' disabled':''}>${x.b.pos?'Перезапустити угоду':'Скинути помилку'}</button><button class="b sm" data-a="mon" data-id="${x.id}">Деталі</button></div>`};
+/* на демо-біржі є позиція в напрямку бота, а модель угоди не веде: запропонувати підхопити її (як у Veles) */
+const adoptOf=x=>{const s=x.srvXs;return x.srv&&x.tn&&x.on&&x.srvSt&&!x.b.pos&&!x.b.pe&&s&&s.amt&&Math.sign(s.amt)===Math.sign(x.g.d)&&s.entry>0?s:null};
+const adoptLine=x=>{const s=adoptOf(x);if(!s)return'';const busy=x.cmd&&x.cmd.k==='adopt';
+return`<p class="mu" style="margin:0">На демо-біржі відкрита позиція ${x.g.pair} ${s.amt>0?'Long':'Short'} ${Math.abs(s.amt)} за ${px(s.entry)} — бот нею не керує.</p><div class="ac"><button class="b sm" data-a="ad" data-id="${x.id}"${busy?' disabled':''}>Підхопити позицію</button></div>`};
+function srvAdopt(x){const s=adoptOf(x);if(!s)return toast('Позиції для підхоплення немає.');
+if(!confirm(`Бот почне вести позицію ${x.g.pair} ${s.amt>0?'Long':'Short'} ${Math.abs(s.amt)} за ${px(s.entry)} з демо-біржі: поставить докупівлі, TP і SL за своїми налаштуваннями від ціни входу. Продовжити?`))return;
+const t=Date.now();x.cmd={id:'a'+t.toString(36),k:'adopt',q:Math.abs(s.amt),px:s.entry,t};sbots();lst();
+toast('Команду надіслано: сервер підхопить позицію протягом 5 хвилин.')}
 function srvResync(x){if(!x.on)return toast('Бот на паузі — запустіть його, щоб сервер виконав перезапуск.');const t=Date.now();
 x.cmd={id:'r'+t.toString(36),k:'resync',t};sbots();lst();
 toast(x.b.pos?'Перезапуск угоди надіслано: сервер протягом 5 хвилин перевірить біржу, поставить відсутні ордери бота й оновить захист.':'Помилку буде скинуто протягом 5 хвилин.')}

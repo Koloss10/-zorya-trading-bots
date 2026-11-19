@@ -211,3 +211,18 @@ test('Лімітний вхід на сервері: події pend → open з
   const one = processBot({ g: gf, state: processBot({ g: gf, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H }).state, candles: cs, now: cs.at(-1).t + H });
   assert.deepEqual(one.state.b.tr.map((t) => t.ts), st.b.tr.map((t) => t.ts));
 });
+
+test('Підхопити позицію (adopt): один раз, із перевіркою ліміту ризику й наявної угоди', () => {
+  const cs = series(900), start = 400, now = cs[start - 1].t + H;
+  const st = processBot({ g, state: null, candles: cs.slice(0, start), now }).state;
+  assert.equal(st.b.pos, null);
+  const r = processBot({ g, state: st, candles: cs.slice(0, start), now, cmd: { id: 'ad1', k: 'adopt', q: 2, px: 50, t: now } });
+  assert.equal(r.manual.ok, true); assert.equal(r.events[0].kind, 'adopt'); assert.equal(r.state.b.pos.q, 2); assert.equal(r.state.mc, 'ad1');
+  assert.match(eventText(r.events[0], g), /підхопив позицію з біржі: 2 за 50/);
+  const again = processBot({ g, state: r.state, candles: cs.slice(0, start), now, cmd: { id: 'ad2', k: 'adopt', q: 2, px: 50, t: now } });
+  assert.equal(again.manual.why, 'бот уже веде угоду');
+  const cap = processBot({ g, state: st, candles: cs.slice(0, start), now, cmd: { id: 'ad3', k: 'adopt', q: 2, px: 50, t: now }, addCap: 80 });
+  assert.match(cap.manual.why, /ліміт ризику/); assert.equal(cap.state.b.pos, null);
+  const bad = processBot({ g, state: st, candles: cs.slice(0, start), now, cmd: { id: 'ad4', k: 'adopt', q: -1, px: 50, t: now } });
+  assert.equal(bad.manual.why, 'некоректні дані позиції');
+});

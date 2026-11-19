@@ -855,3 +855,16 @@ test('Сервер не знімає ордер лімітного входу, �
   assert.ok(st.fl.mis && st.fl.mis.k === 'pf' && !st.fl.mis.on, 'розбіжність «лімітний вхід виконано» без тривоги');
   assert.ok(ex.S.pos && ex.S.pos.sl > 0, 'позиція на біржі вже під стопом (захист від ціни входу біржі)');
 });
+
+test('Підхопити позицію: на біржі ставляться драбина й захист від ціни моделі; позиції вже немає — пропуск', async () => {
+  const ex = fakeEx(), fl = {};
+  await ex.market('TONUSDT', 'BUY', 24, false, '');                  // ручна позиція користувача
+  const a = actionsFor([{ kind: 'adopt', price: 2.5, notional: 60, t: T }], BOT, true)[0];
+  assert.equal(a.kind, 'adopt'); assert.equal(actionsFor([{ kind: 'adopt', price: 2.5, notional: 60, t: T }], BOT, false).length, 0, 'Binance — лише модель');
+  const m = await execute(ex, a, { ...ctx, fl });
+  assert.match(m, /підхоплено позицію 24 за 2\.5/); assert.equal(fl.e0, 2.5);
+  assert.equal((await ex.openOrders()).length, g.orders - 1, 'уся драбина');
+  assert.ok(ex.S.pos.sl > 0, 'стоп на біржі');
+  const n = ex.S.orders.length; await execute(ex, a, { ...ctx, fl }); assert.equal(ex.S.orders.length, n, 'повтор — без дублів');
+  assert.match(await execute(fakeEx(), a, { ...ctx, fl: {} }), /вже немає — підхоплювати нічого/);
+});

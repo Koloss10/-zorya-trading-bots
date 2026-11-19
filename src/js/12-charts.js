@@ -103,6 +103,9 @@ el._d=draw;el._tf=v=>{if(v&&v!==S.tf){S.tf=v;S.sig=''}};el._poll=async()=>{if(mk
 
 function lines(g,pos,pair){const C=TH(),last=lastC(pair).c,A=lv(g,pos?pos.first:last,fltOf(g)),n=pos?pos.n:0,avg=pos?pos.cost/pos.q:A.avg,L=g.lev||1,o=[];
 A.L.forEach((l,k)=>o.push({p:l.p,c:k<n?C.ac:C.mu,t:'#'+(k+1),d:k>=n}));
-o.push({p:avg,c:C.tx,t:'середня',d:1},{p:avg*(1+g.d*g.tp),c:C.up,t:'TP'},{p:avg*(1-g.d*g.sl),c:C.dn,t:'SL'});
+/* трейлінг: TP лише вмикає трейлінг (угода не закривається на TP); після активації (pos.ta) — лінія стопа трейлінгу від максимуму */
+const tr=+g.trail>0,ta=tr&&pos&&pos.ta&&pos.peak>0;
+o.push({p:avg,c:C.tx,t:'середня',d:1},{p:avg*(1+g.d*g.tp),c:ta?C.mu:C.up,t:ta?'TP досягнуто':tr?'TP → трейлінг':'TP',d:ta?1:0},{p:avg*(1-g.d*g.sl),c:C.dn,t:'SL'});
+if(ta)o.push({p:pos.peak*(1-g.d*g.trail),c:C.up,t:'трейлінг-стоп'});
 if(L>1)o.push({p:avg*(1-g.d*Math.max(1/L-.005,0)),c:C.ac2,t:'ліквідація'});return o}
 

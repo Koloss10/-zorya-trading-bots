@@ -130,3 +130,22 @@ test('Реінвест: подія входу несе множник bf, кол
   assert.equal(opens[0].bf, undefined, 'перша угода — без прибутку, без множника');
   assert.ok(opens.some((e) => e.bf > 1), 'після прибуткових угод множник > 1');
 });
+
+test('Ручна команда з інтерфейсу: виконується один раз, стара — ігнорується', () => {
+  const cs = series(900), start = 400;
+  let st = processBot({ g, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H }).state, i = start;
+  while (!st.b.pos && i < cs.length) { i++; st = processBot({ g, state: st, candles: cs.slice(0, i), now: cs[i - 1].t + H }).state; }
+  assert.ok(st.b.pos, 'знайдено відкриту угоду'); const now = cs[i - 1].t + H, px = cs[i - 1].c;
+  const cmd = { id: 'mtest1', k: 'close', t: now - 6e4 };
+  const r = processBot({ g, state: st, candles: cs.slice(0, i), now, cmd });
+  const ev = r.events.find((e) => e.kind === 'close');
+  assert.ok(ev && ev.mn === 1 && ev.price === px, 'закрито вручну за останньою ціною');
+  assert.equal(r.state.b.pos, null); assert.equal(r.state.mc, 'mtest1'); assert.deepEqual(r.manual, { id: 'mtest1', k: 'close', ok: true, why: null });
+  assert.match(eventText(ev, g), /вручну за ринком/);
+  const again = processBot({ g, state: r.state, candles: cs.slice(0, i), now: now + 6e4, cmd });
+  assert.equal(again.events.length, 0, 'та сама команда вдруге не виконується'); assert.equal(again.manual, null);
+  const old = processBot({ g, state: st, candles: cs.slice(0, i), now, cmd: { id: 'mold', k: 'close', t: now - 25 * H } });
+  assert.ok(old.state.b.pos, 'команда старша за добу ігнорується'); assert.equal(old.manual, null);
+  const add = processBot({ g, state: r.state, candles: cs.slice(0, i), now, cmd: { id: 'madd1', k: 'add', n: 10, t: now } });
+  assert.equal(add.manual.ok, false); assert.equal(add.manual.why, 'позиції немає'); assert.equal(add.state.mc, 'madd1');
+});

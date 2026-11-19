@@ -127,7 +127,8 @@ Deno.serve(async (req) => {
       // ліміт ризику: перевищено — нових угод не відкривати (позиції, що вже є, бот веде далі)
       const peers = mirror ? [...tnBots.entries()].filter(([id, x]) => id !== bot.id && x.uid === bot.user_id).map(([, x]) => x) : [];
       const blk = mirror ? riskBlock({ limits: limitsOf(lims.get(bot.user_id)), self: { g, state: bot.state }, peers, now: Date.now() }) : null;
-      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp, entryOk: !blk });
+      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp, entryOk: !blk, cmd: cfg._cmd });
+      if (r.manual && !r.manual.ok) await log(bot, "warn", `Ручна дія «${r.manual.k === "close" ? "закрити за ринком" : "докупити"}» не виконана: ${r.manual.why}`);
       evCount += r.events.length;
       if (tnBots.has(bot.id)) tnBots.get(bot.id)!.state = { ...(bot.state || {}), ...r.state }; // нова угода цього запуску займає ліміт для наступних ботів
       if (want && !mirror && r.events.length) await log(bot, "warn", `На демо-рахунку вже торгує інший бот ${g.pair} — угоду не продубльовано (позиції злилися б в одну)`);

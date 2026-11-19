@@ -651,3 +651,14 @@ test('Реінвест: драбина докупівель на біржі у �
   const again = r1.ex.S.orders.filter((o) => o.status === 'New').map((o) => o.qty);
   assert.deepEqual(again, r1.q);
 });
+
+test('Позапланова докупівля з картки: ринковий ордер один раз, без позиції — пропуск', async () => {
+  const ex = fakeEx(), fl = {};
+  await execute(ex, actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0], { ...ctx, fl });
+  const q0 = ex.S.pos.amt, a = actionsFor([{ kind: 'madd', notional: 25, price: 2.5, t: T + 5e3 }], BOT, true)[0];
+  assert.equal(a.kind, 'madd'); assert.ok(a.id.endsWith('m'));
+  assert.match(await execute(ex, a, { ...ctx, fl }), /позапланова докупівля 10 /);
+  assert.equal(ex.S.pos.amt, q0 + 10);
+  await execute(ex, a, { ...ctx, fl }); assert.equal(ex.S.pos.amt, q0 + 10, 'повтор тієї ж дії — без другого ордера');
+  const e2 = fakeEx(); assert.match(await execute(e2, a, { ...ctx, fl: {} }), /позиції вже немає/); assert.equal(count(e2, 'market'), 0);
+});

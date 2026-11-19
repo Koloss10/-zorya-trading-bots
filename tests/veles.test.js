@@ -73,3 +73,29 @@ test('Сигнали Keltner і «% зміни ціни»', () => {
   const B = Array.from({ length: 30 }, (_, i) => C(i, 100, 101, 99, 100)); B.push(C(30, 100, 106, 100, 105));
   assert.equal(E.SIG.pc(B, g).at(-1), -1);
 });
+
+test('Ручне закриття за ринком: PnL з комісією тейкера, угода з позначкою «вручну»', () => {
+  // вхід 100 USDT по 100: q = 1, комісія входу 0.1. Закриття по 102: 1·102 − 100 − 0.1 − 0.001·102 = 1.798
+  const b = new E.Bot(G(), null, null); b.step(0, C(0, 100, 100, 100, 100), true);
+  const ev = b.manual('close', 102, T0 + 5 * H1);
+  assert.equal(ev.kind, 'close'); assert.equal(ev.mn, 1); near(ev.pnl, 1.798);
+  assert.equal(b.pos, null); assert.equal(b.tr.length, 1); assert.equal(b.tr[0].mn, 1); assert.equal(b.nd, 1); near(b.cum, 1.798);
+  assert.equal(b.manual('close', 102, T0), null, 'без позиції — нічого');
+});
+
+test('Позапланова докупівля: позиція більша, драбина сітки не зсувається', () => {
+  // 2 ордери, крок 2 %: наступна докупівля моделі по 98. Ручна докупівля 50 USDT по 95: q = 50/95, cost +50, комісія 0.05
+  const b = new E.Bot(G({ orders: 2 }), null, null); b.step(0, C(0, 100, 100, 100, 100), true);
+  const ev = b.manual('add', 95, T0 + H1, 50);
+  assert.equal(ev.kind, 'madd'); near(ev.notional, 50);
+  near(b.pos.q, 1 + 50 / 95); near(b.pos.cost, 150); near(b.pos.real, -0.1 - 0.05); assert.equal(b.pos.n, 1); assert.equal(b.pos.last, 100);
+  // ціна торкається 98 — спрацьовує звичайна докупівля сітки
+  b.step(1, C(1, 99, 99, 97.9, 98.5), false); assert.equal(b.pos.n, 2);
+  assert.equal(b.manual('add', 95, T0, 0), null, 'нульова сума — нічого');
+});
+
+test('Ручне закриття — за комісією тейкера (ринковий ордер), не мейкера', () => {
+  // ф'ючерси: тейкер 0.05 %, мейкер 0.02 %. Вхід 100 по 100: комісія 0.05. Закриття по 102: 2 − 0.05 − 0.0005·102 = 1.899
+  const b = new E.Bot(G({ ftk: 0.0005, fmk: 0.0002 }), null, null); b.step(0, C(0, 100, 100, 100, 100), true);
+  near(b.manual('close', 102, T0 + H1).pnl, 1.899);
+});

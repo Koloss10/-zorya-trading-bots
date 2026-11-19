@@ -39,6 +39,7 @@ export function actionsFor(events, botId, native) {
   for (const ev of events) {
     if (ev.kind === "open") out.push({ id: linkId(botId, ev.t, "o"), kind: "open", t: ev.t, notional: ev.notional, price: ev.price, ...(ev.bf > 1 ? { bf: ev.bf } : {}), tries: 0 });
     else if (ev.kind === "dca") { if (!native) out.push({ id: linkId(botId, ev.t, "a" + ev.n), kind: "dca", t: ev.t, notional: ev.notional, tries: 0 }); }
+    else if (ev.kind === "madd") out.push({ id: linkId(botId, ev.t, "m"), kind: "madd", t: ev.t, notional: ev.notional, tries: 0 });
     else if (ev.kind === "part") out.push({ id: linkId(botId, ev.t, "p"), kind: "part", t: ev.t, share: ev.share, tries: 0 });
     else out.push({ id: linkId(botId, ev.t, "c"), kind: "close", t: ev.t, tries: 0 });
   }
@@ -151,6 +152,11 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
     fl.lb = base; fl.e0 = e0; fl.ex = p.entry; // e0 — база драбини (для відновлення після паузи), ex — ціна входу на біржі
     const gd = await guard(ex, { g, symbol, botId, fl }, p, F);
     return msg + ` · на біржі: ${n} лімітн. докупівель${gd ? " · " + gd.msg.replace("Bybit Demo: ", "") : ""}`;
+  }
+  if (a.kind === "madd") { // позапланова докупівля з картки: ринковий ордер на будь-якій біржі (драбина лімітних ордерів не змінюється)
+    if (!(await ex.positions(symbol))[0]) return `${name}: позиції вже немає — позапланову докупівлю пропущено`;
+    const o = await once(ex, symbol, a.id, () => marketNotional(ex, symbol, side, a.notional, a.id));
+    return `${name}: позапланова докупівля ${o.qty} за ${o.approx ? "≈" : ""}${o.price}`;
   }
   if (a.kind === "dca") {
     const o = await once(ex, symbol, a.id, () => marketNotional(ex, symbol, side, a.notional, a.id));

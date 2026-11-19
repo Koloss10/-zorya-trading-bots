@@ -29,9 +29,12 @@ export function restoreBot(g, state, funding = null, filters = null) {
  *                 пропускаються — як і в браузері, після зняття з паузи нічого не «дограється» заднім числом
  * @param entryOk  false — нових угод не відкривати (ліміт ризику, runner/risk.js): сигнал входу пропускається й рахується
  *                 в skipped, а позиція, що вже є, обробляється як завжди (докупівлі, TP, SL, трейлінг)
+ * @param cmd      ручна команда з інтерфейсу (config._cmd): {id, k: "close" | "add", n?: маржа USDT, t: мс}. Виконується один раз
+ *                 (id запам'ятовується в state.mc) після закритих свічок, за останньою ціною; старша за CMD_TTL ігнорується.
  * Новий бот починає з поточного моменту: історія не «програється» заднім числом.
  */
-export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null, entryOk = true }) {
+export const CMD_TTL = 24 * 36e5;
+export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null, entryOk = true, cmd = null }) {
   const act = (t) => !Array.isArray(spans) || !spans.length || spans.some(([a, b]) => t > a && (b == null || t <= b));
   const W = tfMs(g.tf || 1), A = candles.filter((c) => c.t + W <= now);
   const b = restoreBot(g, state, funding, filters);
@@ -56,8 +59,18 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
     // часткова фіксація TP (g.s1): модель зменшила позицію — цю частку треба закрити й на біржі
     else if (p0 && p && !h0 && p.t1 && q0 > 0) events.push({ kind: "part", share: 1 - p.q / q0, price: p.f[p.f.length - 1].p, t: ct });
   }
+  // ручна команда: після закритих свічок, за останньою ціною (свічка, що формується, теж дає поточну ціну)
+  let mc = state?.mc ?? null, manual = null;
+  if (cmd && typeof cmd.id === "string" && cmd.id.length <= 40 && cmd.id !== mc && (cmd.k === "close" || cmd.k === "add")
+    && Number.isFinite(cmd.t) && cmd.t <= now + 6e4 && now - cmd.t <= CMD_TTL) {
+    mc = cmd.id;
+    const px = candles.length ? +candles[candles.length - 1].c : 0, n = +cmd.n;
+    const ev = cmd.k === "add" && !(n > 0 && n <= 1e6) ? null : b.manual(cmd.k, px, now, cmd.k === "add" ? n : 0);
+    if (ev) events.push(ev);
+    manual = { id: cmd.id, k: cmd.k, ok: !!ev, why: ev ? null : !b.pos ? "позиції немає" : "сума некоректна або ордер замалий для біржі" };
+  }
   const tr = b.tr.slice(-keepTrades);
-  return { state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum, nd: b.nd }, pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events, skipped };
+  return { manual, state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum, nd: b.nd }, ...(mc ? { mc } : {}), pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events, skipped };
 }
 
 /* текст події для журналу й Telegram */
@@ -67,6 +80,7 @@ export function eventText(ev, g) {
   if (ev.kind === "open") return `Orbix (сервер): ${pair} — відкрито позицію по ${ev.price}`;
   if (ev.kind === "dca") return `Orbix (сервер): ${pair} — докупівля №${ev.n} по ${ev.price}`;
   if (ev.kind === "part") return `Orbix (сервер): ${pair} — часткова фіксація TP: закрито ${Math.round(ev.share * 100)} % позиції по ${ev.price}`;
-  if (ev.kind === "close") return `Orbix (сервер): ${pair} — угоду закрито, PnL ${f(ev.pnl)} USDT`;
+  if (ev.kind === "close") return `Orbix (сервер): ${pair} — угоду закрито${ev.mn ? " вручну за ринком по " + ev.price : ""}, PnL ${f(ev.pnl)} USDT`;
+  if (ev.kind === "madd") return `Orbix (сервер): ${pair} — позапланова докупівля на ${ev.notional.toFixed(2)} USDT по ${ev.price}`;
   return `Orbix (сервер): ${pair} — ${ev.kind === "liq" ? "ліквідація" : "Stop-Loss"}, PnL ${f(ev.pnl)} USDT`;
 }

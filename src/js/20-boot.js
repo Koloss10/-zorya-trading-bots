@@ -3,7 +3,7 @@ applyTheme();mnuR();
 $('#home-aw').hidden=true;$('#home-eq').hidden=true;SET.brand='orbix';$('#brl').closest('.card').hidden=true;applyTheme();mnuR();
 MD.ip=mdInit();pfr();tfilter();favs();feedR();lst();go('ov');accR();boot();
 async function boot(){try{await MD.ip}finally{splashEnd()}accR();mnuR();
-$('#fp').innerHTML=PK.map(k=>`<option value="${k}">${k}</option>`).join('');$('#pl').innerHTML=PK.map(k=>`<option value="${k}">`).join('');if(!PAIRS[MKP])MKP=PK[0];
+$('#fp').innerHTML=PK.map(k=>`<option value="${k}">${k}</option>`).join('');{const a=$('#awp'),v=a.value;a.innerHTML=PK.map(k=>`<option value="${k}">${k}</option>`).join('');a.value=PAIRS[v]?v:PAIRS['BTC/USDT']?'BTC/USDT':PK[0]}$('#pl').innerHTML=PK.map(k=>`<option value="${k}">`).join('');if(!PAIRS[MKP])MKP=PK[0];
 const saved=ld('zorya3',[]).filter(x=>x&&x.g),ps=[...new Set(saved.map(x=>x.g.pair).filter(p=>PAIRS[p]))];
 $('#tops').textContent=MD.mode==='live'?`Завантажую реальні дані ${MD.src}…`:'Біржі недоступні, працюю на демо-даних.';
 try{await need('BTC/USDT')}catch(e){}for(const x of saved)if(PAIRS[x.g.pair])try{await need(dk(x.g),hrsFor(x.t0,x.g.tf))}catch(e){}

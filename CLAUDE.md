@@ -65,3 +65,29 @@ npm run verify   # check + test
   - Конфлікт revert у `src/js/14-builder-backtests.js` (перевірено пробним запуском): рядки `cfg`/`bad`/`fill`/`pv` взяти з версії з фільтрами, блок від `/* округлення кількості` до `minR` лишити перед `function pv(){`; у `bad()` перед `return''}` додати `{const r=minFirst(g);if(r&&g.base<r.min-1e-9)return minText(r)}`; у `pv()` після `fgSum(c);` — `minLoad(c.g);minR(c.g);`. `orbix.html` — `npm run build`. Підказки [?] і Вікі для фільтрів (`19-hints.js`) з'являться самі.
   - Того ж оновлення: модель (сервер і бектест) рахує кількість за правилами біржі бота — крок кількості, мінімум, крок ціни Bybit Demo / Binance Testnet (`MD.xflt`, `xRules`; на сервері — правила з біржі), щоб ордери моделі й біржі збігались (знахідка тесту: ETH 0,0171 → 0,01).
   - Того ж оновлення — правило «біржа головна» (погоджено з користувачем 19.11): якщо біржа закрила позицію бота за TP, SL чи трейлінгом (звірка бачить `xc`: у моделі позиція є, на біржі немає, ордерів бота немає), модель закриває свою угоду за ціною закриття на біржі (з `xr`), а не чекає власного виходу за свічками. Так картка, статистика й журнал показують те, що сталося на біржі. Знахідка тесту: ETH 4 год — біржа закрила трейлінгом 19.11 о 01:34 за 1771,61 (відкат усередині 4-годинної свічки), модель тримала угоду далі. Потрібні тести в `mirror.test.mjs` / `sim.test.mjs` (закриття біржею → модель закрита за ціною біржі, без нових ордерів) і мутаційна перевірка.
+
+## Додаткові правила й агенти (everything-claude-code)
+Загальні настанови з [everything-claude-code](https://github.com/affaan-m/everything-claude-code) (MIT, `.claude/ECC-LICENSE`). **Правила цього файлу (вище) мають пріоритет**: мова комітів і PR — українська, межі Demo/Testnet, згенеровані файли, заборона змін `runner`/`exchange` під час етапу C тощо.
+
+@.claude/ecc-rules/common/code-review.md
+@.claude/ecc-rules/common/coding-style.md
+@.claude/ecc-rules/common/development-workflow.md
+@.claude/ecc-rules/common/git-workflow.md
+@.claude/ecc-rules/common/patterns.md
+@.claude/ecc-rules/common/performance.md
+@.claude/ecc-rules/common/security.md
+@.claude/ecc-rules/common/testing.md
+@.claude/ecc-rules/typescript/coding-style.md
+@.claude/ecc-rules/typescript/patterns.md
+@.claude/ecc-rules/typescript/security.md
+@.claude/ecc-rules/typescript/testing.md
+@.claude/ecc-rules/web/coding-style.md
+@.claude/ecc-rules/web/design-quality.md
+@.claude/ecc-rules/web/patterns.md
+@.claude/ecc-rules/web/performance.md
+@.claude/ecc-rules/web/security.md
+@.claude/ecc-rules/web/testing.md
+
+Агенти (`.claude/agents/`): planner, architect, code-reviewer, typescript-reviewer (JS/TS), database-reviewer (Postgres/Supabase), security-reviewer, tdd-guide, build-error-resolver, refactor-cleaner, doc-updater, silent-failure-hunter, performance-optimizer.
+Команди: `/plan`, `/code-review`, `/build-fix`, `/refactor-clean`, `/test-coverage`, `/update-docs`, `/feature-dev`.
+Скіли: `postgres-patterns`, `database-migrations`, `security-review` (поряд із власним `orbix-deploy`).

@@ -13,7 +13,7 @@ function mk(g,ex,on=true,m={}){g=normG({...DEF,...g});const t0=+m.t0||clk(dk(g))
 const x={id:++uid,g,ex,on,b:new Bot(g),pk:0,dd:0,t0,lt:t0,sp,tn:!!m.tn&&!!g.fut,srv:!!m.srv,srvEx:m.srvEx||null};advance(x,0);bots.push(x);return x}
 function setOn(x,on){if(!!x.on===!!on)return;const t=clk(dk(x.g));x.on=!!on;if(on)x.sp.push([t,null]);else{const l=x.sp[x.sp.length-1];if(l&&l[1]==null)l[1]=t}}
 const bv=x=>x.b.eqv(lastC(dk(x.g)));
-let BOOT=0,KEEP=[];const sloc=()=>{if(BOOT)sv('zorya3',bots.map(({g,ex,on,rid,pid,t0,sp,tn,srv,srvEx})=>({g,ex,on,rid,pid,t0,sp,tn,srv,srvEx})).concat(KEEP))},sbots=()=>{sloc();cloudQ()};
+let BOOT=0,KEEP=[];const sloc=()=>{if(BOOT)sv('zorya3',bots.map(({g,ex,on,rid,pid,t0,sp,tn,srv,srvEx,demo})=>({g,ex,on,rid,pid,t0,sp,tn,srv,srvEx,...(demo?{demo:1}:{})})).concat(KEEP))},sbots=()=>{sloc();cloudQ()};
 function bcard(x){const p=x.b.pos,v=bv(x),s=x.b.tr,w=s.filter(t=>t.pnl>0).length;
 return`<div class="bc ${x.on?'on':'off'}" data-bot="${x.id}"><div class="bh"><b>${x.g.pair}</b><span class="mu">${dir(x.g)} · ${tfl(x.g.tf)} · ${x.g.lev}× · ${x.ex} · з ${tm(x.t0)}</span><span class="st" style="margin-left:auto">${x.on?'Працює':'Пауза'}</span></div>${!s.length&&!p?`<p class="mu bwait">${x.on?'Чекає на сигнал':'На паузі'} · перевірка після закриття свічки ${tfl(x.g.tf)}</p>`:''}${x.trunc?'<p class="mu" style="margin:0">Історії бракує, щоб відтворити бота з самого запуску: показано з найранішої доступної свічки.</p>':''}
 ${srvLine(x)}<div class="bm"><div>PnL з відкритою<b class="${cls(v)}">${f(v)}</b></div><div>Угод / win<b>${s.length} / ${s.length?Math.round(w/s.length*100):0}%</b></div><div>Позиція<b>${p?p.n+' з '+x.g.orders+' орд.':'немає'}</b></div><div>Просадка<b class="${cls(x.dd)}">${f(x.dd,0)}</b></div></div>
@@ -65,6 +65,7 @@ if(a==='m'){const m=t.closest('.bc').querySelector('.bmo');if(m){m.hidden=!m.hid
 if(a==='g'){const g=t.closest('.bc').querySelector('.gr');g.hidden=!g.hidden;if(!g.hidden&&!g._d)lwChart(g,()=>({pair:x.g.pair,key:dk(x.g),tf:x.g.tf,lv:()=>lines(x.g,x.b.pos,dk(x.g)),mk:()=>tradeMarks(x.b.tr,x.b.pos,x.g)}),'mini');else if(!g.hidden)g._d();return}
 if(a==='j'){const j=t.closest('.bc').querySelectorAll('.gr')[1];j.hidden=!j.hidden;j.innerHTML=jrn(x);return}
 if(a==='c'){fill(x.g,x.ex);go('bd');return}
+if(a==='srv'||a==='tn')x.demo=0; // користувач узяв демо-бота в роботу — тепер це звичайний бот
 if(a==='srv'){srvToggle(x);return}
 if(a==='tn'){if(!x.tn){const o=bots.find(y=>y!==x&&y.tn&&y.g.fut&&y.g.pair===x.g.pair);if(o){toast('На демо-рахунку вже торгує бот '+x.g.pair+' — позиції на біржі злилися б в одну. Вимкніть «Тестнет» в іншому боті або виберіть іншу пару.');return}}x.tn=!x.tn;sbots();lst();toast(x.tn?'Угоди бота '+x.g.pair+' дублюватимуться на демо-рахунку біржі'+(x.srv?' — сервером, цілодобово.'+rkWarn(x):' (поки застосунок відкритий)'):'Тестнет для бота вимкнено');return}
 if(a==='x'){if(!confirm('Видалити бота '+ttl(x)+'?'))return;if(srvLive(x)&&confirm(FLATQ(x.g.pair)))srvFlat(x);bots=bots.filter(b=>b!==x)}else{setOn(x,!x.on);if(!x.on&&srvLive(x))toast('Бот '+x.g.pair+' на паузі: сервер зніме його лімітні докупівлі на біржі (до 5 хв). Відкрита позиція лишиться зі своїм стопом.')}sbots();lst()}

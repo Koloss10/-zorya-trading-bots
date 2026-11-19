@@ -6,7 +6,7 @@ $('#pl').innerHTML=PK.map(k=>`<option value="${k}">`).join('');
 const FGR=[['main','Основне',1],['sig','Сигнали входу'],['dca','Сітка DCA'],['ex','Вихід: TP, SL, трейлінг'],['flt','Фільтри'],['bt','Бектест']],
 FGI={fb:'main',flv:'main',frp:'sig',frs:'sig',fbn:'sig',fbk:'sig',fcn:'sig',fcv:'sig',fk:'sig',fo:'dca',fs:'dca',fx:'dca',fm:'dca',ft:'ex',fs1:'ex',ft2:'ex',fr:'ex',fl:'ex',fc:'ex',ffm:'flt'},
 fin=([i,l,k,m])=>`<label>${l}<input id="${i}" type="number" inputmode="decimal" step="any" value="${+(DEF[k]*m).toFixed(4)}"></label>`,fgn=g=>NUM.filter(n=>(FGI[n[0]]||'flt')===g).map(fin).join(''),
-FGH={main:()=>sel('fe','Біржа',[])+sel('fp','Пара',PK.map(k=>[k,k]))+sel('fmk','Ринок',[[1,'Futures'],[0,'Spot']])+sel('fdr','Напрямок',[[1,'Long'],[-1,'Short']])+sel('ftf','Таймфрейм свічок',TFS)+fgn('main')+'<div class="fw afit"><label>Бюджет бота (маржа на всю сітку), USDT<input id="fbud" type="number" inputmode="decimal" step="any" min="0"></label><button class="b" type="button" id="fbudb">Підібрати під біржу</button><p id="fbudr" class="mu" hidden aria-live="polite"></p></div>',
+FGH={main:()=>sel('fe','Біржа',[])+sel('fp','Пара',PK.map(k=>[k,k]))+sel('fmk','Ринок',[[1,'Futures'],[0,'Spot']])+sel('fdr','Напрямок',[[1,'Long'],[-1,'Short']])+sel('ftf','Таймфрейм свічок',TFS)+fgn('main'),
 sig:()=>'<label class="fw">Готова стратегія<select id="fst"></select></label><div class="sgr fw" id="fsg"></div>'+fgn('sig'),
 dca:()=>fgn('dca'),ex:()=>sel('fbe','SL у беззбиток після TP1',[[0,'Ні'],[1,'На нулі'],[2,'На ціні TP1']])+fgn('ex'),flt:()=>fgn('flt'),
 bt:()=>sel('fper','Період бектесту',PER,8760)+'<label>Депозит, USDT<input id="fdp" type="number" inputmode="decimal" step="any" value="1000"></label>'};
@@ -20,7 +20,7 @@ $('#fsg').innerHTML=Object.entries(SGN).map(([k,l])=>`<label class="ck"><input t
 $('#fst').innerHTML='<option value="">Власний набір сигналів</option>'+STR.map((s,i)=>`<option value="${i}">${s[0]}</option>`).join('');
 $('#fst').onchange=e=>{const s=STR[+e.target.value];if(!s)return;$$('[data-sg]').forEach(c=>c.checked=s[1].includes(c.dataset.sg));$('#fk').value=s[2];pv()};
 function cfg(){const g={d:+$('#fdr').value,tf:+$('#ftf').value,fut:+$('#fmk').value,be:+$('#fbe').value,pair:$('#fp').value,sg:$$('[data-sg]').filter(c=>c.checked).map(c=>c.dataset.sg),fee:.001,slip:.0005};NUM.forEach(([i,,k,m])=>g[k]=+$('#'+i).value/m);['orders','rp','bn','cn','cd','k'].forEach(k=>g[k]=Math.round(g[k]));if(!g.fut)g.lev=1;return{g,ex:$('#fe').value,per:+$('#fper').value,dep:+$('#fdp').value}}
-function bad(c){const g=c.g;if(!c.ex)return'Підключіть біржу в профілі.';if(!PAIRS[g.pair]||!listed(g.pair,c.ex))return'Ця пара не торгується на вибраній біржі.';if(!g.sg.length)return'Оберіть хоча б один сигнал входу.';if(Object.values(g).some(v=>typeof v==='number'&&!isFinite(v)))return'Усі числові поля мають бути заповнені.';if(!(g.base>0&&g.step>0&&g.tp>0&&g.sl>0&&g.mult>0&&g.smul>0&&g.tp2>0&&c.dep>0))return'Розмір ордера, крок, TP, SL, множники й депозит мають бути більшими за 0.';if(g.orders<1||g.orders>30)return'Ордерів DCA: від 1 до 30.';if(g.rp<2||g.bn<2||g.cn<2)return'Періоди індикаторів мають бути не менші за 2.';if(g.d<0&&!g.fut)return'Short доступний лише на Futures.';const m=maxLev(g.pair,c.ex);if(g.lev<1||g.lev>m)return'Плече для цієї пари на цій біржі: від 1 до '+m+'×.';if(g.s1<0||g.s1>=1)return'Частка Multi-TP: від 0 до 99%.';const F=fltOf(g);if(F&&F.minN){const mo=g.base*(g.fut?g.lev:1)*Math.min(1,g.mult**(g.orders-1));if(mo<F.minN-1e-9)return`Біржа не прийме такий ордер: мінімум ${n2(F.minN,2)} USDT на ордер для ${g.pair}${g.fut?' (ф\'ючерси)':''}. ${g.mult<1?'Найменший ордер сітки':'Перший ордер з плечем'}: ${n2(mo,2)} USDT.`}if(g.k<1)return'Мін. сигналів має бути не менше 1.';return''}
+function bad(c){const g=c.g;if(!c.ex)return'Підключіть біржу в профілі.';if(!PAIRS[g.pair]||!listed(g.pair,c.ex))return'Ця пара не торгується на вибраній біржі.';if(!g.sg.length)return'Оберіть хоча б один сигнал входу.';if(Object.values(g).some(v=>typeof v==='number'&&!isFinite(v)))return'Усі числові поля мають бути заповнені.';if(!(g.base>0&&g.step>0&&g.tp>0&&g.sl>0&&g.mult>0&&g.smul>0&&g.tp2>0&&c.dep>0))return'Розмір ордера, крок, TP, SL, множники й депозит мають бути більшими за 0.';if(g.orders<1||g.orders>30)return'Ордерів DCA: від 1 до 30.';if(g.rp<2||g.bn<2||g.cn<2)return'Періоди індикаторів мають бути не менші за 2.';if(g.d<0&&!g.fut)return'Short доступний лише на Futures.';const m=maxLev(g.pair,c.ex);if(g.lev<1||g.lev>m)return'Плече для цієї пари на цій біржі: від 1 до '+m+'×.';if(g.s1<0||g.s1>=1)return'Частка Multi-TP: від 0 до 99%.';const F=fltOf(g);if(F&&F.minN){const mo=g.base*(g.fut?g.lev:1)*Math.min(1,g.mult**(g.orders-1));if(mo<F.minN-1e-9)return`Біржа не прийме такий ордер: мінімум ${n2(F.minN,2)} USDT на ордер для ${g.pair}${g.fut?' (ф\'ючерси)':''}. ${g.mult<1?'Найменший ордер сітки':'Перший ордер з плечем'}: ${n2(mo,2)} USDT.`}if(g.k<1)return'Мін. сигналів має бути не менше 1.';{const r=minFirst(g);if(r&&g.base<r.min-1e-9)return minText(r)}return''}
 function fill(g,ex){g={...DEF,...g};$('#fp').value=g.pair;if(ex&&cx.includes(ex))$('#fe').value=ex;$('#fdr').value=g.d;$('#ftf').value=g.tf;$('#fmk').value=g.fut;$('#fbe').value=g.be;NUM.forEach(([i,,k,m])=>$('#'+i).value=+(g[k]*m).toFixed(4));$$('[data-sg]').forEach(c=>c.checked=g.sg.includes(c.dataset.sg))}
 const MODES=[{step:.025,orders:4,mult:1.15,tp:.006,sl:.06},{step:.015,orders:5,mult:1.3,tp:.01,sl:.05},{step:.01,orders:7,mult:1.6,tp:.015,sl:.08}];
 $$('[data-m]').forEach(b=>b.onclick=()=>{const c=cfg();fill({...c.g,...MODES[+b.dataset.m]},c.ex);pv()});
@@ -38,55 +38,40 @@ const need=Math.ceil(10*F.step*px/(mm||1)/5)*5;return{worst,first,step:F.step,co
 const rndText=(r,ex,short)=>{const pc=x=>'−'+Math.round(x*100)+' %';
 return short?`⚠ На біржі ордери округлюються до кроку ${String(r.step).replace('.',',')} ${r.coin}: перший ${n2(r.first[0],2)} → ${n2(r.first[1],2)} USDT (${pc(1-r.first[1]/r.first[0])})${r.zero?', частину ордерів біржа не прийме':''} — модель і біржа розходяться в обсязі.`
 :`⚠ На ${XNAME[ex]||ex} кількість округлюється до кроку ${String(r.step).replace('.',',')} ${r.coin}: перший ордер ${n2(r.first[0],2)} USDT стане ${n2(r.first[1],2)} USDT (${pc(1-r.first[1]/r.first[0])}), найгірший ордер сітки ${pc(r.worst)}${r.zero?' — частину ордерів біржа не прийме':''}. Модель бота й біржа розійдуться в обсязі. Щоб похибка була ≤ 10 %, потрібен перший ордер від ~${n2(r.need,0)} USDT (з більшим плечем — менше).`};
-function rndWarnR(g){const el=$('#frw');if(!el)return;const ex=(typeof TN!=='undefined'&&TN.ex)||'bybit',r=rndInfo(g,ex);
-if(r&&(r.worst>=.1||r.zero)){el.textContent=rndText(r,ex);el.hidden=false}else{el.hidden=true;el.textContent='';if(!MD.xflt[ex]&&g&&g.fut)xRules(ex).then(m=>{if(m&&CUR==='bd')rndWarnR(cfg().g)})}}
-/* ---------- автопідбір під біржу ----------
-   Бюджет (маржа на всю сітку: вхід і всі докупівлі) → перший ордер, плече, кількість ордерів DCA. Стратегія (крок,
-   множники, TP, SL, сигнали) не змінюється. Ціна й правила (крок кількості, мінімум) — з біржі, на якій торгує бот.
-   Спершу шукаємо найменше плече, за якого кожен ордер сітки біржа прийме й округлить не більш як на 10 %;
-   не вийшло — зменшуємо кількість ордерів. Межі плеча: біржа (maxLev); ліквідація далі за SL (L ≤ 1 / (SL + 1 %));
-   ліміт угоди (обсяг усієї сітки з плечем ≤ profiles.risk_max_pos, без профілю — 3000, як DEF_LIMITS на сервері). */
+/* ---------- мінімальний перший ордер для біржі ----------
+   Біржа бота (Bybit Demo чи Binance Testnet) округлює кількість кожного ордера сітки вниз до кроку й не приймає ордер,
+   менший за мінімум. Перший ордер (маржа) має бути таким, щоб кожен ордер сітки (вхід і докупівлі, з плечем) мав
+   ≥ 10 кроків кількості (тоді округлення ≤ 10 %), не менше minQty і мінімальної суми ордера. Ціна — з біржі (кеш на 2 хв),
+   поки її немає — з графіка. Правил біржі немає (не завантажились) — перевірки немає, як і раніше (лише fltOf у bad()).
+   Мінімум залежить від плеча й множника ордера; кількість ордерів змінює суму всієї сітки. */
 const XPX={bybit:s=>[j=>+((j.result&&j.result.list&&j.result.list[0])||{}).lastPrice,`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${s}`],
 binance:s=>[j=>+j.price,`https://testnet.binancefuture.com/fapi/v1/ticker/price?symbol=${s}`,`https://fapi.binance.com/fapi/v1/ticker/price?symbol=${s}`]};
+MD.xpx={};
 async function xPrice(ex,s){const R=XPX[ex];if(!R)return null;const[f,...U]=R(s);for(const u of U){try{const p=f(await jget(u,8000));if(p>0)return p}catch(e){}}return null}
-function fitGrid(g,B,px,F,maxL,cap){const m=+g.mult||1,Lsl=Math.max(1,Math.floor(1/((+g.sl||0)+.01))),Lcap=cap>0?Math.floor(cap/B+1e-9):Infinity,Lmax=Math.min(maxL,Lsl,Lcap),n0=Math.max(1,Math.round(g.orders||1));
-const chk=(n,L)=>{const base=Math.floor(B/ladder({orders:n,mult:m})*100)/100;if(!(base>0))return null;const P=lv({...g,orders:n,base,lev:L,fee:0,slip:0},px,null).L;if(P.length<n)return null;let worst=0;
-for(let k=0;k<n;k++){const p=P[k].p,q=base*L*m**k/p,qf=Math.floor(q/F.step+1e-9)*F.step;if(qf<=0||(F.minQty&&qf<F.minQty-1e-12)||(F.minN&&qf*p<F.minN-1e-9))return null;const loss=1-qf/q;if(loss>.1+1e-9)return null;if(loss>worst)worst=loss}
-return{n,L,base,worst,qty:Math.floor(base*L/px/F.step+1e-9)*F.step}};
-for(let n=n0;n>=1;n--)for(let L=1;L<=Lmax;L++){const r=chk(n,L);if(r)return{...r,n0,Lcap}}
-/* не вміщається: найменший бюджет для повної сітки з найбільшим плечем, яке дозволяють біржа й SL */
-const L=Math.max(1,Math.min(maxL,Lsl)),P=lv({...g,orders:n0,base:1,lev:L,fee:0,slip:0},px,null).L;let need=0;
-for(let k=0;k<n0;k++){const p=(P[k]||{p:px}).p,v=Math.max(10*F.step*p,(F.minQty||0)*p,F.minN||0)*1.001;need=Math.max(need,v/(L*m**k))}
-return{fail:1,need:Math.ceil(need*ladder({orders:n0,mult:m})/5)*5,L,n0,Lcap}}
-const XFIT={r:null};
-function afSay(h,ok){XFIT.r={h,ok};const el=$('#fbudr');if(!el)return;el.innerHTML=h;el.hidden=false}
-function afHide(){XFIT.r=null;const el=$('#fbudr');if(el){el.hidden=true;el.textContent=''}}
-async function afRun(){const c=cfg(),g=c.g,B=+$('#fbud').value;try{localStorage.setItem('zbud',String(B||''))}catch(e){}
-if(!g.fut)return afSay('Підбір працює для ф\'ючерсів: боти з «Тестнет» торгують лише на ф\'ючерсах.');
-if(!(B>0))return afSay('Вкажіть бюджет бота — скільки USDT маржі ви готові виділити на всю сітку (вхід і всі докупівлі).');
-if(!PAIRS[g.pair])return afSay('Оберіть пару.');
-const ex=(typeof TN!=='undefined'&&TN.ex)||'bybit',X=XNAME[ex]||ex,s=sym(g.pair),coin=g.pair.split('/')[0],btn=$('#fbudb');afSay(`Отримую ціну й правила ${X}…`);if(btn)btn.disabled=true;
-let M,p1;try{[M,p1]=await Promise.all([xRules(ex),xPrice(ex,s)])}finally{if(btn)btn.disabled=false}const F=M&&M[s];
-if(!F||!(F.step>0))return afSay(`Не вдалося отримати правила ${X} для ${g.pair}. Спробуйте пізніше.`);
-let px=p1,src='з біржі';if(!(px>0)){try{px=lastC(dk(g)).c;src='з графіка'}catch(e){}}if(!(px>0))return afSay('Немає ціни для '+g.pair+'. Спробуйте пізніше.');
-const maxL=Math.min(F.maxLev||Infinity,maxLev(g.pair,c.ex||'Binance')),cap=typeof RK!=='undefined'&&RK.l?RK.l.pos:3000,r=fitGrid(g,B,px,F,maxL,cap),
-ps=x=>String(x).replace('.',','),head=`${X}: ціна ${coin} ${n2(px,px<1?5:2)} (${src}), крок кількості ${ps(F.step)} ${coin}${F.minN?', мін. ордер '+n2(F.minN,2)+' USDT':''}.`;
-if(r.fail)return afSay(r.Lcap<1?`${head} Бюджет ${n2(B,0)} USDT навіть із плечем 1× більший за ваш ліміт угоди ${n2(cap,0)} USDT (Профіль → «Ліміти ризику»).`
-:`${head} Бюджету ${n2(B,0)} USDT замало: біржа не виконає жодної сітки з похибкою округлення ≤ 10 %. Для сітки з ${r.n0} ордерів потрібно від ~${n2(r.need,0)} USDT (з плечем ${r.L}×).${r.need*r.L>cap?` Обсяг такої сітки перевищить ліміт угоди ${n2(cap,0)} USDT — його можна змінити в Профілі.`:''}`);
-const same=Math.abs(r.base-g.base)<.005&&r.L===(g.lev||1)&&r.n===g.orders,lad=ladder({orders:r.n,mult:+g.mult||1});XFIT.fit=r;
-afSay(`${head} ${same?'Поточні налаштування вже підходять:':'Пропозиція:'} перший ордер <b>${n2(r.base,2)} USDT</b> × плече <b>${r.L}×</b> = ${n2(r.base*r.L,2)} USDT (${ps(+r.qty.toFixed(8))} ${coin}), ордерів DCA <b>${r.n}</b>${r.n<r.n0?` (замість ${r.n0}: на більше бюджету не вистачає)`:''}. Уся сітка — ${n2(r.base*lad,2)} USDT маржі, ${n2(r.base*lad*r.L,2)} USDT обсягу; похибка округлення до ${Math.round(r.worst*100)} %.${r.L>1?` Ліквідація приблизно за ${n2((1/r.L-.005)*100,1)} % проти середньої ціни, SL — ${n2(g.sl*100,1)} %.`:''}`
-+(same?'':' <button class="b p" type="button" id="fbuda">Застосувати</button>'),1)}
-function afApply(){const r=XFIT.fit;if(!r)return;$('#fb').value=r.base;$('#flv').value=r.L;$('#fo').value=r.n;pv();
-afSay(`Застосовано: перший ордер ${n2(r.base,2)} USDT, плече ${r.L}×, ордерів DCA ${r.n}. Запустіть бектест, щоб перевірити стратегію з новими значеннями.`,1)}
-function pv(){const c=cfg(),m=$('#flh'),e=bad(c);fgSum(c);rndWarnR(c.g);{const bi=$('#fbud');if(bi&&c.g.base>0&&c.g.orders>0)bi.placeholder='зараз '+n2(c.g.base*ladder(c.g),0)}if(e)$$('#fg input').forEach(i=>{if(i.type==='number'&&(i.value===''||!isFinite(+i.value))){const d=i.closest('details');if(d)d.open=true}});const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
+const botEx=()=>(typeof TN!=='undefined'&&TN.ex)||'bybit';
+function minFirst(g,ex=botEx()){if(!g||!g.fut||!PAIRS[g.pair])return null;const s=sym(g.pair),F=MD.xflt[ex]&&MD.xflt[ex][s];if(!F||!(F.step>0))return null;
+const c=MD.xpx[ex+s];let px=c&&c.p,src='з біржі';if(!(px>0)){try{px=lastC(dk(g)).c;src='з графіка'}catch(e){}}if(!(px>0))return null;
+const L=+g.lev||1,m=+g.mult||1,n=Math.max(1,Math.round(g.orders||1)),P=lv({...g,base:1,lev:L,orders:n,fee:0,slip:0},px,null).L;let need=0;
+for(let k=0;k<n;k++){const p=(P[k]||{p:px}).p,v=Math.max(10*F.step*p,(F.minQty||0)*p,F.minN||0);need=Math.max(need,v/(L*m**k))}
+return{min:Math.ceil(need-1e-9),F,px,src,ex,L,n,m,coin:g.pair.split('/')[0]}}
+const minText=r=>`Замала сума першого ордера для ${XNAME[r.ex]||r.ex}: потрібно від ${n2(r.min,0)} USDT з плечем ${r.L}× (ціна ${r.coin} ${n2(r.px,r.px<1?5:2)} ${r.src}, крок кількості ${String(r.F.step).replace('.',',')} ${r.coin}). З меншою сумою біржа округлить ордери більш ніж на 10 % або не прийме їх. Збільште суму або плече. Уся сітка з ${r.n} орд. тоді — ${n2(r.min*ladder({orders:r.n,mult:r.m}),0)} USDT маржі.`;
+/* біржові дані для мінімуму: правила (xRules, кеш на добу) і ціна (кеш на 2 хв); після завантаження — перерахунок форми */
+const XLD={};
+function minLoad(g){if(!g||!g.fut||!PAIRS[g.pair])return;const ex=botEx(),s=sym(g.pair),k=ex+s,redo=()=>{if(CUR==='bd')pv()};
+if(!MD.xflt[ex]&&!XLD[ex]){XLD[ex]=1;xRules(ex).then(m=>{XLD[ex]=0;if(m)redo()})}
+const c=MD.xpx[k];if((!c||Date.now()-c.at>12e4)&&!XLD[k]){XLD[k]=1;xPrice(ex,s).then(p=>{XLD[k]=0;if(p>0){MD.xpx[k]={p,at:Date.now()};redo()}})}}
+function minR(g){const r=minFirst(g),fb=$('#fb');if(!fb)return;let h=fb.parentNode.querySelector('.fmin');if(!h){h=document.createElement('small');h.className='fmin';fb.insertAdjacentElement('afterend',h)}
+const lo=!!(r&&g.base<r.min-1e-9);fb.classList.toggle('inv',lo);fb.setAttribute('aria-invalid',lo?'true':'false');
+h.innerHTML=r?`мін. ${n2(r.min,0)} USDT на ${XNAME[r.ex]||r.ex}${lo?' <button type="button" class="lnk" data-minset="'+r.min+'">підставити</button>':''}`:'';h.classList.toggle('dn',lo);
+const w=$('#frw');if(w){w.hidden=!lo;w.textContent=lo?minText(r):''}}
+function pv(){const c=cfg(),m=$('#flh'),e=bad(c);fgSum(c);minLoad(c.g);minR(c.g);if(e)$$('#fg input').forEach(i=>{if(i.type==='number'&&(i.value===''||!isFinite(+i.value))){const d=i.closest('details');if(d)d.open=true}});const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
 m.textContent=`Макс. плече для ${c.g.pair} на ${c.ex||'біржі'}: ${mx}×. Фундаментальний бал пари (демо): ${PAIRS[c.g.pair].f}/100.`+(c.g.lev>1&&c.g.fut?` Ліквідація приблизно за ${((1/c.g.lev-.005)*100).toFixed(1)}% проти позиції.`:'')+((F=>F?` Правила біржі: мін. ордер ${n2(F.minN,2)} USDT, крок ціни ${F.tick}, крок кількості ${F.step}${F.maxLev?', плече до '+F.maxLev+'×':''}.`:'')(fltOf(normG({...c.g}))));
 if(e){$('#gs').textContent=e;return}
 const ck=dk(c.g);if(!ready(ck)){$('#gs').textContent='Завантажую історію '+c.g.pair+' ('+mkLbl(ck)+')…';need(ck).then(pv).catch(er=>$('#gs').textContent='Не вдалося завантажити дані: '+er.message);return}
 const v=$('#gv');if(v._k!==ck||(v._g&&v._g.tf!==c.g.tf))v._mk=null;v._p=c.g.pair;v._k=ck;v._g=c.g;if(!v._d)lwChart(v,()=>({pair:v._p,key:v._k,tf:v._g.tf,lv:()=>lines(v._g,null,v._k),mk:()=>v._mk||[]}),'full');else v._d();if(v._lt!==c.g.tf){v._lt=c.g.tf;if(v._tf){v._tf(c.g.tf);v._d()}}
 const A=lv(c.g,lastC(ck).c,fltOf(c.g));$('#gs').textContent=`Сітка: ${n2(c.g.base*ladder(c.g),0)} USDT маржі, позиція до ${n2(A.L.reduce((a,l)=>a+l.s,0),0)} USDT. Лінії показано від поточної ціни.`}
-$('#fg').oninput=$('#fg').onchange=e=>{if(e&&e.target&&e.target.id!=='fbud'&&XFIT.r)afHide();pv()};
-$('#fg').addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('button');if(!t)return;if(t.id==='fbudb')afRun();else if(t.id==='fbuda')afApply()});
-try{const v=localStorage.getItem('zbud');if(v&&+v>0)$('#fbud').value=v}catch(e){}
+$('#fg').oninput=$('#fg').onchange=pv;
+$('#fg').addEventListener('click',e=>{const t=e.target.closest&&e.target.closest('[data-minset]');if(!t)return;e.preventDefault();$('#fb').value=t.dataset.minset;pv()});
 $('#bt').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;
 withData(dk(c.g),$('#res'),()=>{const R=bt(c.g,c.per,c.dep,1),s=summ(R,c.dep);bsave(c,s);
 $('#res').innerHTML=`<div class="k">${K('Угод',s.n)}${K('Win rate',s.wr.toFixed(0)+'%')}${K('PnL з відкритою позицією',f(s.pnl),cls(s.pnl))}${K('Реалізований / відкритий',f(s.real,0)+' / '+f(s.unr,0))}${K('Дохідність',f(s.roi,1)+'%',cls(s.roi))}${K('Макс. просадка',f(s.dd)+' ('+f(s.ddp,1)+'%)',cls(s.dd))}${K('Профіт-фактор',pf(s))}${K('Ліквідацій',s.liq,s.liq?'dn':'')}${c.g.fut?K('Funding',f(-s.fund),cls(-s.fund)):''}</div><p class="mu" style="margin-top:10px">${dataNote(c.g)}</p><div class="card" id="qa" style="margin-top:12px"></div><h3>Графік угод</h3><div class="bt-ch"></div><h3>Крива капіталу</h3><div style="margin:8px 0 14px">${chart(s.cur)}</div><p class="mu">${c.g.pair}, ${tfl(c.g.tf)}, ${perl(c.per)} на ${hsrc()}${MD.mode==='live'&&D[dk(c.g)].length<c.per?` (доступно ${n2(D[dk(c.g)].length/24,0)} дн.)`:''}. Просадка враховує відкриті позиції, докупівлі в одній свічці виконуються до стопа. ${MD.mode==='live'?'Минулі результати не гарантують майбутніх, тому дивіться й розділ «Стрес-тест».':'Демо-ціни поводяться м’якше за реальний ринок, тому дивіться й розділ «Стрес-тест».'}</p>`+R.b.tr.slice(-8).reverse().map(t=>`<div class="tr"><span>${tm(t.ts)}, ордерів ${t.n}${t.liq?', ліквідація':t.sl?', SL':''}</span><span class="mono ${cls(t.pnl)}">${f(t.pnl)}</span></div>`).join('');

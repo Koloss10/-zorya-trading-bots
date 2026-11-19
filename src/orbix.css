@@ -236,3 +236,4 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .fbk{font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--ln)}
 .fbk-bug{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 40%,transparent)}
 .fbk-idea{color:var(--ac);border-color:color-mix(in srgb,var(--ac) 40%,transparent)}
+.rndw{color:var(--warn);font-size:13px;margin:0 0 12px;line-height:1.45}

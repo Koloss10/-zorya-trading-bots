@@ -37,7 +37,7 @@ export const linkId = (botId, t, kind) => linkBase(botId, t) + kind;
 export function actionsFor(events, botId, native) {
   const out = [];
   for (const ev of events) {
-    if (ev.kind === "open") out.push({ id: linkId(botId, ev.t, "o"), kind: "open", t: ev.t, notional: ev.notional, price: ev.price, tries: 0 });
+    if (ev.kind === "open") out.push({ id: linkId(botId, ev.t, "o"), kind: "open", t: ev.t, notional: ev.notional, price: ev.price, ...(ev.bf > 1 ? { bf: ev.bf } : {}), tries: 0 });
     else if (ev.kind === "dca") { if (!native) out.push({ id: linkId(botId, ev.t, "a" + ev.n), kind: "dca", t: ev.t, notional: ev.notional, tries: 0 }); }
     else if (ev.kind === "part") out.push({ id: linkId(botId, ev.t, "p"), kind: "part", t: ev.t, share: ev.share, tries: 0 });
     else out.push({ id: linkId(botId, ev.t, "c"), kind: "close", t: ev.t, tries: 0 });
@@ -142,7 +142,8 @@ export async function execute(ex, a, { g, symbol, native, botId, fl = {} }) {
     // зсуває всі рівні, і біржа докуповує не там, де модель (дії старих версій без ціни — від ціни на біржі)
     const e0 = a.price > 0 ? a.price : p.entry;
     let n = 0;
-    for (const r of ladder(g, e0, F)) {
+    const gl = a.bf > 1 ? { ...g, base: g.base * a.bf } : g; // реінвест: драбина у тому ж масштабі, що й угода моделі
+    for (const r of ladder(gl, e0, F)) {
       try { await once(ex, symbol, base + "d" + r.k, () => ex.limit(symbol, side, r.qty, r.price, base + "d" + r.k)); n++; }
       catch (e) { msg += ` · докупівля ${r.k}: ${e.message}`; }
     }
@@ -265,7 +266,8 @@ export async function restore(ex, { g, symbol, fl, mp }) {
   const was = (k) => [fl.lb + "d" + k, ...Array.from({ length: gen - 1 }, (_, i) => fl.lb + "e" + (i + 1) + "x" + k)];
   let n = 0;
   const miss = [];
-  for (const r of ladder(g, fl.e0, F)) {
+  const gl = mp.bf > 1 ? { ...g, base: g.base * mp.bf } : g; // реінвест — як при вході
+  for (const r of ladder(gl, fl.e0, F)) {
     if (r.k < mp.n) continue;
     // перевірка не вдалася — відновлення переривається (fl.rs лишається, повтор наступного запуску): інакше нове покоління продублювало б сходинку
     const prev = await Promise.all(was(r.k).map((id) => ex.byLink(symbol, id)));

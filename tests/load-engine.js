@@ -9,6 +9,7 @@ function loadEngine() {
   if (!mods.length) throw new Error('не знайдено модулів рушія в src/js');
   const code = mods.map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('') + `
 ;({Bot,run,summ,ladder,lv,entry,normG,rnd,wfo,wfPlan,wfFold,wfSum,searchWin,lbT,SIG,agg,aggC,ema,rsi,bbands,cci,stoch,macdH,auto,evalC,stress,DEF,PAIRS,DT,MD,STR,
+  atr,wma,hma,supertrend,psar,
   bt:typeof bt==='function'?bt:null,aggT:typeof aggT==='function'?aggT:null,closedTf:typeof closedTf==='function'?closedTf:null,
   replay:typeof replay==='function'?replay:null,qualityA,qMarket})`;
   const ctx = vm.createContext({ console, Math, Date, JSON, Array, Object, Number, String, Set, Map, Promise, Proxy,

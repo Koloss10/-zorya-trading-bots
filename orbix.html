@@ -40,7 +40,7 @@ svg{width:100%;height:auto;display:block}
 .b.p{background:linear-gradient(135deg,var(--ac),color-mix(in srgb,var(--ac) 70%,var(--ac2)));border-color:transparent;color:var(--actx);font-weight:600;box-shadow:0 6px 18px -8px var(--ac)}
 .b.d{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 45%,transparent);background:color-mix(in srgb,var(--dn) 7%,transparent)}
 .b.sm{min-height:36px;padding:0 12px;font-size:13px;border-radius:10px}
-.tg[aria-pressed=true]{background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac);color:var(--ac)}
+.tg:is([aria-pressed=true],[aria-selected=true]){background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac);color:var(--ac)}
 .mi{width:100%;text-align:left;display:flex;align-items:center;gap:10px}
 .mi svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .mi[aria-current=true]{background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:color-mix(in srgb,var(--ac) 45%,transparent);color:var(--ac)}
@@ -270,6 +270,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <button class="b" id="mb" aria-label="Меню" aria-expanded="false" style="padding:0 12px"><svg viewBox="0 0 24 24" style="width:22px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </header>
 
+<main id="main">
 <section id="v-ov" class="s">
 <div id="hero"></div>
 <div class="card" id="home-top"><div class="hd"><h2>Топ Боти</h2><button class="b ib" id="tfb" aria-label="Фільтри топ-ботів" aria-expanded="false" aria-controls="tfp"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg></button><button class="b ib" id="topr" aria-label="Перерахувати топ"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg></button></div><p class="mu" id="tops" style="margin-bottom:10px"></p>
@@ -288,7 +289,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 
 <section id="v-mk" class="s" hidden>
 <div class="card"><h2>Ринок</h2><input class="srch" id="mq" type="search" placeholder="Знайти пару, напр. ETH" autocomplete="off" aria-label="Знайти пару" aria-controls="mkl"><div class="row" id="mkm" style="margin-bottom:8px"><button class="b sm tg" data-mm="F">Ф'ючерси USDⓈ-M</button><button class="b sm tg" data-mm="S">Спот</button></div><p class="mu" id="mks" style="margin-bottom:8px"></p><div id="mkc"></div><div class="row" style="margin-top:10px"><button class="b p" id="mkb">Створити бота на цій парі</button><button class="b" id="mka">Авто-майстер для пари</button></div></div>
-<div class="card"><h2>Пари</h2><div class="pft" id="mkt" role="tablist" aria-label="Список пар"><button class="b sm tg" role="tab" data-mt="all">Усі</button><button class="b sm tg" role="tab" data-mt="up">Ростуть</button><button class="b sm tg" role="tab" data-mt="dn">Падають</button><button class="b sm tg" role="tab" data-mt="fav">★ Обрані</button></div><div id="mkl"></div></div>
+<div class="card"><h2>Пари</h2><div class="pft" id="mkt" role="group" aria-label="Список пар"><button class="b sm tg" data-mt="all">Усі</button><button class="b sm tg" data-mt="up">Ростуть</button><button class="b sm tg" data-mt="dn">Падають</button><button class="b sm tg" data-mt="fav">★ Обрані</button></div><div id="mkl"></div></div>
 </section>
 
 <section id="v-aw" class="s" hidden>
@@ -309,11 +310,11 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 
 <section id="v-bs" class="s" hidden><div class="card"><h2>Історія бектестів</h2><div id="bsh"></div></div></section>
 
-<section id="v-jr" class="s" hidden><div class="card"><h2>Журнал угод</h2><div class="fl" id="jfl"></div><div class="sc"><table id="jt"></table></div></div></section>
+<section id="v-jr" class="s" hidden><div class="card"><h2>Журнал угод</h2><div class="fl" id="jfl"></div><div class="sc" tabindex="0" role="region" aria-label="Таблиця, гортайте вбік"><table id="jt"></table></div></div></section>
 
 <section id="v-st" class="s" hidden>
 <div class="k" id="sk"></div>
-<div class="card"><h2>Статистика ботів</h2><div class="sc"><table id="stt"></table></div></div>
+<div class="card"><h2>Статистика ботів</h2><div class="sc" tabindex="0" role="region" aria-label="Таблиця, гортайте вбік"><table id="stt"></table></div></div>
 <div class="card"><h2>PnL за ботами</h2><div id="sb"></div></div>
 </section>
 
@@ -357,6 +358,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <section id="v-help" class="s" hidden>
 <div class="card"><h2>Довідка</h2><div id="help"></div></div>
 </section>
+</main>
 </div>
 
 <nav id="tab" aria-label="Розділи" hidden></nav>
@@ -1011,7 +1013,7 @@ el.innerHTML=`<h2>Якість стратегії</h2><p style="margin:0 0 10px"
 ${q.flags.length?`<ul style="margin:0 0 10px;padding-left:18px">${q.flags.map(x=>`<li class="${x.sev?'dn':''}">${esc(x.t)}</li>`).join('')}</ul>`:''}
 <h3>PnL за різних витрат, USDT</h3>${ROW('Без витрат',f(q.gross.pnl),cls(q.gross.pnl))}${ROW('Як у бектесті',f(q.base.pnl),cls(q.base.pnl))}${ROW('Подвоєні витрати',f(q.hard.pnl),cls(q.hard.pnl))}${ROW('Витрати від валового прибутку',q.costShare==null?'—':Math.round(q.costShare*100)+' %',q.costShare>.5?'dn':'')}
 <h3>Стабільність</h3>${q.W?ROW(`Вікон по ${W} у плюсі`,q.act?q.pos+' з '+q.act:'—',q.posShare==null?'':q.posShare>=.6?'up':q.posShare<.5?'dn':''):''}${q.conc!=null?ROW('Частка прибутку найкращого вікна',Math.round(q.conc*100)+' %',q.conc>.6?'dn':''):''}${ROW('1-а / 2-а половина, % за 30 дн.',f(q.h1m,1)+' / '+f(q.h2m,1),cls(Math.min(q.h1m,q.h2m)))}
-${reg?`<h3>Ринкові умови</h3><div class="sc"><table style="min-width:0"><tr><th>Ринок</th><th>Вікон у плюсі</th><th>PnL</th></tr>${reg}</table></div><p class="mu">${q.vol.hi.n?`Висока волатильність: ${q.vol.hi.n} вікон, PnL ${f(q.vol.hi.pnl)}; звичайна: ${q.vol.lo.n} вікон, PnL ${f(q.vol.lo.pnl)}.`:'Волатильність у всіх вікнах схожа.'}</p>`:''}
+${reg?`<h3>Ринкові умови</h3><div class="sc" tabindex="0" role="region" aria-label="Таблиця, гортайте вбік"><table style="min-width:0"><tr><th>Ринок</th><th>Вікон у плюсі</th><th>PnL</th></tr>${reg}</table></div><p class="mu">${q.vol.hi.n?`Висока волатильність: ${q.vol.hi.n} вікон, PnL ${f(q.vol.hi.pnl)}; звичайна: ${q.vol.lo.n} вікон, PnL ${f(q.vol.lo.pnl)}.`:'Волатильність у всіх вікнах схожа.'}</p>`:''}
 <p class="mu" style="margin-top:8px">Подвоєні витрати: комісії ×2, ще 0,1&nbsp;% прослизання на кожному ринковому вході й стопі, прослизання стопу щонайменше 0,2&nbsp;%, funding ×2. Кожне вікно — окремий бот із нуля. Ринок вікна — ріст чи падіння, якщо ціна змінилась більш ніж на ${q.W===168?'3,9':'8'} %, інакше бічний.</p>
 <div id="qawf"><button class="b sm" id="qawfb">Walk-forward: чи заробляє підбір на цій парі поза навчанням</button></div>`;
 $('#qawfb').onclick=()=>{const w=$('#qawf');w.innerHTML='<p class="mu">Рахую walk-forward…</p>';setTimeout(()=>{let r;try{r=qualityWF({...c.g},c.ex,c.per)}catch(e){w.innerHTML=`<p class="dn">Помилка розрахунку: ${esc(e.message)}</p>`;return}
@@ -1059,7 +1061,7 @@ $('#awr').innerHTML=`<div class="card"><h2>Підібрана конфігура
 <div class="card"><h2>Депозит і страховка</h2>${KV('Маржа сітки ордерів',n2(E.M,0)+' USDT')}${KV('Страховий запас',n2(E.reserve,0)+' USDT')}${KV('Оптимальний депозит',n2(need,0)+' USDT')}${c.amt>0?KV('Ваш депозит',n2(c.amt,0)+' USDT, '+(c.amt>=need?'достатньо':'бракує '+n2(need-c.amt,0)+' USDT')):'<p class="mu" style="margin-top:6px">Розрахунок для першого ордера 10 USDT. Для іншого розміру збільшіть усе пропорційно.</p>'}<p class="mu" style="margin-top:6px">Страховий запас: більше з двох значень, 1,5 від найгіршої історичної просадки або найгірший збиток у стрес-сценаріях.</p></div>
 <div class="card"><h2>Бектест, ${perl(c.per)}</h2><p class="mu" style="margin-bottom:8px">Період включає 70% даних, на яких підбирались параметри, тому цифри завищені. Чесна оцінка — перевірка поза підбором нижче.</p><div class="k">${K('Угод',s.n)}${K('Win rate',s.wr.toFixed(0)+'%')}${K('PnL з відкритою позицією',f(s.pnl),cls(s.pnl))}${K('Дохідність на депозит',f(s.roi,1)+'%',cls(s.roi))}${K('Макс. просадка',f(s.dd,0)+' ('+f(s.ddp,1)+'%)',cls(s.dd))}${K('Профіт-фактор',pf(s))}</div><div style="margin:14px 0">${chart(s.cur)}</div><p class="mu">Перевірка на останніх 30% періоду, які не брали участі в підборі: угод ${t.n}, PnL ${f(t.pnl,0)} USDT${t.n<5?' (замало угод для висновків)':''}.</p></div>
 <div class="card" id="awwf">${wfHtml(AW.wf,AW.wfp)}</div>
-<div class="card"><h2>Стрес-сценарії</h2><div class="sc"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Результат</th></tr>${sx}</table></div></div>
+<div class="card"><h2>Стрес-сценарії</h2><div class="sc" tabindex="0" role="region" aria-label="Таблиця, гортайте вбік"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Результат</th></tr>${sx}</table></div></div>
 <div class="card"><div class="row"><button class="b p" data-a="a">Додати paper-бота</button><button class="b" data-a="o">Відкрити в конструкторі</button><button class="b" data-a="f">У топові</button></div><p class="mu" style="margin-top:10px">Підбір виконано на ${hsrc()}. Кращий бектест не гарантує прибуток.</p></div>`}
 function awRun(c){const o=$('#awr');if(!PAIRS[c.pair]||!c.ex||!listed(c.pair,c.ex))return o.innerHTML='<p class="dn">Оберіть пару зі списку, яка торгується на вибраній біржі.</p>';
 if(c.dr<0&&!c.fut)return o.innerHTML='<p class="dn">Short доступний лише на Futures.</p>';
@@ -1165,7 +1167,7 @@ $('#jt').innerHTML='<tr><th>Час</th><th>Бот</th><th>Ордерів</th><th
 let SXG=null;
 function sxr(){const o=$('#sxs');o.innerHTML=bots.map(x=>`<option value="${x.id}">${ttl(x)}</option>`).join('')+(SXG?'<option value="b">Налаштування з конструктора</option>':'')||'<option value="">Немає ботів</option>';if(SXG)o.value='b'}
 $('#sxo').onclick=()=>{const v=$('#sxs').value,g=v==='b'?SXG:(bots.find(x=>x.id===+v)||{}).g;if(!g)return $('#sxt').innerHTML='<p class="dn">Створіть бота або відкрийте стрес-тест із конструктора.</p>';
-const M=g.base*ladder(g),r=stress(g);$('#sxt').innerHTML=`<div class="sc"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Кінець</th><th>Результат</th></tr>${r.map(x=>`<tr><td>${x.n}</td><td>${x.dca}</td><td class="mono ${cls(x.mn)}">${f(x.mn,0)}</td><td class="mono ${cls(x.end)}">${f(x.end,0)}</td><td>${x.liq?'ліквідація':x.sl?'SL':'—'}</td></tr>`).join('')}</table></div><p class="mu" style="margin-top:8px">Маржа сітки ${n2(M,0)} USDT. Бот відкриває позицію перед ударом ринку; стопи виконуються з прослизанням 2%. Найгірший збиток: ${f(Math.min(...r.map(x=>x.mn)),0)} USDT.</p>`};
+const M=g.base*ladder(g),r=stress(g);$('#sxt').innerHTML=`<div class="sc" tabindex="0" role="region" aria-label="Таблиця, гортайте вбік"><table><tr><th>Сценарій</th><th>Ордерів</th><th>Мін. капітал</th><th>Кінець</th><th>Результат</th></tr>${r.map(x=>`<tr><td>${x.n}</td><td>${x.dca}</td><td class="mono ${cls(x.mn)}">${f(x.mn,0)}</td><td class="mono ${cls(x.end)}">${f(x.end,0)}</td><td>${x.liq?'ліквідація':x.sl?'SL':'—'}</td></tr>`).join('')}</table></div><p class="mu" style="margin-top:8px">Маржа сітки ${n2(M,0)} USDT. Бот відкриває позицію перед ударом ринку; стопи виконуються з прослизанням 2%. Найгірший збиток: ${f(Math.min(...r.map(x=>x.mn)),0)} USDT.</p>`};
 $('#pfb').onclick=()=>{const o=$('#pft2');o.textContent='Рахую…';needAll([dk({...DEF,pair:'BTC/USDT'}),dk({...DEF,pair:'ETH/USDT'})]).then(()=>setTimeout(()=>{const t0=performance.now();for(let i=0;i<100;i++)bt({...DEF,pair:'BTC/USDT',rm:30+i%10},8760,1000,0);const a=performance.now()-t0,t1=performance.now();auto({pair:'ETH/USDT',ex:'Bybit',amt:1000,per:8760,tf:0,dr:0,fut:1,lev:0},1);const b=performance.now()-t1;
 o.innerHTML=KV('100 бектестів, 1 рік',Math.round(a)+' мс')+KV('Автомайстер, 1 рік, усі таймфрейми',Math.round(b)+' мс')+KV('Пар у пам’яті',Object.keys(D).length+' з '+PK.length)+KV('Активних ботів',bots.filter(x=>x.on).length)+KV('Джерело даних',MD.mode==='live'?MD.src+(MD.fut?' + '+MD.fsrc:''):'демо')},30)).catch(e=>o.textContent='Помилка: '+e.message)};
 
@@ -1207,7 +1209,7 @@ $('#msg').innerHTML=Object.entries(MSN).map(([k,n])=>{const c=MS[k];return`<div 
 secR();secLoad().catch(()=>{});tnR();rkR();accR()}
 /* вкладки профілю: Акаунт / Біржі й ризик / Сповіщення; вхід, 2FA і відновлення пароля — завжди «Акаунт» */
 let PFT=ld('zpft','a');
-function pfTab(k,tmp){if(!['a','x','n'].includes(k))k='a';if(!tmp){PFT=k;sv('zpft',k)}$$('#pft [data-pft]').forEach(b=>{const on=b.dataset.pft===k;b.setAttribute('aria-pressed',on);b.setAttribute('aria-selected',on)});$$('#v-pf [data-pt]').forEach(c=>c.hidden=c.dataset.pt!==k)}
+function pfTab(k,tmp){if(!['a','x','n'].includes(k))k='a';if(!tmp){PFT=k;sv('zpft',k)}$$('#pft [data-pft]').forEach(b=>{const on=b.dataset.pft===k;b.setAttribute('aria-selected',on)});$$('#v-pf [data-pt]').forEach(c=>c.hidden=c.dataset.pt!==k)}
 $('#pft').onclick=e=>{const b=e.target.closest('[data-pft]');if(b)pfTab(b.dataset.pft)};
 $('#pfn').oninput=e=>{PF.n=e.target.value;sv('zpf',PF);mnuR();nameQ()};
 $('#exl').onclick=e=>{const t=e.target.closest('button');if(!t)return;const x=t.dataset.e;cx=cx.includes(x)?cx.filter(y=>y!==x):[...cx,x];sv('zex',cx);pfr();tfilter()};
@@ -1259,7 +1261,7 @@ const MENU=[['ov','Головна'],['bots','Мої боти'],['aw','Авто-�
 function mnuR(){const m=$('#mn'),b=BRANDS[SET.brand];const head=VARIANT===2?`<button class="b mi" data-v="pf" style="min-height:64px;margin-bottom:6px" aria-label="Профіль: ${esc(PF.n||'Трейдер')}">${avH(40)}<span><b>${esc(PF.n||'Трейдер')}</b><div class="mu">${CLOUD.u?esc(emMask(CLOUD.u.email))+' · профіль ›':'Увійти в акаунт ›'}</div></span></button>`:`<div style="display:flex;align-items:center;gap:10px;padding:6px 8px 12px"><span style="width:28px;height:28px">${b.svg}</span><b style="font:700 14px 'Space Grotesk',sans-serif;letter-spacing:.14em">${b.n}</b></div>`;
 m.innerHTML=head+MENU.filter(([k])=>(VARIANT!==2||k!=='pf')&&(k!=='adm'||CLOUD.adm)).map(([k,l])=>`<button class="b mi" data-v="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>${l}</button>`).join('')+`<p class="mu" style="margin-top:auto;padding:10px 8px 0">${b.n} · paper-режим. ${MD.mode==='live'?'Ціни '+MD.src+' у реальному часі':'Ціни демо'}, ордери не відправляються.</p>`;
 const t=$('#tab');if(VARIANT===2){t.hidden=false;$('#wrap').classList.add('tb');t.innerHTML=[['ov','Головна'],['bots','Боти'],['mk','Ринок'],['top','Топ'],['menu','Меню']].map(([k,l])=>`<button data-v="${k}" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k==='top'?'aw':k==='menu'?'set':k]}</svg>${l}</button>`).join('');t.onclick=e=>{const b=e.target.closest('button');if(!b)return;b.dataset.v==='menu'?mnu(1):go(b.dataset.v)}}}
-function mnu(o){if(o&&$('#srp')&&!$('#srp').hidden)srOpen(0);$('#mn').hidden=$('#sh').hidden=!o;$('#mb').setAttribute('aria-expanded',!!o);if(o){const f=$('#mn button');f&&f.focus()}}
+function mnu(o){if(o&&$('#srp')&&!$('#srp').hidden)srOpen(0);if(!o&&$('#mn').contains(document.activeElement))$('#mb').focus();$('#mn').hidden=$('#sh').hidden=!o;$('#mb').setAttribute('aria-expanded',!!o);if(o){const f=$('#mn button');f&&f.focus()}}
 const VIEWS=['ov','bots','mk','aw','bd','bs','jr','st','mon','sx','set','pf','fb','adm','help','wiki'];let CUR='ov';
 function go(n){if(n==='top'){go('ov');setTimeout(()=>{const e=$('#home-top');e&&e.scrollIntoView({behavior:'smooth',block:'start'})},50);return}
 if(n==='fb'&&CUR!=='fb')FB.from=CUR;VIEWS.forEach(k=>{const e=$('#v-'+k);if(e)e.hidden=k!==n});CUR=n;$$('.mi').forEach(b=>b.setAttribute('aria-current',b.dataset.v===n));$$('#tab button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===n));mnu(0);scrollTo(0,0);
@@ -1675,7 +1677,7 @@ if(TN.bal)h+=KV('Баланс гаманця, USDT',n2(TN.bal.wallet,2))+KV('Д�
 const opts=PK.filter(p=>!MD.fset||MD.fset.has(p)).slice(0,40).map(p=>`<option value="${sym(p)}">${p}</option>`).join('');
 h+=`<h3>Пробний ордер</h3><div class="fg" style="margin-bottom:8px"><label>Пара<select id="tn-p">${opts}</select></label><label>Сума, USDT (з плечем)<input id="tn-n" type="number" inputmode="decimal" value="150"></label><label>Плече<select id="tn-l">${[1,2,3,5,10,20].map(v=>`<option value="${v}">${v}×</option>`).join('')}</select></label></div>
 <div class="row"><button class="b sm p" data-tn="buy">Купити (Long)</button><button class="b sm d" data-tn="sell">Продати (Short)</button><button class="b sm" data-tn="close">Закрити позицію</button><button class="b sm" data-tn="pos">Позиції</button></div>`;
-if(TN.pos)h+=TN.pos.length?'<div class="sc" style="margin-top:10px"><table><tr><th>Пара</th><th>Кількість</th><th>Вхід</th><th>Mark</th><th>PnL</th><th>Ліквідація</th></tr>'+TN.pos.map(x=>`<tr><td>${esc(x.symbol)}</td><td class="mono ${cls(x.amt)}">${x.amt}</td><td class="mono">${px(x.entry)}</td><td class="mono">${px(x.mark)}</td><td class="mono ${cls(x.pnl)}">${f(x.pnl)}</td><td class="mono">${x.liq?px(x.liq):'—'}</td></tr>`).join('')+'</table></div>':'<p class="mu" style="margin-top:10px">Відкритих позицій немає.</p>';
+if(TN.pos)h+=TN.pos.length?'<div class="sc" tabindex="0" role="region" aria-label="Таблиця, гортайте вбік" style="margin-top:10px"><table><tr><th>Пара</th><th>Кількість</th><th>Вхід</th><th>Mark</th><th>PnL</th><th>Ліквідація</th></tr>'+TN.pos.map(x=>`<tr><td>${esc(x.symbol)}</td><td class="mono ${cls(x.amt)}">${x.amt}</td><td class="mono">${px(x.entry)}</td><td class="mono">${px(x.mark)}</td><td class="mono ${cls(x.pnl)}">${f(x.pnl)}</td><td class="mono">${x.liq?px(x.liq):'—'}</td></tr>`).join('')+'</table></div>':'<p class="mu" style="margin-top:10px">Відкритих позицій немає.</p>';
 h+=`<p class="mu" style="margin-top:10px">Щоб бот торгував на ${TNX[TN.ex].s}, натисніть «Тестнет» на картці ф'ючерсного бота: кожен його вхід, докупівля й закриття дублюватимуться на вибраній біржі. Разом із «Сервер 24/7» бот торгує й тоді, коли Orbix закритий. Обмеження розміру угод — у картці «Ліміти ризику» нижче.</p>`}
 el.innerHTML=h+`<p class="mu" id="tnm" style="margin-top:10px">${esc(TN.msg)}</p>`}
 const tnm=t=>{TN.msg=t;const m=$('#tnm');if(m)m.textContent=t};

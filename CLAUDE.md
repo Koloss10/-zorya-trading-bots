@@ -90,6 +90,6 @@ npm run verify   # check + test
 
 Агенти (`.claude/agents/`): planner, architect, code-reviewer, typescript-reviewer (JS/TS), database-reviewer (Postgres/Supabase), security-reviewer, tdd-guide, build-error-resolver, refactor-cleaner, doc-updater, silent-failure-hunter, performance-optimizer.
 Команди: `/plan`, `/code-review`, `/build-fix`, `/refactor-clean`, `/test-coverage`, `/update-docs`, `/feature-dev`.
-Скіли: `supabase` і `supabase-postgres-best-practices` (офіційні від Supabase, MIT; міграції в Orbix — як описано вище, через `apply_migration`), `security-review` (поряд із власним `orbix-deploy`).
+Скіли: `exchange-api` (довідка по API Bybit Demo і Binance Testnet — завантажувати перед змінами в коді бірж), `supabase` і `supabase-postgres-best-practices` (офіційні від Supabase, MIT; міграції в Orbix — як описано вище, через `apply_migration`), `security-review` (поряд із власним `orbix-deploy`).
 
 Хуки (`.claude/settings.json`): заборона ручного редагування згенерованих файлів; перед завершенням відповіді — `npm run check`.

@@ -50,10 +50,10 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
     const n0 = b.tr.length, p0 = b.pos, o0 = p0 ? p0.n : 0, c0 = p0 ? p0.cost : 0, q0 = p0 ? p0.q : 0, h0 = p0 ? !!p0.t1 : false;
     let en = e[i];
     if (en && !p0 && !entryOk) { en = false; skipped++; } // ліміт ризику: нову угоду не відкривати
-    b.step(Math.floor(c.t / W), c, en);
+    b.step(Math.floor(c.t / W), c, en, undefined, e.x && e.x[i]);
     const v = b.eqv(c); pk = Math.max(pk, v); dd = Math.min(dd, v - pk);
     const p = b.pos;
-    if (b.tr.length > n0) { const l = b.tr[b.tr.length - 1]; events.push({ kind: l.liq ? "liq" : l.sl ? "sl" : "close", pnl: l.pnl, price: l.f[l.f.length - 1].p, t: ct }); }
+    if (b.tr.length > n0) { const l = b.tr[b.tr.length - 1]; events.push({ kind: l.liq ? "liq" : l.sl ? "sl" : "close", pnl: l.pnl, price: l.f[l.f.length - 1].p, t: ct, ...(l.xs ? { xs: 1 } : {}) }); }
     else if (!p0 && p) events.push({ kind: "open", notional: p.cost, price: c.c, t: ct, ...(p.bf > 1 ? { bf: p.bf } : {}) }); // bf — множник реінвесту (драбина на біржі)
     else if (p0 && p && p.n > o0) events.push({ kind: "dca", notional: p.cost - c0, price: p.last, n: p.n, t: ct });
     // часткова фіксація TP (g.s1): модель зменшила позицію — цю частку треба закрити й на біржі
@@ -80,7 +80,7 @@ export function eventText(ev, g) {
   if (ev.kind === "open") return `Orbix (сервер): ${pair} — відкрито позицію по ${ev.price}`;
   if (ev.kind === "dca") return `Orbix (сервер): ${pair} — докупівля №${ev.n} по ${ev.price}`;
   if (ev.kind === "part") return `Orbix (сервер): ${pair} — часткова фіксація TP: закрито ${Math.round(ev.share * 100)} % позиції по ${ev.price}`;
-  if (ev.kind === "close") return `Orbix (сервер): ${pair} — угоду закрито${ev.mn ? " вручну за ринком по " + ev.price : ""}, PnL ${f(ev.pnl)} USDT`;
+  if (ev.kind === "close") return `Orbix (сервер): ${pair} — угоду закрито${ev.mn ? " вручну за ринком по " + ev.price : ev.xs ? " за сигналом виходу по " + ev.price : ""}, PnL ${f(ev.pnl)} USDT`;
   if (ev.kind === "madd") return `Orbix (сервер): ${pair} — позапланова докупівля на ${ev.notional.toFixed(2)} USDT по ${ev.price}`;
   return `Orbix (сервер): ${pair} — ${ev.kind === "liq" ? "ліквідація" : "Stop-Loss"}, PnL ${f(ev.pnl)} USDT`;
 }

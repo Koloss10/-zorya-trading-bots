@@ -248,6 +248,8 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 #frw.rndw{color:var(--dn)}
 .hq{display:inline-grid;place-items:center;width:22px;height:22px;min-height:0;margin-left:6px;padding:0;border-radius:50%;border:1px solid var(--ln);background:var(--pan2);color:var(--ac);font:700 12px/1 inherit;cursor:pointer;vertical-align:middle;flex:0 0 auto}.hq[aria-expanded=true]{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.hq::before{content:'';position:absolute;inset:-11px}.hq{position:relative}.hqp{grid-column:1/-1;border:1px solid color-mix(in srgb,var(--ac) 35%,var(--ln));background:var(--pan2);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.5}.hqp p{margin:4px 0 6px;color:var(--tx)}.wq{display:block;margin-bottom:12px}.wki{border-bottom:1px solid var(--ln);padding:10px 0}.wki summary{cursor:pointer;font-weight:600;min-height:28px}.wki p{margin:8px 0 2px;line-height:1.55;color:var(--tx)}#wiki h3{margin:18px 0 4px;font-size:15px;color:var(--ac)}
 .hql{display:inline-flex;align-items:center;gap:0}
+#srbg{position:fixed;inset:0;background:rgba(5,7,10,.6);z-index:11}#srp{position:fixed;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top,0px));width:min(640px,calc(100vw - 16px));max-height:calc(100dvh - 24px - env(safe-area-inset-top,0px));overflow:auto;z-index:12;background:var(--pan);border:1px solid var(--ln);border-radius:var(--r);padding:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}.srh{display:flex;gap:8px;position:sticky;top:-12px;background:var(--pan);padding:0 0 8px}.srh input{flex:1;min-width:0}#srr h3{margin:12px 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}.sri{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;margin-bottom:6px;padding:8px 12px}.sri .mu{font-size:12px;font-weight:400;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.chip{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bc.flash{outline:2px solid var(--ac);outline-offset:2px;transition:outline-color .3s}
+@media (max-width:480px){header{gap:6px}header #sbtn,header #mb{padding:0 9px!important}.chip{font-size:10px;letter-spacing:.03em;padding:4px 8px}.brand{gap:6px;padding-right:0}}
 </style>
 </head>
 <body>
@@ -264,6 +266,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <header>
 <button class="brand" id="brand" aria-label="На головну"><span id="logo"></span><h1 id="bname"></h1></button>
 <span class="chip" id="chip">Демо</span>
+<button class="b" id="sbtn" aria-label="Пошук" aria-expanded="false" aria-controls="srp" title="Пошук (/)" style="padding:0 12px"><svg viewBox="0 0 24 24" style="width:22px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
 <button class="b" id="mb" aria-label="Меню" aria-expanded="false" style="padding:0 12px"><svg viewBox="0 0 24 24" style="width:22px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </header>
 
@@ -359,6 +362,8 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <nav id="tab" aria-label="Розділи" hidden></nav>
 <div id="ts" role="status" hidden></div>
 <div id="lk" hidden role="dialog" aria-modal="true" aria-labelledby="lkt"><div class="lkb"><span class="av" style="width:72px;height:72px"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><h2 id="lkt" style="margin:14px 0 6px">Orbix заблоковано</h2><p class="mu" style="margin-bottom:16px">Підтвердіть, що це ви: відбиток пальця, Face ID або PIN пристрою.</p><p class="mu" id="lka" style="margin:-8px 0 14px;font-size:13px"></p><button class="b p" id="lkb">Розблокувати</button><p class="dn" id="lkm" style="margin-top:10px"></p><button class="b sm" id="lkr" style="margin-top:18px">Не вдається розблокувати</button></div></div>
+<div id="srbg" hidden></div>
+<div id="srp" role="dialog" aria-modal="true" aria-label="Пошук" hidden><div class="srh"><input id="srq" type="search" placeholder="Пошук: бот, пара, розділ, індикатор…" autocomplete="off" aria-label="Що шукати"><button class="b" id="srx" aria-label="Закрити пошук">✕</button></div><div id="srr" aria-live="polite"></div></div>
 <div id="sh" hidden></div>
 <nav id="mn" aria-label="Меню" hidden></nav>
 <datalist id="pl"></datalist>
@@ -1249,7 +1254,7 @@ const MENU=[['ov','Головна'],['bots','Мої боти'],['aw','Авто-�
 function mnuR(){const m=$('#mn'),b=BRANDS[SET.brand];const head=VARIANT===2?`<button class="b mi" data-v="pf" style="min-height:64px;margin-bottom:6px" aria-label="Профіль: ${esc(PF.n||'Трейдер')}">${avH(40)}<span><b>${esc(PF.n||'Трейдер')}</b><div class="mu">${CLOUD.u?esc(emMask(CLOUD.u.email))+' · профіль ›':'Увійти в акаунт ›'}</div></span></button>`:`<div style="display:flex;align-items:center;gap:10px;padding:6px 8px 12px"><span style="width:28px;height:28px">${b.svg}</span><b style="font:700 14px 'Space Grotesk',sans-serif;letter-spacing:.14em">${b.n}</b></div>`;
 m.innerHTML=head+MENU.filter(([k])=>(VARIANT!==2||k!=='pf')&&(k!=='adm'||CLOUD.adm)).map(([k,l])=>`<button class="b mi" data-v="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>${l}</button>`).join('')+`<p class="mu" style="margin-top:auto;padding:10px 8px 0">${b.n} · paper-режим. ${MD.mode==='live'?'Ціни '+MD.src+' у реальному часі':'Ціни демо'}, ордери не відправляються.</p>`;
 const t=$('#tab');if(VARIANT===2){t.hidden=false;$('#wrap').classList.add('tb');t.innerHTML=[['ov','Головна'],['bots','Боти'],['mk','Ринок'],['top','Топ'],['menu','Меню']].map(([k,l])=>`<button data-v="${k}" aria-current="false"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[k==='top'?'aw':k==='menu'?'set':k]}</svg>${l}</button>`).join('');t.onclick=e=>{const b=e.target.closest('button');if(!b)return;b.dataset.v==='menu'?mnu(1):go(b.dataset.v)}}}
-function mnu(o){$('#mn').hidden=$('#sh').hidden=!o;$('#mb').setAttribute('aria-expanded',!!o);if(o){const f=$('#mn button');f&&f.focus()}}
+function mnu(o){if(o&&$('#srp')&&!$('#srp').hidden)srOpen(0);$('#mn').hidden=$('#sh').hidden=!o;$('#mb').setAttribute('aria-expanded',!!o);if(o){const f=$('#mn button');f&&f.focus()}}
 const VIEWS=['ov','bots','mk','aw','bd','bs','jr','st','mon','sx','set','pf','fb','adm','help','wiki'];let CUR='ov';
 function go(n){if(n==='top'){go('ov');setTimeout(()=>{const e=$('#home-top');e&&e.scrollIntoView({behavior:'smooth',block:'start'})},50);return}
 if(n==='fb'&&CUR!=='fb')FB.from=CUR;VIEWS.forEach(k=>{const e=$('#v-'+k);if(e)e.hidden=k!==n});CUR=n;$$('.mi').forEach(b=>b.setAttribute('aria-current',b.dataset.v===n));$$('#tab button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===n));mnu(0);scrollTo(0,0);
@@ -1534,6 +1539,40 @@ if($('#wq'))$('#wq').oninput=wikiR;
 if($('#wko'))$('#wko').onclick=()=>wikiGo('');
 if($('#wkb'))$('#wkb').onclick=()=>go('set');
 hqInit();wikiR();
+/* ---------- Пошук (кнопка-лупа у верхній панелі, клавіша «/») ----------
+   Шукає одразу: розділи й налаштування, мої боти (пара, напрямок, таймфрейм), пари ринку, записи Вікі
+   (індикатори, фільтри, параметри, готові стратегії). Enter — перший результат, Esc — закрити. */
+const SRX=[['Тема оформлення','set'],['Звук і сповіщення','set'],['Telegram-сповіщення','set'],['Назва та логотип','set'],['Дані: експорт і скидання','set'],
+['Ліміти ризику','pf'],['Тестнет: API-ключі біржі','pf'],['Акаунт: вхід і вихід','pf'],['Аварійна зупинка всіх ботів','bots'],['Вікі','wiki']];
+/* інші назви полів для пошуку (укр. і англ. написання) */
+const SRA={fr:'трейлінг трейлинг trailing',ft:'тейк профіт тейк-профіт take profit тп',fl:'стоп лос стоп-лосс stop loss сл',flv:'leverage кредитне плече',fb:'сума маржа ордер',fo:'докупівлі усереднення dca',fm:'мартингейл martingale',fs:'крок сітки step',ftf:'таймфрейм timeframe свічка',fdr:'long short лонг шорт',fmk:'спот ф\'ючерси futures spot',fbe:'беззбиток breakeven',fs1:'частковий тейк multi-tp',fc:'пауза cooldown',fk:'збіг сигналів'};
+const SR={q:'',items:[]};
+const srN=s=>String(s).toLowerCase().replace(/ё/g,'е');
+function srFind(q){const n=srN(q.trim());if(!n)return[];const m=s=>srN(s).includes(n),o=[];
+const sec=[...MENU.filter(([k])=>k!=='adm'||CLOUD.adm).map(([k,l])=>[l,k]),...SRX].filter(([l])=>m(l)).slice(0,6);
+if(sec.length)o.push(['Розділи',sec.map(([l,k])=>({t:l,s:'',go:()=>go(k)}))]);
+const B=bots.filter(x=>m(x.g.pair)||m(x.g.pair.replace('/',''))||m(dir(x.g))||m(x.g.name||'')).slice(0,6);
+if(B.length)o.push(['Мої боти',B.map(x=>({t:x.g.pair,s:`${dir(x.g)} · ${tfl(x.g.tf)} · ${x.on?'працює':'пауза'}`,go:()=>srBot(x)}))]);
+const P=PK.filter(p=>m(p)||m(p.replace('/',''))).slice(0,6);
+if(P.length)o.push(['Пари на ринку',P.map(p=>({t:p,s:'графік і ціна',go:()=>{MKP=p;go('mk')}}))]);
+const H=(typeof HM!=='undefined'?Object.values(HM):[]).filter(h=>hqHas(h[0])),nm=h=>m(h[1])||m(SRA[h[0]]||''),
+W=[...H.filter(nm),...H.filter(h=>!nm(h)&&m(h[2]))].slice(0,8).map(h=>({t:h[1],s:h[2],go:()=>wikiGo(h[0])}));
+if(typeof STR!=='undefined')STR.forEach((s,i)=>{if(W.length<10&&m(s[0]))W.push({t:s[0],s:'готова стратегія',go:()=>wikiGo('st'+i)})});
+if(W.length)o.push(['Вікі',W]);return o}
+function srBot(x){const q=$('#bq');if(q)q.value='';go('bots');setTimeout(()=>{const c=$(`#bl2 [data-bot="${x.id}"]`)||$(`#bl [data-bot="${x.id}"]`);if(!c)return;c.scrollIntoView({block:'center'});c.classList.add('flash');setTimeout(()=>c.classList.remove('flash'),1600)},60)}
+function srR(){const el=$('#srr');if(!el)return;const G=srFind(SR.q);SR.items=G.flatMap(g=>g[1]);let i=0;
+el.innerHTML=!SR.q.trim()?'<p class="mu">Шукайте розділ, свого бота, пару (наприклад, ETH) або що означає індикатор чи фільтр (RSI, трейлінг, плече).</p>'
+:G.length?G.map(([h,L])=>`<h3>${esc(h)}</h3>`+L.map(r=>`<button class="b sri" data-sri="${i++}"><b>${esc(r.t)}</b>${r.s?`<span class="mu">${esc(r.s)}</span>`:''}</button>`).join('')).join('')
+:'<p class="mu">Нічого не знайдено.</p>'}
+function srOpen(o){const p=$('#srp');if(!p)return;p.hidden=$('#srbg').hidden=!o;$('#sbtn').setAttribute('aria-expanded',!!o);
+if(o){mnu(0);const i=$('#srq');i.value=SR.q;srR();setTimeout(()=>{i.focus();i.select()},20)}}
+function srPick(n){const r=SR.items[n];if(!r)return;srOpen(0);r.go()}
+$('#sbtn').onclick=()=>srOpen($('#srp').hidden);$('#srbg').onclick=()=>srOpen(0);$('#srx').onclick=()=>srOpen(0);
+$('#srq').oninput=e=>{SR.q=e.target.value;srR()};
+$('#srq').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();srPick(0)}};
+$('#srr').onclick=e=>{const b=e.target.closest('[data-sri]');if(b)srPick(+b.dataset.sri)};
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#srp').hidden){srOpen(0);$('#sbtn').focus();return}
+if(e.key==='/'&&$('#srp').hidden&&!/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement||{}).tagName||'')&&!(document.activeElement||{}).isContentEditable){e.preventDefault();srOpen(1)}});
 /* ---------- Боти на сервері 24/7 ----------
    Бот із позначкою «Сервер 24/7» (config._srv) торгує на сервері: Edge Function `runner` кожні 5 хвилин
    проганяє той самий рушій і зберігає стан у bot_state, події — у bot_events. Браузер лише показує цей стан

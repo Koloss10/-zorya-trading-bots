@@ -1081,8 +1081,8 @@ const u64b=s=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/
 function shareUrl(c){const g={};for(const k of SHK)if(c.g[k]!==undefined)g[k]=c.g[k];return location.origin+location.pathname+'#b='+b64u(JSON.stringify({v:1,g,ex:c.ex,per:c.per,dep:c.dep}))}
 function shareParse(h){const m=/^#b=([A-Za-z0-9_-]{8,4000})$/.exec(h||'');if(!m)return null;let o;try{o=JSON.parse(u64b(m[1]))}catch(e){return null}
 if(!o||o.v!==1||!o.g||typeof o.g!=='object')return null;const g={};
-for(const k of SHK){const v=o.g[k];if(v===undefined)continue;if(k==='pair'){if(typeof v==='string'&&PAIRS[v])g.pair=v}
-else if(k==='sg'){if(Array.isArray(v))g.sg=v.filter(x=>typeof x==='string'&&SGN[x])}else if(typeof v==='number'&&isFinite(v))g[k]=v}
+for(const k of SHK){const v=o.g[k];if(v===undefined)continue;if(k==='pair'){if(typeof v==='string'&&Object.prototype.hasOwnProperty.call(PAIRS,v))g.pair=v}
+else if(k==='sg'){if(Array.isArray(v))g.sg=v.filter(x=>typeof x==='string'&&Object.prototype.hasOwnProperty.call(SGN,x))}else if(typeof v==='number'&&isFinite(v))g[k]=v}
 if(g.d!==1&&g.d!==-1)delete g.d;if(!g.pair)return null;return{g,ex:typeof o.ex==='string'?o.ex:'',per:+o.per,dep:+o.dep}}
 function shareApply(){const s=shareParse(location.hash);if(!location.hash.startsWith('#b='))return;history.replaceState(null,'',location.pathname+location.search);
 if(!s)return toast('Посилання на бота пошкоджене — налаштування не завантажено');fill(s.g,s.ex);

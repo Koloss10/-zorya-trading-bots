@@ -40,7 +40,7 @@ svg{width:100%;height:auto;display:block}
 #mn{position:fixed;top:0;right:0;bottom:0;width:min(320px,88vw);background:color-mix(in srgb,var(--pan2) 94%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-left:1px solid var(--ln);z-index:10;padding:calc(14px + env(safe-area-inset-top,0px)) 14px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px;overflow-y:auto}
 #sh{position:fixed;inset:0;background:rgba(5,7,10,.6);z-index:9}
 #ts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:color-mix(in srgb,var(--pan) 96%,transparent);border:1px solid color-mix(in srgb,var(--ac) 55%,transparent);border-radius:12px;padding:10px 14px;z-index:11;max-width:90vw;box-shadow:0 10px 30px -10px rgba(0,0,0,.8)}
-.w.tb #ts{bottom:calc(90px + env(safe-area-inset-bottom,0px))}
+.w.tb~#ts{bottom:calc(90px + env(safe-area-inset-bottom,0px))}
 .bc{position:relative;border:1px solid var(--ln);border-radius:14px;padding:14px 14px 12px 16px;background:var(--pan2);margin-top:10px;display:flex;flex-direction:column;gap:8px}
 .bc::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;background:var(--st)}
 .bc.on{--st:var(--up)}.bc.off{--st:var(--mu);opacity:.85}

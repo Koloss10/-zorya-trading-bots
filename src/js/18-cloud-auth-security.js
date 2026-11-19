@@ -10,7 +10,7 @@ function cloudQ(){if(!CLOUD.u)return;clearTimeout(csT);csT=setTimeout(()=>{csQ=c
 async function cloudSave(onlyNew){if(!CLOUD.u||!SB)return;try{
 const cur=new Set(bots.filter(x=>x.rid).map(x=>x.rid)),del=[...CLOUD.known].filter(r=>!cur.has(r));
 if(del.length&&!onlyNew){const r=await SB.from('bots').delete().in('id',del);if(r.error)throw r.error}
-for(const x of bots){if(onlyNew&&x.rid)continue;const row=brow(x),h=JSON.stringify(row);if(x.rid&&x._h===h)continue;
+for(const x of bots){if(x.demo||(onlyNew&&x.rid))continue;const row=brow(x),h=JSON.stringify(row);if(x.rid&&x._h===h)continue;
 if(x.rid){const r=await SB.from('bots').update(row).eq('id',x.rid);if(r.error)throw r.error}
 else{const r=await SB.from('bots').insert(row).select('id').single();if(r.error)throw r.error;x.rid=r.data.id}
 x._h=h}
@@ -106,7 +106,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Da
 $('#lkb').onclick=()=>LOCK.unlock();$('#lkr').onclick=()=>LOCK.reset();LOCK.show();
 
 async function cloudIn(u){const prevU=ld('zuid','');if(prevU&&prevU!==u.id)pfLocalReset();CLOUD.u=u;TN.loaded=0;tnLoad().then(()=>{lst();if(CUR==='pf')tnR()}).catch(()=>{});TG={st:null,loaded:0,err:''};CLOUD.err='';accR();
-if(ld('zuid','')!==u.id)bots=bots.filter(x=>!x.rid);sv('zuid',u.id);
+if(ld('zuid','')!==u.id)bots=bots.filter(x=>!x.rid);bots=bots.filter(x=>!x.demo);KEEP=KEEP.filter(x=>!x.demo); // демо-боти в акаунт не переносятьсяsv('zuid',u.id);
 await (csQ=csQ.then(()=>cloudSave(1)));if(CLOUD.err)return;
 const r=await SB.from('bots').select('id,exchange,status,config,preset_id,started_at').order('created_at');if(r.error)return cloudFail(r.error);
 for(const row of r.data){const c=row.config||{};if(c.pair&&PAIRS[c.pair])try{await need(dk(c),hrsFor(c._t0,c.tf))}catch(e){}}

@@ -84,5 +84,8 @@ fill(it.g,it.ex);$('#fdp').value=Math.round(it.need||1000);go('bd')}
 $('#fav').onclick=topClick;$('#favp').onclick=topClick;
 $('#tfb').onclick=()=>{const p=$('#tfp'),o=p.hidden;p.hidden=!o;$('#tfb').setAttribute('aria-expanded',o)};
 $('#topr').onclick=()=>topJob(1);
-function seed(){if(ld('zseed',0)||bots.length||!TOP.list.length)return;TOP.list.slice(0,3).forEach(x=>mk(x.g,x.ex));sv('zseed',1);sbots();lst()}
+/* демо-боти для нового відвідувача без акаунта: позначені demo, в акаунт не переносяться й у хмару не зберігаються;
+   якщо в браузері вже є вхід (сесія Supabase), демо-ботів не створюємо */
+const hasSess=()=>{try{return!!localStorage.getItem('sb-krmnaypaitruhqgaxkfw-auth-token')}catch(e){return false}};
+function seed(){if(ld('zseed',0)||bots.length||!TOP.list.length||CLOUD.u||CLOUD.pend||hasSess())return;TOP.list.slice(0,3).forEach(x=>{mk(x.g,x.ex).demo=1});sv('zseed',1);sbots();lst()}
 

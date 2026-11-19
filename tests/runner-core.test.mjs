@@ -161,3 +161,27 @@ test('Вихід за сигналом на сервері: подія close з 
   for (let i = start + 1; i <= cs.length; i++) { const r = processBot({ g: g0, state: s2, candles: cs.slice(Math.max(0, i - 300), i), now: cs[i - 1].t + H }); ref.push(...r.events); s2 = r.state; }
   assert.equal(ref.filter((e) => e.xs).length, 0, 'без xs прапорця немає');
 });
+
+test('Ручна докупівля не перевищує стелю ліміту ризику (addCap)', () => {
+  const cs = series(900), start = 400;
+  let st = processBot({ g, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H }).state, i = start;
+  while (!st.b.pos && i < cs.length) { i++; st = processBot({ g, state: st, candles: cs.slice(0, i), now: cs[i - 1].t + H }).state; }
+  assert.ok(st.b.pos); const now = cs[i - 1].t + H, cost = st.b.pos.cost, lev = g.lev || 1;
+  // стеля = вартість позиції + 5 USDT маржі·плече: докупівля на 20 USDT маржі її перевищує, на 2 — ні
+  const cap = cost + 5 * lev;
+  const no = processBot({ g, state: st, candles: cs.slice(0, i), now, cmd: { id: 'mc1', k: 'add', n: 20, t: now }, addCap: cap });
+  assert.equal(no.manual.ok, false); assert.match(no.manual.why, /ліміт ризику/); assert.equal(no.state.b.pos.cost, cost, 'позиція не змінилась');
+  const yes = processBot({ g, state: st, candles: cs.slice(0, i), now, cmd: { id: 'mc2', k: 'add', n: 2, t: now }, addCap: cap });
+  assert.equal(yes.manual.ok, true); assert.ok(yes.state.b.pos.cost > cost);
+  const free = processBot({ g, state: st, candles: cs.slice(0, i), now, cmd: { id: 'mc3', k: 'add', n: 20, t: now }, addCap: 0 });
+  assert.equal(free.manual.ok, true, 'addCap 0 — без обмеження');
+});
+
+test('Зупинка після N угод: збережений стан без лічильника nd (бот до оновлення) рахує вже закриті угоди', () => {
+  const cs = series(900), start = 400, gm = { ...g, maxd: 2 };
+  const tr = [{ ts: 1, pnl: 1, n: 1, f: [{ t: 1, p: 1, k: 'e' }, { t: 2, p: 1, k: 'x' }] }, { ts: 2, pnl: 1, n: 1, f: [{ t: 1, p: 1, k: 'e' }, { t: 2, p: 1, k: 'x' }] }];
+  const st = { b: { pos: null, tr, cd: 0, cum: 2 }, pk: 0, dd: 0, lt: cs[start - 1].t + H };
+  let r = { state: st }, opens = 0;
+  for (let i = start + 1; i <= cs.length; i++) { r = processBot({ g: gm, state: r.state, candles: cs.slice(Math.max(0, i - 300), i), now: cs[i - 1].t + H }); opens += r.events.filter((e) => e.kind === 'open').length; }
+  assert.equal(opens, 0, 'ліміт 2 угод уже досягнуто'); assert.equal(r.state.b.nd, 2);
+});

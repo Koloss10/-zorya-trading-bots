@@ -8,7 +8,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { botConfig, INTERVAL, processBot } from "./core.js";
 import { binance, bybit } from "./exchanges.ts";
 import { handleBot, owners, park } from "./mirror.js";
-import { limitsOf, riskBlock } from "./risk.js";
+import { addCap, limitsOf, riskBlock } from "./risk.js";
 
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { "content-type": "application/json" } });
 const BYIV: Record<string, string> = { "1h": "60", "4h": "240", "12h": "720", "1d": "D", "1w": "W" };
@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
       // ліміт ризику: перевищено — нових угод не відкривати (позиції, що вже є, бот веде далі)
       const peers = mirror ? [...tnBots.entries()].filter(([id, x]) => id !== bot.id && x.uid === bot.user_id).map(([, x]) => x) : [];
       const blk = mirror ? riskBlock({ limits: limitsOf(lims.get(bot.user_id)), self: { g, state: bot.state }, peers, now: Date.now() }) : null;
-      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp, entryOk: !blk, cmd: cfg._cmd });
+      const r = processBot({ g, state: bot.state, candles: m.candles, funding: m.funding, now: Date.now(), spans: cfg._sp, entryOk: !blk, cmd: cfg._cmd, addCap: mirror ? addCap(limitsOf(lims.get(bot.user_id)), peers) : 0 });
       if (r.manual && !r.manual.ok) await log(bot, "warn", `Ручна дія «${r.manual.k === "close" ? "закрити за ринком" : "докупити"}» не виконана: ${r.manual.why}`);
       evCount += r.events.length;
       if (tnBots.has(bot.id)) tnBots.get(bot.id)!.state = { ...(bot.state || {}), ...r.state }; // нова угода цього запуску займає ліміт для наступних ботів

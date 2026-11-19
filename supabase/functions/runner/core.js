@@ -16,7 +16,7 @@ export function restoreBot(g, state, funding = null, filters = null) {
   const b = new Bot(g, funding, filters);
   // глибока копія: обробка не змінює переданий стан
   const s = state && state.b ? JSON.parse(JSON.stringify(state.b)) : null;
-  if (s) { b.pos = s.pos ?? null; b.tr = Array.isArray(s.tr) ? s.tr : []; b.cd = s.cd ?? 0; b.cum = s.cum ?? 0; b.nd = s.nd ?? 0; }
+  if (s) { b.pos = s.pos ?? null; b.tr = Array.isArray(s.tr) ? s.tr : []; b.cd = s.cd ?? 0; b.cum = s.cum ?? 0; b.nd = s.nd ?? b.tr.length; } // бот зі збереженим станом без лічильника (до оновлення): рахуємо наявні угоди
   return b;
 }
 
@@ -29,12 +29,13 @@ export function restoreBot(g, state, funding = null, filters = null) {
  *                 пропускаються — як і в браузері, після зняття з паузи нічого не «дограється» заднім числом
  * @param entryOk  false — нових угод не відкривати (ліміт ризику, runner/risk.js): сигнал входу пропускається й рахується
  *                 в skipped, а позиція, що вже є, обробляється як завжди (докупівлі, TP, SL, трейлінг)
+ * @param addCap   стеля вартості позиції (USDT, з плечем) для ручної докупівлі: 0 — без обмеження (ліміти ризику, runner/risk.js addCap)
  * @param cmd      ручна команда з інтерфейсу (config._cmd): {id, k: "close" | "add", n?: маржа USDT, t: мс}. Виконується один раз
  *                 (id запам'ятовується в state.mc) після закритих свічок, за останньою ціною; старша за CMD_TTL ігнорується.
  * Новий бот починає з поточного моменту: історія не «програється» заднім числом.
  */
 export const CMD_TTL = 24 * 36e5;
-export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null, entryOk = true, cmd = null }) {
+export function processBot({ g, state, candles, funding = null, filters = null, now = Date.now(), keepTrades = 200, spans = null, entryOk = true, cmd = null, addCap = 0 }) {
   const act = (t) => !Array.isArray(spans) || !spans.length || spans.some(([a, b]) => t > a && (b == null || t <= b));
   const W = tfMs(g.tf || 1), A = candles.filter((c) => c.t + W <= now);
   const b = restoreBot(g, state, funding, filters);
@@ -65,9 +66,10 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
     && Number.isFinite(cmd.t) && cmd.t <= now + 6e4 && now - cmd.t <= CMD_TTL) {
     mc = cmd.id;
     const px = candles.length ? +candles[candles.length - 1].c : 0, n = +cmd.n;
-    const ev = cmd.k === "add" && !(n > 0 && n <= 1e6) ? null : b.manual(cmd.k, px, now, cmd.k === "add" ? n : 0);
+    const over = cmd.k === "add" && addCap > 0 && b.pos && b.pos.cost + n * (g.lev || 1) > addCap + 1e-9;
+    const ev = (cmd.k === "add" && !(n > 0 && n <= 1e6)) || over ? null : b.manual(cmd.k, px, now, cmd.k === "add" ? n : 0);
     if (ev) events.push(ev);
-    manual = { id: cmd.id, k: cmd.k, ok: !!ev, why: ev ? null : !b.pos ? "позиції немає" : "сума некоректна або ордер замалий для біржі" };
+    manual = { id: cmd.id, k: cmd.k, ok: !!ev, why: ev ? null : !b.pos ? "позиції немає" : over ? "перевищить ліміт ризику (позиція не може бути більшою за " + Math.round(addCap) + " USDT)" : "сума некоректна або ордер замалий для біржі" };
   }
   const tr = b.tr.slice(-keepTrades);
   return { manual, state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum, nd: b.nd }, ...(mc ? { mc } : {}), pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events, skipped };

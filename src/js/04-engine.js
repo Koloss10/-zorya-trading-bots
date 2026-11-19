@@ -36,10 +36,12 @@ const decs=x=>{const s=String(x);if(s.includes('e-'))return+s.split('e-')[1];con
 const rnd=(v,st,m)=>st>0?+(Math[m](v/st+(m==='floor'?1e-9:-1e-9))*st).toFixed(decs(st)):v;
 const normG=g=>{if(g.ftk==null){g.ftk=g.fut?.0005:.001;g.fmk=g.fut?.0002:.001}return g};
 const lbT=(F,t)=>{let lo=0,hi=F.length;while(lo<hi){const m=(lo+hi)>>1;if(F[m].t<t)lo=m+1;else hi=m}return lo};
+/* реінвест: множник розміру нової угоди = 1 + частка прибутку / маржа сітки (не менше 1). Спільна для рушія й ліміту ризику (runner/risk.js) */
+function reinvestFactor(g,cum){if(!(g.rv>0)||!(cum>0))return 1;const M=g.base*(g.mult===1?g.orders:(g.mult**g.orders-1)/(g.mult-1));return M>0?1+g.rv*cum/M:1}
 class Bot{constructor(g,fr,flt){this.g=g;this.F=flt!==undefined?flt:(typeof fltOf==='function'?fltOf(g):null);this.pos=null;this.tr=[];this.cd=0;this.cum=0;this.nd=0;this.ft=g.ftk!=null?g.ftk:g.fee;this.fmk=g.fmk!=null?g.fmk:g.fee;
 this.fr=fr!==undefined?fr:(g.fut&&typeof frOf==='function'?frOf(g.pair):null)}
 /* реінвест: множник розміру нової угоди — частка g.rv накопиченого прибутку додається до маржі сітки (без зменшення після збитків) */
-bf(){const g=this.g;if(!(g.rv>0)||!(this.cum>0))return 1;const M=g.base*(g.mult===1?g.orders:(g.mult**g.orders-1)/(g.mult-1));return M>0?1+g.rv*this.cum/M:1}
+bf(){return reinvestFactor(this.g,this.cum)}
 /* ручне керування угодою (як у Veles): 'close' — закрити за ринком за ціною px (комісія тейкера);
    'add' — позапланова докупівля на n USDT маржі за ціною px (драбина сітки не зсувається). Повертає подію або null. */
 manual(k,px,t,n=0){const g=this.g,d=g.d,p=this.pos,L=g.lev||1;if(!p||!(px>0)||!isFinite(px))return null;

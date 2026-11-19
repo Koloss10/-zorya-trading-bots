@@ -145,3 +145,41 @@ test('Вихід за сигналом: Short закривається прот�
   const A = pcSeries().map((r, i) => C(i, 200 - r.o, 200 - r.l, 200 - r.h, 200 - r.c)), g = gx({ d: -1 }), R = E.run(A, E.entry(A, g), g, 0, 0, 0);
   assert.equal(R.b.tr.length, 1); assert.equal(R.b.tr[0].xs, 1);
 });
+
+// ---------- вхід лімітним ордером з відступом (g.fo), скасування за відходом ціни (g.pu) і часом (g.fw) ----------
+const play2 = (g, cs, sig) => { const b = new E.Bot(g, null, null); cs.forEach((r, i) => b.step(i, r, sig.includes(i))); return b; };
+
+test('Лімітний вхід: виставляється на закритті свічки сигналу, виконується з наступної свічки за рівнем (комісія мейкера)', () => {
+  // сигнал на свічці 0 (закриття 100), відступ 2 % → рівень 98. Свічка 0 сама опускалась до 97 — не рахується (вхід ще не виставлено)
+  const g = G({ fo: 0.02, ftk: 0.0005, fmk: 0.0002 }), b = new E.Bot(g, null, null);
+  b.step(0, C(0, 100, 100, 97, 100), true);
+  assert.equal(b.pos, null); assert.ok(b.pe); near(b.pe.px, 98); near(b.pe.q, 100 / 98);
+  b.step(1, C(1, 100, 101, 99, 100), false); assert.equal(b.pos, null, 'не дійшла до 98');
+  b.step(2, C(2, 100, 100, 97.5, 99), false);
+  assert.ok(b.pos); near(b.pos.first, 98); near(b.pos.q, 100 / 98); near(b.pos.real, -0.0002 * 100, 1e-9, 'комісія мейкера'); assert.equal(b.pe, null);
+  assert.equal(b.pos.pt, C(0).t, 'pt — час свічки сигналу');
+});
+
+test('Лімітний вхід: «підтягування» — ціна пішла вгору на pu, вхід скасовано, бот чекає новий сигнал', () => {
+  const g = G({ fo: 0.02, pu: 0.03 }), b = new E.Bot(g, null, null);
+  b.step(0, C(0, 100, 100, 100, 100), true);
+  b.step(1, C(1, 100, 103.5, 99, 103), false);   // high 103.5 ≥ 100·1.03
+  assert.equal(b.pe, null); assert.equal(b.pos, null);
+  b.step(2, C(2, 103, 103, 103, 103), true); near(b.pe.px, 103 * 0.98, 1e-9, 'новий сигнал — новий рівень від нової ціни');
+});
+
+test('Лімітний вхід: скасування через fw свічок; торкання обох рівнів в одній свічці — вхід', () => {
+  const b = new E.Bot(G({ fo: 0.02, fw: 2 }), null, null);
+  b.step(0, C(0, 100, 100, 100, 100), true); b.step(1, C(1, 100, 101, 99, 100), false); assert.ok(b.pe);
+  b.step(2, C(2, 100, 101, 99, 100), false); assert.equal(b.pe, null, 'минуло 2 свічки');
+  const c = new E.Bot(G({ fo: 0.02, pu: 0.03 }), null, null);
+  c.step(0, C(0, 100, 100, 100, 100), true); c.step(1, C(1, 100, 104, 97, 101), false);
+  assert.ok(c.pos, 'одна свічка й до 97, і до 104 — вхід'); near(c.pos.first, 98);
+});
+
+test('Лімітний вхід для Short: рівень вище ціни, скасування при падінні', () => {
+  const b = new E.Bot(G({ d: -1, fo: 0.02, pu: 0.03 }), null, null);
+  b.step(0, C(0, 100, 100, 100, 100), true); near(b.pe.px, 102);
+  b.step(1, C(1, 100, 101, 96.5, 97), false); assert.equal(b.pe, null, 'ціна впала на 3 % — скасовано');
+  b.step(2, C(2, 97, 97, 97, 97), true); b.step(3, C(3, 97, 99, 96, 98), false); near(b.pos.first, 97 * 1.02, 1e-9);
+});

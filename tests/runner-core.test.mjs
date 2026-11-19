@@ -196,3 +196,18 @@ test('Перезапуск угоди (resync): команда виконуєт�
   assert.equal(r.events.length, 0); assert.deepEqual(r.state.b.pos, st.b.pos);
   assert.equal(processBot({ g, state: r.state, candles: cs.slice(0, i), now, cmd }).manual, null, 'повтор — нічого');
 });
+
+test('Лімітний вхід на сервері: події pend → open з тим самим часом (pt) або pcan; стан pe переживає запуски', () => {
+  const cs = series(900), start = 400, gf = { ...g, fo: 0.01, pu: 0.02, fw: 6 };
+  let st = processBot({ g: gf, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H }).state, evs = [], seenPe = false;
+  for (let i = start + 1; i <= cs.length; i++) { const r = processBot({ g: gf, state: st, candles: cs.slice(Math.max(0, i - 300), i), now: cs[i - 1].t + H }); evs.push(...r.events); st = r.state; if (st.b.pe) seenPe = true; }
+  const pend = evs.filter((e) => e.kind === 'pend'), opens = evs.filter((e) => e.kind === 'open'), pcan = evs.filter((e) => e.kind === 'pcan');
+  assert.ok(seenPe && pend.length > 0 && opens.length > 0, `pend ${pend.length}, open ${opens.length}`);
+  for (const o of opens) { assert.ok(pend.some((p) => p.t === o.pt), 'кожен вхід — з виставленого ліміту'); assert.ok(o.t > o.pt); assert.equal(o.price, pend.find((p) => p.t === o.pt).price); }
+  for (const c of pcan) assert.ok(pend.some((p) => p.t === c.pt), 'скасовано саме виставлений');
+  assert.equal(pend.length, opens.length + pcan.length + (st.b.pe ? 1 : 0), 'кожен ліміт або виконано, або скасовано, або ще чекає');
+  assert.match(eventText(pend[0], gf), /лімітний ордер/);
+  // один прогін дає той самий результат, що й покроковий
+  const one = processBot({ g: gf, state: processBot({ g: gf, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H }).state, candles: cs, now: cs.at(-1).t + H });
+  assert.deepEqual(one.state.b.tr.map((t) => t.ts), st.b.tr.map((t) => t.ts));
+});

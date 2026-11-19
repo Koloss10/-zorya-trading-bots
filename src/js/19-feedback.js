@@ -3,7 +3,7 @@
    Адмін бачить усі відгуки в розділі «Адмін» з ID автора, без пошти. */
 const FB={from:'ov',kind:'bug',busy:0,mine:null,msg:''};
 const FBK={bug:'Помилка',idea:'Ідея',other:'Інше'};
-const VNAME={ov:'Головна',bots:'Мої боти',mk:'Ринок',aw:'Авто-майстер',bd:'Конструктор',bs:'Бектести',jr:'Журнал угод',st:'Статистика',mon:'Моніторинг',sx:'Стрес-тест',set:'Налаштування',pf:'Профіль',adm:'Адмін',help:'Довідка'};
+const VNAME={ov:'Головна',bots:'Мої боти',mk:'Ринок',aw:'Авто-майстер',bd:'Конструктор',bs:'Бектести',jr:'Журнал угод',st:'Статистика',mon:'Моніторинг',sx:'Стрес-тест',set:'Налаштування',pf:'Профіль',adm:'Адмін',help:'Довідка',wiki:'Вікі'};
 async function fbMine(){if(!SB||!CLOUD.u)return;try{const r=await SB.from('feedback').select('id,kind,body,status,created_at').order('created_at',{ascending:false}).limit(5);if(!r.error)FB.mine=r.data||[]}catch(e){}if(CUR==='fb')fbR()}
 function fbR(){const el=$('#fbx');if(!el)return;
 if(!CLOUD.u){el.innerHTML='<div class="card"><h2>Відгук</h2><p class="mu" style="margin-bottom:12px">Увійдіть в акаунт, щоб надіслати відгук: так ми знатимемо ваш ID і зможемо відповісти.</p><button class="b p" id="fbin">Увійти</button></div>';$('#fbin').onclick=()=>{go('pf');pfTab('a',1)};return}

@@ -91,7 +91,7 @@ if(!r){w.innerHTML='<p class="mu">Замало історії для walk-forwar
 w.innerHTML=wfHtml(r).replace('<h2>Walk-forward перевірка</h2>','<h3>Walk-forward</h3>')+`<p class="mu">Ваші параметри на тих самих тестових відрізках: <b class="${cls(r.mine)}">${f(r.mine,1)}%</b>, підбір без знання майбутнього: ${f(r.oos,1)}%.${r.mine>2*Math.max(r.oos,0)+5?' Ваші параметри помітно кращі — можливо, вони підігнані під історію; порівняйте з результатом на Demo.':''}</p>`},30)}}
 /* опис джерела даних і моделі комісій для бектесту */
 function dataNote(g){const k=dk(normG({...g}));if(MD.mode!=='live')return'Дані: демо-історія.';
-if(isF(k))return`Дані: ф'ючерси ${MD.fsrc} (USDⓈ-M), ліквідація за mark price, funding кожні 8 год враховано. Комісії: 0,02% мейкер (DCA, TP), 0,05% тейкер (вхід, стоп).`;
+if(isF(k))return`Дані: ф'ючерси ${MD.fsrc} (USDⓈ-M), ліквідація за mark price, funding враховано за фактичним розкладом біржі (8, 4 або 1 год). Комісії: 0,02% мейкер (DCA, TP), 0,05% тейкер (вхід, стоп).`;
 return g.fut?`Ф'ючерсних даних для пари немає${MD.ferr?' ('+esc(MD.ferr)+')':''}: використано спот ${MD.src}, без funding і mark price. Комісії 0,1%.`:`Дані: спот ${MD.src}. Комісії 0,1%.`}
 $('#ad').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;withData(dk(c.g),$('#res'),()=>{mk(c.g,c.ex);sbots();lst();go(VARIANT===2?'bots':'ov')})};
 $('#sxb').onclick=()=>{const c=cfg(),e=bad(c);if(e)return $('#res').innerHTML=`<p class="dn">${e}</p>`;SXG=c.g;go('sx')};

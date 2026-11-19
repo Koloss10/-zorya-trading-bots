@@ -185,3 +185,14 @@ test('Зупинка після N угод: збережений стан без
   for (let i = start + 1; i <= cs.length; i++) { r = processBot({ g: gm, state: r.state, candles: cs.slice(Math.max(0, i - 300), i), now: cs[i - 1].t + H }); opens += r.events.filter((e) => e.kind === 'open').length; }
   assert.equal(opens, 0, 'ліміт 2 угод уже досягнуто'); assert.equal(r.state.b.nd, 2);
 });
+
+test('Перезапуск угоди (resync): команда виконується один раз, модель не змінюється', () => {
+  const cs = series(900), start = 400;
+  let st = processBot({ g, state: null, candles: cs.slice(0, start), now: cs[start - 1].t + H }).state, i = start;
+  while (!st.b.pos && i < cs.length) { i++; st = processBot({ g, state: st, candles: cs.slice(0, i), now: cs[i - 1].t + H }).state; }
+  const now = cs[i - 1].t + H, cmd = { id: 'rs1', k: 'resync', t: now };
+  const r = processBot({ g, state: st, candles: cs.slice(0, i), now, cmd });
+  assert.deepEqual(r.manual, { id: 'rs1', k: 'resync', ok: true, why: null }); assert.equal(r.state.mc, 'rs1');
+  assert.equal(r.events.length, 0); assert.deepEqual(r.state.b.pos, st.b.pos);
+  assert.equal(processBot({ g, state: r.state, candles: cs.slice(0, i), now, cmd }).manual, null, 'повтор — нічого');
+});

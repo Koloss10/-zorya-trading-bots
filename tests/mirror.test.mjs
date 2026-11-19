@@ -769,3 +769,23 @@ test('Часткове виставлення разом з реінвестом
   assert.ok(Math.abs(b.first[0] - a.first[0] * 1.5) <= 0.1 + 1e-9, `перша сходинка ${b.first[0]} vs ${a.first[0] * 1.5}`);
   assert.ok(Math.abs(b.next[0] - a.next[0] * 1.5) <= 0.1 + 1e-9, `докладена сходинка ${b.next[0]} vs ${a.next[0] * 1.5}`);
 });
+
+test('Перезапуск угоди після помилки: втрачені лімітні ордери бота повертаються, помилка біржі скидається', async () => {
+  const ex = fakeEx(), fl = {};
+  await execute(ex, actionsFor([{ kind: 'open', notional: 60, price: 2.5, t: T }], BOT, true)[0], { ...ctx, fl });
+  const n0 = (await ex.openOrders()).length; assert.ok(n0 > 0);
+  for (const o of ex.S.orders) if (o.status === 'New') o.status = 'Cancelled';   // ордери бота зникли з біржі
+  const xe = { m: 'timeout', at: T + 30e3 }, mp = { q: 1, n: 1, t1: 0 };
+  const go = async (manual) => { const saved = [], logs = [];
+    await handleBot({ bot: { id: BOT, state: { fl: { ...fl }, xe } }, g, r: { state: { b: { pos: mp }, lt: T }, events: [], manual }, symbol: 'TONUSDT', mirror: true, native: true, ex, now: T + 60e3,
+      save: async (s) => { saved.push(JSON.parse(JSON.stringify(s))); return true; }, log: async (l, m) => logs.push(m), notify: async () => {} });
+    return { saved, logs }; };
+  const plain = await go(null);
+  assert.equal((await ex.openOrders()).length, 0, 'без перезапуску ордери не відновлюються');
+  assert.ok(plain.saved[0].xe, 'помилка лишається');
+  const rs = await go({ id: 'rs1', k: 'resync', ok: true });
+  assert.equal((await ex.openOrders()).length, n0, 'усі сходинки драбини знову на біржі');
+  assert.equal(rs.saved[0].xe, undefined, 'помилку скинуто');
+  assert.ok(rs.logs.some((m) => /Перезапуск угоди/.test(m)));
+  assert.ok(rs.logs.some((m) => /відновлено \d+ лімітн/.test(m)));
+});

@@ -22,6 +22,16 @@ const e=await SB.from('bot_events').select('id,bot_id,level,message,created_at')
 if(!e.error){let add=0;for(const r of (e.data||[]).slice().reverse()){if(SRV.seen.has(r.id))continue;SRV.seen.add(r.id);FEED.unshift({t:new Date(r.created_at).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}),m:'☁ '+r.message});add++}
 if(add){FEED=FEED.slice(0,60);sv('zfeed',FEED);feedR()}}
 lst();upd();if(CUR==='mon')monR()}catch(er){}finally{SRV.busy=0}}
+/* статус «Помилка» (як у Veles): свіжа помилка біржі (state.xe, не старша за годину) або тривожна розбіжність з біржею (fl.mis.on).
+   Кнопка «Перезапустити угоду» надсилає серверу команду resync: він відновлює ордери бота на біржі й скидає помилку. */
+const ERR_TTL=36e5;
+const srvErr=x=>{if(!x.srv||!x.on||!x.srvSt)return null;const e=x.srvXe;if(e&&e.m&&Date.now()-e.at<ERR_TTL)return{t:'Помилка біржі: '+e.m,at:e.at,xe:1};
+const m=x.srvMis;return m&&m.on&&m.t?{t:'Розбіжність з біржею: '+m.t}:null};
+const errLine=x=>{const e=srvErr(x);if(!e)return'';const busy=x.cmd&&x.cmd.k==='resync';
+return`${e.xe?`<p class="dn" style="margin:0">⚠ ${esc(e.t)} · ${ago(e.at)}</p>`:''}<div class="ac"><button class="b sm p" data-a="rs" data-id="${x.id}"${busy?' disabled':''}>${x.b.pos?'Перезапустити угоду':'Скинути помилку'}</button><button class="b sm" data-a="mon" data-id="${x.id}">Деталі</button></div>`};
+function srvResync(x){if(!x.on)return toast('Бот на паузі — запустіть його, щоб сервер виконав перезапуск.');const t=Date.now();
+x.cmd={id:'r'+t.toString(36),k:'resync',t};sbots();lst();
+toast(x.b.pos?'Перезапуск угоди надіслано: сервер протягом 5 хвилин перевірить біржу, поставить відсутні ордери бота й оновить захист.':'Помилку буде скинуто протягом 5 хвилин.')}
 const srvMisL=x=>{const m=x.srvMis;if(!x.tn||!m||!m.t||(m.k!=='xc'&&!m.on))return'';return`<p class="${m.k==='xc'?'mu':'dn'}" style="margin:0">${m.k==='xc'?'ℹ':'⚠'} Звірка з біржею: ${esc(m.t)}${m.k==='orphan'?' — перевірте позицію в Bybit Demo':''}</p>`};
 const srvRlL=x=>x.srv&&x.tn&&x.srvRl&&x.srvRl.t?`<p class="dn" style="margin:0">⏸ Нові угоди призупинено лімітом ризику: ${esc(x.srvRl.t)}</p>`:'';
 const srvLine=x=>x.srv?srvMisL(x)+srvRlL(x)+`<p class="mu" style="margin:0">☁ Працює на сервері 24/7${x.srvSt&&x.srvAt?' · оновлено '+tm(x.srvAt):' · сервер підхопить бота протягом 5 хвилин'}${x.tn?((x.srvEx||'bybit')==='bybit'?' · угоди на Bybit Demo: докупівлі, TP і SL стоять на самій біржі':' · угоди дублюються на Binance Testnet (TP/SL — з сервера після закриття свічки)'):''}</p>`:'';

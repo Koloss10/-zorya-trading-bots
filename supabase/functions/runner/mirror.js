@@ -371,6 +371,9 @@ export async function results(ex, { symbol, xr }) {
 export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, log, notify, risk = null, now = Date.now() }) {
   const pend = [...(Array.isArray(bot.state?.pend) ? bot.state.pend : []), ...(mirror ? actionsFor(r.events, bot.id, native) : [])];
   const fl = { ...(bot.state?.fl || {}) }, fl0 = JSON.stringify(fl);
+  // перезапуск угоди з картки (як «Restart the deal» у Veles): відновити ордери бота на біржі й скинути останню помилку
+  const rsy = !!(r.manual && r.manual.k === "resync" && r.manual.ok);
+  if (rsy && native && r.state?.b?.pos) fl.rs = 1;
   if (fl.parked && native) fl.rs = 1; // бот знято з паузи — відновити драбину на біржі (повторюється, доки не вдасться)
   delete fl.parked; // бот знову працює
   if (!(mirror && native && ex)) clearMis(fl); // звірки немає — давнє попередження не лишається на картці
@@ -384,7 +387,7 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     fl.rl = { k: risk.blk.k, t: risk.blk.t, day, at: now };
   }
   // xs — знімок біржі (моніторинг), xe — остання помилка біржі {m, at}; без дублювання на біржу обидва не потрібні
-  const st = { ...r.state, pend, fl, ...(mirror && ex ? { xs: bot.state?.xs ?? null, ...(bot.state?.xe ? { xe: bot.state.xe } : {}) } : {}) };
+  const st = { ...r.state, pend, fl, ...(mirror && ex ? { xs: bot.state?.xs ?? null, ...(bot.state?.xe && !rsy ? { xe: bot.state.xe } : {}) } : {}) };
   // xr — результати на біржі для порівняння з моделлю (лише рідний режим)
   if (mirror && ex && native && typeof ex.closedPnl === "function") st.xr = bot.state?.xr ? JSON.parse(JSON.stringify(bot.state.xr)) : newXr(now);
   const xsOf = () => JSON.stringify([st.xs ?? null, st.xe ?? null, st.xr ?? null]);
@@ -397,6 +400,7 @@ export async function handleBot({ bot, g, r, symbol, mirror, native, ex, save, l
     await notify(text);
   }
   for (const [lvl, m, tg] of rlMsg) { await log(lvl, m); if (tg) await notify(`Orbix (сервер): ${g.pair} — ${m}`); }
+  if (rsy) await log("info", `Перезапуск угоди: ${mirror && ex && native && r.state?.b?.pos ? "сервер перевірить біржу, поставить відсутні ордери бота й оновить захист" : r.state?.b?.pos ? "помилку скинуто, угоду веде сервер" : "угоди немає — помилку скинуто"}`);
   if (!mirror) return { saved: true };
   if (!ex) {
     if (pend.length) await log("error", "Ключі біржі не підключено — угоди не продубльовано");

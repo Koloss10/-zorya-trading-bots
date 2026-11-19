@@ -30,7 +30,8 @@ export function restoreBot(g, state, funding = null, filters = null) {
  * @param entryOk  false — нових угод не відкривати (ліміт ризику, runner/risk.js): сигнал входу пропускається й рахується
  *                 в skipped, а позиція, що вже є, обробляється як завжди (докупівлі, TP, SL, трейлінг)
  * @param addCap   стеля вартості позиції (USDT, з плечем) для ручної докупівлі: 0 — без обмеження (ліміти ризику, runner/risk.js addCap)
- * @param cmd      ручна команда з інтерфейсу (config._cmd): {id, k: "close" | "add", n?: маржа USDT, t: мс}. Виконується один раз
+ * @param cmd      ручна команда з інтерфейсу (config._cmd): {id, k: "close" | "add" | "resync", n?: маржа USDT, t: мс}.
+ *                 "resync" (перезапуск угоди після помилки) моделі не змінює — handleBot відновлює ордери бота на біржі. Виконується один раз
  *                 (id запам'ятовується в state.mc) після закритих свічок, за останньою ціною; старша за CMD_TTL ігнорується.
  * Новий бот починає з поточного моменту: історія не «програється» заднім числом.
  */
@@ -62,14 +63,17 @@ export function processBot({ g, state, candles, funding = null, filters = null, 
   }
   // ручна команда: після закритих свічок, за останньою ціною (свічка, що формується, теж дає поточну ціну)
   let mc = state?.mc ?? null, manual = null;
-  if (cmd && typeof cmd.id === "string" && cmd.id.length <= 40 && cmd.id !== mc && (cmd.k === "close" || cmd.k === "add")
+  if (cmd && typeof cmd.id === "string" && cmd.id.length <= 40 && cmd.id !== mc && (cmd.k === "close" || cmd.k === "add" || cmd.k === "resync")
     && Number.isFinite(cmd.t) && cmd.t <= now + 6e4 && now - cmd.t <= CMD_TTL) {
     mc = cmd.id;
-    const px = candles.length ? +candles[candles.length - 1].c : 0, n = +cmd.n;
-    const over = cmd.k === "add" && addCap > 0 && b.pos && b.pos.cost + n * (g.lev || 1) > addCap + 1e-9;
-    const ev = (cmd.k === "add" && !(n > 0 && n <= 1e6)) || over ? null : b.manual(cmd.k, px, now, cmd.k === "add" ? n : 0);
-    if (ev) events.push(ev);
-    manual = { id: cmd.id, k: cmd.k, ok: !!ev, why: ev ? null : !b.pos ? "позиції немає" : over ? "перевищить ліміт ризику (позиція не може бути більшою за " + Math.round(addCap) + " USDT)" : "сума некоректна або ордер замалий для біржі" };
+    if (cmd.k === "resync") manual = { id: cmd.id, k: cmd.k, ok: true, why: null }; // перезапуск угоди: модель не змінюється, біржею займається handleBot
+    else {
+      const px = candles.length ? +candles[candles.length - 1].c : 0, n = +cmd.n;
+      const over = cmd.k === "add" && addCap > 0 && b.pos && b.pos.cost + n * (g.lev || 1) > addCap + 1e-9;
+      const ev = (cmd.k === "add" && !(n > 0 && n <= 1e6)) || over ? null : b.manual(cmd.k, px, now, cmd.k === "add" ? n : 0);
+      if (ev) events.push(ev);
+      manual = { id: cmd.id, k: cmd.k, ok: !!ev, why: ev ? null : !b.pos ? "позиції немає" : over ? "перевищить ліміт ризику (позиція не може бути більшою за " + Math.round(addCap) + " USDT)" : "сума некоректна або ордер замалий для біржі" };
+    }
   }
   const tr = b.tr.slice(-keepTrades);
   return { manual, state: { b: { pos: b.pos, tr, cd: b.cd, cum: b.cum, nd: b.nd }, ...(mc ? { mc } : {}), pk, dd, lt, equity: A.length ? b.eqv(A[A.length - 1]) : b.cum }, events, skipped };

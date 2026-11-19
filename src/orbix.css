@@ -237,3 +237,4 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .fbk-bug{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 40%,transparent)}
 .fbk-idea{color:var(--ac);border-color:color-mix(in srgb,var(--ac) 40%,transparent)}
 .rndw{color:var(--warn);font-size:13px;margin:0 0 12px;line-height:1.45}
+.afit{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end}.afit label{flex:1 1 220px}.afit>.b{flex:0 0 auto}.afit #fbudr{flex-basis:100%;margin:0;line-height:1.5}.afit #fbudr .b{display:block;margin-top:8px}

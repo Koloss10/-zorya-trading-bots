@@ -1,7 +1,7 @@
 /* ---------- ринкові дані: реальні свічки з бірж, демо як запасний варіант ---------- */
 const H1=36e5,SYN={};
 function synth(k){if(SYN[k])return SYN[k];const P=PAIRS[pairOf(k)],R=rng(P.s);P.c=P.a=P.p;const a=Array.from({length:N},()=>nextC(P,R)),b=Math.floor(Date.now()/H1)*H1-N*H1;a.forEach((c,i)=>c.t=b+i*H1);return SYN[k]=a}
-const DT={},MD={flt:{},flterr:'',mode:'init',src:'',base:'',tk:{},live:{},load:{},err:'',fut:0,fsrc:'',fbase:'',fk:'',ftk:{},fset:null,fr:{},ferr:''};
+const DT={},MD={xflt:{},flt:{},flterr:'',mode:'init',src:'',base:'',tk:{},live:{},load:{},err:'',fut:0,fsrc:'',fbase:'',fk:'',ftk:{},fset:null,fr:{},ferr:''};
 const D=new Proxy(DT,{get(t,k){if(typeof k!=='string'||!PAIRS[pairOf(k)])return t[k];if(t[k])return t[k];if(MD.mode==='demo')return t[k]=synth(k);need(k).then(()=>onData(k)).catch(()=>{});return synth(k)}});
 const ready=p=>MD.mode==='demo'||!!DT[p];
 const hist=p=>{const a=D[p];if(!a)throw new Error('невідома пара '+p);return a};
@@ -79,6 +79,11 @@ IDB.set(key,{at:Date.now(),m});return m}
 async function fltInit(){if(MD.mode!=='live')return;try{const m=await fltLoad(0);for(const p of PK)if(m[sym(p)])MD.flt[p]=m[sym(p)]}catch(e){MD.flterr=e.message}
 if(MD.fut)try{const m=await fltLoad(1);for(const p of PK)if(m[sym(p)]&&MD.fset.has(p))MD.flt[p+FK]=m[sym(p)]}catch(e){MD.flterr=e.message}}
 const fltOf=g=>g&&MD.flt?MD.flt[dk(g)]||null:null;
+/* правила ф'ючерсів демо-бірж, на яких торгують боти з «Тестнет» (Bybit Demo — правила Bybit linear, Binance Testnet —
+   правила USDⓈ-M): крок кількості для попередження про округлення. Публічні дані, кеш на добу; помилка — без попередження. */
+const XRU={bybit:['https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000',j=>fBy((j.result&&j.result.list)||[],1)],binance:['https://fapi.binance.com/fapi/v1/exchangeInfo',j=>fBn(j.symbols||[])]};
+async function xRules(ex){if(MD.xflt[ex])return MD.xflt[ex];const R=XRU[ex];if(!R)return null;const key='flt:x'+ex,c=await IDB.get(key).catch(()=>null);
+if(c&&Date.now()-c.at<864e5)return MD.xflt[ex]=c.m;try{const m=R[1](await jget(R[0]));if(Object.keys(m).length){IDB.set(key,{at:Date.now(),m});MD.xflt[ex]=m}}catch(e){}return MD.xflt[ex]||null}
 async function tkRefresh(){if(MD.mode!=='live')return;try{Object.assign(MD.tk,tkMap(await tkSpot(MD.base)))}catch(e){}if(MD.fut)try{Object.assign(MD.ftk,tkMap(await tkFut(MD.fbase,MD.fk)))}catch(e){}}
 /* остання ціна за ключем даних: поточна свічка або остання закрита */
 const lastC=p=>MD.live[p]||D[p][D[p].length-1];

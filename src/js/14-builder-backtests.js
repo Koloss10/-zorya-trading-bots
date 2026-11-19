@@ -24,7 +24,23 @@ function bad(c){const g=c.g;if(!c.ex)return'Підключіть біржу в �
 function fill(g,ex){g={...DEF,...g};$('#fp').value=g.pair;if(ex&&cx.includes(ex))$('#fe').value=ex;$('#fdr').value=g.d;$('#ftf').value=g.tf;$('#fmk').value=g.fut;$('#fbe').value=g.be;NUM.forEach(([i,,k,m])=>$('#'+i).value=+(g[k]*m).toFixed(4));$$('[data-sg]').forEach(c=>c.checked=g.sg.includes(c.dataset.sg))}
 const MODES=[{step:.025,orders:4,mult:1.15,tp:.006,sl:.06},{step:.015,orders:5,mult:1.3,tp:.01,sl:.05},{step:.01,orders:7,mult:1.6,tp:.015,sl:.08}];
 $$('[data-m]').forEach(b=>b.onclick=()=>{const c=cfg();fill({...c.g,...MODES[+b.dataset.m]},c.ex);pv()});
-function pv(){const c=cfg(),m=$('#flh'),e=bad(c);fgSum(c);if(e)$$('#fg input').forEach(i=>{if(i.type==='number'&&(i.value===''||!isFinite(+i.value))){const d=i.closest('details');if(d)d.open=true}});const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
+/* округлення кількості на демо-біржі: кожен ордер сітки (вхід і докупівлі) біржа округлює вниз до кроку кількості,
+   як і сервер (floorStep). Повертає null, якщо правил немає, або {worst, first, firstX, step, coin, need, zero}:
+   worst — найбільша втрата обсягу серед ордерів (0…1), first — перший ордер (USDT) до і після округлення,
+   need — найменший перший ордер (USDT, кратний 5), за якого втрата кожного ордера ≤ 10 %, zero — біржа не прийме ордер */
+const XNAME={bybit:'Bybit Demo',binance:'Binance Testnet'};
+function rndInfo(g,ex){if(!g||!g.fut||!PAIRS[g.pair])return null;const F=MD.xflt[ex]&&MD.xflt[ex][sym(g.pair)];if(!F||!(F.step>0))return null;
+let px;try{px=lastC(dk(g)).c}catch(e){return null}if(!(px>0))return null;
+const lev=g.fut?(+g.lev||1):1,P=lv({...g,fee:0,slip:0},px,null).L.map(x=>x.p),n=Math.max(1,Math.round(g.orders||1));let worst=0,zero=false,first=null,mm=Infinity;
+for(let k=0;k<n;k++){const p=P[k]||px,m=(+g.mult||1)**k,s=(+g.base||0)*lev*m,q=s/p,qf=Math.floor(q/F.step+1e-9)*F.step,loss=q>0?1-qf/q:0;
+if(qf<=0)zero=true;if(loss>worst)worst=loss;if(k===0)first=[s,qf*p];if(m*lev<mm)mm=m*lev}
+const need=Math.ceil(10*F.step*px/(mm||1)/5)*5;return{worst,first,step:F.step,coin:g.pair.split('/')[0],need,zero}}
+const rndText=(r,ex,short)=>{const pc=x=>'−'+Math.round(x*100)+' %';
+return short?`⚠ На біржі ордери округлюються до кроку ${String(r.step).replace('.',',')} ${r.coin}: перший ${n2(r.first[0],2)} → ${n2(r.first[1],2)} USDT (${pc(1-r.first[1]/r.first[0])})${r.zero?', частину ордерів біржа не прийме':''} — модель і біржа розходяться в обсязі.`
+:`⚠ На ${XNAME[ex]||ex} кількість округлюється до кроку ${String(r.step).replace('.',',')} ${r.coin}: перший ордер ${n2(r.first[0],2)} USDT стане ${n2(r.first[1],2)} USDT (${pc(1-r.first[1]/r.first[0])}), найгірший ордер сітки ${pc(r.worst)}${r.zero?' — частину ордерів біржа не прийме':''}. Модель бота й біржа розійдуться в обсязі. Щоб похибка була ≤ 10 %, потрібен перший ордер від ~${n2(r.need,0)} USDT (з більшим плечем — менше).`};
+function rndWarnR(g){const el=$('#frw');if(!el)return;const ex=(typeof TN!=='undefined'&&TN.ex)||'bybit',r=rndInfo(g,ex);
+if(r&&(r.worst>=.1||r.zero)){el.textContent=rndText(r,ex);el.hidden=false}else{el.hidden=true;el.textContent='';if(!MD.xflt[ex]&&g&&g.fut)xRules(ex).then(m=>{if(m&&CUR==='bd')rndWarnR(cfg().g)})}}
+function pv(){const c=cfg(),m=$('#flh'),e=bad(c);fgSum(c);rndWarnR(c.g);if(e)$$('#fg input').forEach(i=>{if(i.type==='number'&&(i.value===''||!isFinite(+i.value))){const d=i.closest('details');if(d)d.open=true}});const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
 m.textContent=`Макс. плече для ${c.g.pair} на ${c.ex||'біржі'}: ${mx}×. Фундаментальний бал пари (демо): ${PAIRS[c.g.pair].f}/100.`+(c.g.lev>1&&c.g.fut?` Ліквідація приблизно за ${((1/c.g.lev-.005)*100).toFixed(1)}% проти позиції.`:'')+((F=>F?` Правила біржі: мін. ордер ${n2(F.minN,2)} USDT, крок ціни ${F.tick}, крок кількості ${F.step}${F.maxLev?', плече до '+F.maxLev+'×':''}.`:'')(fltOf(normG({...c.g}))));
 if(e){$('#gs').textContent=e;return}
 const ck=dk(c.g);if(!ready(ck)){$('#gs').textContent='Завантажую історію '+c.g.pair+' ('+mkLbl(ck)+')…';need(ck).then(pv).catch(er=>$('#gs').textContent='Не вдалося завантажити дані: '+er.message);return}

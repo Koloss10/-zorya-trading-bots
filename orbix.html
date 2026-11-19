@@ -243,6 +243,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 .fbk{font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--ln)}
 .fbk-bug{color:var(--dn);border-color:color-mix(in srgb,var(--dn) 40%,transparent)}
 .fbk-idea{color:var(--ac);border-color:color-mix(in srgb,var(--ac) 40%,transparent)}
+.rndw{color:var(--warn);font-size:13px;margin:0 0 12px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -293,6 +294,7 @@ td{padding:10px 8px;border-top:1px solid var(--ln);font-size:14px}
 <div class="row" style="margin-bottom:12px"><button class="b" data-m="0">Консервативний</button><button class="b" data-m="1">Помірний</button><button class="b" data-m="2">Агресивний</button></div>
 <div id="fg"></div>
 <p class="mu" id="flh" style="margin-bottom:12px"></p>
+<p id="frw" class="rndw" hidden></p>
 <div class="row"><button class="b p" id="bt">Запустити бектест</button><button class="b" id="ad">Додати paper-бота</button><button class="b" id="sxb">Стрес-тест</button></div></div>
 <div class="card"><h2>Графік і сітка ордерів</h2><div id="gv"></div><p class="mu" id="gs" style="margin-top:8px"></p></div>
 <div class="card"><h2>Результат бектесту</h2><div id="res"><p class="mu">Задайте параметри й запустіть бектест на історії обраної пари.</p></div></div>
@@ -375,7 +377,7 @@ let PK=Object.keys(PAIRS);
 /* ---------- ринкові дані: реальні свічки з бірж, демо як запасний варіант ---------- */
 const H1=36e5,SYN={};
 function synth(k){if(SYN[k])return SYN[k];const P=PAIRS[pairOf(k)],R=rng(P.s);P.c=P.a=P.p;const a=Array.from({length:N},()=>nextC(P,R)),b=Math.floor(Date.now()/H1)*H1-N*H1;a.forEach((c,i)=>c.t=b+i*H1);return SYN[k]=a}
-const DT={},MD={flt:{},flterr:'',mode:'init',src:'',base:'',tk:{},live:{},load:{},err:'',fut:0,fsrc:'',fbase:'',fk:'',ftk:{},fset:null,fr:{},ferr:''};
+const DT={},MD={xflt:{},flt:{},flterr:'',mode:'init',src:'',base:'',tk:{},live:{},load:{},err:'',fut:0,fsrc:'',fbase:'',fk:'',ftk:{},fset:null,fr:{},ferr:''};
 const D=new Proxy(DT,{get(t,k){if(typeof k!=='string'||!PAIRS[pairOf(k)])return t[k];if(t[k])return t[k];if(MD.mode==='demo')return t[k]=synth(k);need(k).then(()=>onData(k)).catch(()=>{});return synth(k)}});
 const ready=p=>MD.mode==='demo'||!!DT[p];
 const hist=p=>{const a=D[p];if(!a)throw new Error('невідома пара '+p);return a};
@@ -453,6 +455,11 @@ IDB.set(key,{at:Date.now(),m});return m}
 async function fltInit(){if(MD.mode!=='live')return;try{const m=await fltLoad(0);for(const p of PK)if(m[sym(p)])MD.flt[p]=m[sym(p)]}catch(e){MD.flterr=e.message}
 if(MD.fut)try{const m=await fltLoad(1);for(const p of PK)if(m[sym(p)]&&MD.fset.has(p))MD.flt[p+FK]=m[sym(p)]}catch(e){MD.flterr=e.message}}
 const fltOf=g=>g&&MD.flt?MD.flt[dk(g)]||null:null;
+/* правила ф'ючерсів демо-бірж, на яких торгують боти з «Тестнет» (Bybit Demo — правила Bybit linear, Binance Testnet —
+   правила USDⓈ-M): крок кількості для попередження про округлення. Публічні дані, кеш на добу; помилка — без попередження. */
+const XRU={bybit:['https://api.bybit.com/v5/market/instruments-info?category=linear&limit=1000',j=>fBy((j.result&&j.result.list)||[],1)],binance:['https://fapi.binance.com/fapi/v1/exchangeInfo',j=>fBn(j.symbols||[])]};
+async function xRules(ex){if(MD.xflt[ex])return MD.xflt[ex];const R=XRU[ex];if(!R)return null;const key='flt:x'+ex,c=await IDB.get(key).catch(()=>null);
+if(c&&Date.now()-c.at<864e5)return MD.xflt[ex]=c.m;try{const m=R[1](await jget(R[0]));if(Object.keys(m).length){IDB.set(key,{at:Date.now(),m});MD.xflt[ex]=m}}catch(e){}return MD.xflt[ex]||null}
 async function tkRefresh(){if(MD.mode!=='live')return;try{Object.assign(MD.tk,tkMap(await tkSpot(MD.base)))}catch(e){}if(MD.fut)try{Object.assign(MD.ftk,tkMap(await tkFut(MD.fbase,MD.fk)))}catch(e){}}
 /* остання ціна за ключем даних: поточна свічка або остання закрита */
 const lastC=p=>MD.live[p]||D[p][D[p].length-1];
@@ -840,7 +847,7 @@ const bv=x=>x.b.eqv(lastC(dk(x.g)));
 let BOOT=0,KEEP=[];const sloc=()=>{if(BOOT)sv('zorya3',bots.map(({g,ex,on,rid,pid,t0,sp,tn,srv,srvEx,demo})=>({g,ex,on,rid,pid,t0,sp,tn,srv,srvEx,...(demo?{demo:1}:{})})).concat(KEEP))},sbots=()=>{sloc();cloudQ()};
 function bcard(x){const p=x.b.pos,v=bv(x),s=x.b.tr,w=s.filter(t=>t.pnl>0).length;
 return`<div class="bc ${x.on?'on':'off'}" data-bot="${x.id}"><div class="bh"><b>${x.g.pair}</b><span class="mu">${dir(x.g)} · ${tfl(x.g.tf)} · ${x.g.lev}× · ${x.ex} · з ${tm(x.t0)}</span><span class="st" style="margin-left:auto">${x.on?'Працює':'Пауза'}</span></div>${!s.length&&!p?`<p class="mu bwait">${x.on?'Чекає на сигнал':'На паузі'} · перевірка після закриття свічки ${tfl(x.g.tf)}</p>`:''}${x.trunc?'<p class="mu" style="margin:0">Історії бракує, щоб відтворити бота з самого запуску: показано з найранішої доступної свічки.</p>':''}
-${srvLine(x)}<div class="bm"><div>PnL з відкритою<b class="${cls(v)}">${f(v)}</b></div><div>Угод / win<b>${s.length} / ${s.length?Math.round(w/s.length*100):0}%</b></div><div>Позиція<b>${p?p.n+' з '+x.g.orders+' орд.':'немає'}</b></div><div>Просадка<b class="${cls(x.dd)}">${f(x.dd,0)}</b></div></div>
+${srvLine(x)}${x.tn?((ex,r)=>r&&(r.worst>=.1||r.zero)?`<p class="rndw" style="margin:0">${rndText(r,ex,1)}</p>`:'')(x.srvEx||(typeof TN!=='undefined'&&TN.ex)||'bybit',rndInfo(x.g,x.srvEx||(typeof TN!=='undefined'&&TN.ex)||'bybit')):''}<div class="bm"><div>PnL з відкритою<b class="${cls(v)}">${f(v)}</b></div><div>Угод / win<b>${s.length} / ${s.length?Math.round(w/s.length*100):0}%</b></div><div>Позиція<b>${p?p.n+' з '+x.g.orders+' орд.':'немає'}</b></div><div>Просадка<b class="${cls(x.dd)}">${f(x.dd,0)}</b></div></div>
 <div class="ac"><button class="b sm ${x.on?'':'p'}" data-a="t" data-id="${x.id}">${x.on?'Пауза':'Запустити'}</button><button class="b sm" data-a="g" data-id="${x.id}">Графік</button><button class="b sm" data-a="j" data-id="${x.id}">Угоди</button>${CLOUD.u?`<button class="b sm tg" data-a="srv" data-id="${x.id}" aria-pressed="${!!x.srv}" title="Бот торгує на сервері, навіть коли застосунок закритий">${x.srv?'Сервер 24/7: увімк.':'Сервер 24/7'}</button>`:''}${x.g.fut&&CLOUD.u&&TN.c?`<button class="b sm tg" data-a="tn" data-id="${x.id}" aria-pressed="${!!x.tn}" title="Дублювати угоди бота ордерами на демо-рахунку біржі (Bybit Demo або Binance Testnet)">${x.tn?'Тестнет: увімк.':'Тестнет'}</button>`:''}<button class="b sm bmore" data-a="m" data-id="${x.id}" aria-expanded="false" aria-label="Ще дії" title="Ще дії">⋯</button></div><div class="ac bmo" hidden><button class="b sm" data-a="c" data-id="${x.id}">Клонувати</button><button class="b sm d" data-a="x" data-id="${x.id}">Видалити бота</button></div><div class="gr" id="gr${x.id}" hidden></div><div class="gr" id="jr${x.id}" hidden></div></div>`}
 function lstTo(el,list){if(!el)return;const on=list.filter(x=>x.on),off=list.filter(x=>!x.on);el.innerHTML=list.length?(on.length?`<h3>Працюють · ${on.length}</h3>`+on.map(bcard).join(''):'')+(off.length?`<h3>На паузі · ${off.length}</h3>`+off.map(bcard).join(''):''):'<p class="mu">Ботів ще немає. Запустіть топового бота, скористайтеся Авто-майстром або створіть свого.</p>'}
 function lst(){lstTo($('#bl'),bots);const q=($('#bq')&&$('#bq').value||'').trim().toUpperCase();lstTo($('#bl2'),q?bots.filter(x=>x.g.pair.includes(q)):bots);upd()}
@@ -928,7 +935,23 @@ function bad(c){const g=c.g;if(!c.ex)return'Підключіть біржу в �
 function fill(g,ex){g={...DEF,...g};$('#fp').value=g.pair;if(ex&&cx.includes(ex))$('#fe').value=ex;$('#fdr').value=g.d;$('#ftf').value=g.tf;$('#fmk').value=g.fut;$('#fbe').value=g.be;NUM.forEach(([i,,k,m])=>$('#'+i).value=+(g[k]*m).toFixed(4));$$('[data-sg]').forEach(c=>c.checked=g.sg.includes(c.dataset.sg))}
 const MODES=[{step:.025,orders:4,mult:1.15,tp:.006,sl:.06},{step:.015,orders:5,mult:1.3,tp:.01,sl:.05},{step:.01,orders:7,mult:1.6,tp:.015,sl:.08}];
 $$('[data-m]').forEach(b=>b.onclick=()=>{const c=cfg();fill({...c.g,...MODES[+b.dataset.m]},c.ex);pv()});
-function pv(){const c=cfg(),m=$('#flh'),e=bad(c);fgSum(c);if(e)$$('#fg input').forEach(i=>{if(i.type==='number'&&(i.value===''||!isFinite(+i.value))){const d=i.closest('details');if(d)d.open=true}});const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
+/* округлення кількості на демо-біржі: кожен ордер сітки (вхід і докупівлі) біржа округлює вниз до кроку кількості,
+   як і сервер (floorStep). Повертає null, якщо правил немає, або {worst, first, firstX, step, coin, need, zero}:
+   worst — найбільша втрата обсягу серед ордерів (0…1), first — перший ордер (USDT) до і після округлення,
+   need — найменший перший ордер (USDT, кратний 5), за якого втрата кожного ордера ≤ 10 %, zero — біржа не прийме ордер */
+const XNAME={bybit:'Bybit Demo',binance:'Binance Testnet'};
+function rndInfo(g,ex){if(!g||!g.fut||!PAIRS[g.pair])return null;const F=MD.xflt[ex]&&MD.xflt[ex][sym(g.pair)];if(!F||!(F.step>0))return null;
+let px;try{px=lastC(dk(g)).c}catch(e){return null}if(!(px>0))return null;
+const lev=g.fut?(+g.lev||1):1,P=lv({...g,fee:0,slip:0},px,null).L.map(x=>x.p),n=Math.max(1,Math.round(g.orders||1));let worst=0,zero=false,first=null,mm=Infinity;
+for(let k=0;k<n;k++){const p=P[k]||px,m=(+g.mult||1)**k,s=(+g.base||0)*lev*m,q=s/p,qf=Math.floor(q/F.step+1e-9)*F.step,loss=q>0?1-qf/q:0;
+if(qf<=0)zero=true;if(loss>worst)worst=loss;if(k===0)first=[s,qf*p];if(m*lev<mm)mm=m*lev}
+const need=Math.ceil(10*F.step*px/(mm||1)/5)*5;return{worst,first,step:F.step,coin:g.pair.split('/')[0],need,zero}}
+const rndText=(r,ex,short)=>{const pc=x=>'−'+Math.round(x*100)+' %';
+return short?`⚠ На біржі ордери округлюються до кроку ${String(r.step).replace('.',',')} ${r.coin}: перший ${n2(r.first[0],2)} → ${n2(r.first[1],2)} USDT (${pc(1-r.first[1]/r.first[0])})${r.zero?', частину ордерів біржа не прийме':''} — модель і біржа розходяться в обсязі.`
+:`⚠ На ${XNAME[ex]||ex} кількість округлюється до кроку ${String(r.step).replace('.',',')} ${r.coin}: перший ордер ${n2(r.first[0],2)} USDT стане ${n2(r.first[1],2)} USDT (${pc(1-r.first[1]/r.first[0])}), найгірший ордер сітки ${pc(r.worst)}${r.zero?' — частину ордерів біржа не прийме':''}. Модель бота й біржа розійдуться в обсязі. Щоб похибка була ≤ 10 %, потрібен перший ордер від ~${n2(r.need,0)} USDT (з більшим плечем — менше).`};
+function rndWarnR(g){const el=$('#frw');if(!el)return;const ex=(typeof TN!=='undefined'&&TN.ex)||'bybit',r=rndInfo(g,ex);
+if(r&&(r.worst>=.1||r.zero)){el.textContent=rndText(r,ex);el.hidden=false}else{el.hidden=true;el.textContent='';if(!MD.xflt[ex]&&g&&g.fut)xRules(ex).then(m=>{if(m&&CUR==='bd')rndWarnR(cfg().g)})}}
+function pv(){const c=cfg(),m=$('#flh'),e=bad(c);fgSum(c);rndWarnR(c.g);if(e)$$('#fg input').forEach(i=>{if(i.type==='number'&&(i.value===''||!isFinite(+i.value))){const d=i.closest('details');if(d)d.open=true}});const mx=PAIRS[c.g.pair]?maxLev(c.g.pair,c.ex||'Binance'):1;
 m.textContent=`Макс. плече для ${c.g.pair} на ${c.ex||'біржі'}: ${mx}×. Фундаментальний бал пари (демо): ${PAIRS[c.g.pair].f}/100.`+(c.g.lev>1&&c.g.fut?` Ліквідація приблизно за ${((1/c.g.lev-.005)*100).toFixed(1)}% проти позиції.`:'')+((F=>F?` Правила біржі: мін. ордер ${n2(F.minN,2)} USDT, крок ціни ${F.tick}, крок кількості ${F.step}${F.maxLev?', плече до '+F.maxLev+'×':''}.`:'')(fltOf(normG({...c.g}))));
 if(e){$('#gs').textContent=e;return}
 const ck=dk(c.g);if(!ready(ck)){$('#gs').textContent='Завантажую історію '+c.g.pair+' ('+mkLbl(ck)+')…';need(ck).then(pv).catch(er=>$('#gs').textContent='Не вдалося завантажити дані: '+er.message);return}
@@ -1597,7 +1620,7 @@ const saved=ld('zorya3',[]).filter(x=>x&&x.g),ps=[...new Set(saved.map(x=>x.g.pa
 $('#tops').textContent=MD.mode==='live'?`Завантажую реальні дані ${MD.src}…`:'Біржі недоступні, працюю на демо-даних.';
 try{await need('BTC/USDT')}catch(e){}for(const x of saved)if(PAIRS[x.g.pair])try{await need(dk(x.g),hrsFor(x.t0,x.g.tf))}catch(e){}
 for(const x of saved){if(PAIRS[x.g.pair]&&ready(dk(x.g))){const b=mk(x.g,x.ex,x.on!==false,{t0:x.t0,sp:x.sp,tn:x.tn,srv:x.srv,srvEx:x.srvEx});b.rid=x.rid;b.pid=x.pid;if(x.demo)b.demo=1}else KEEP.push(x)}
-BOOT=1;sloc();lst();favs();if(CUR==='bd')pv();if(CUR==='mk')mkt();
+BOOT=1;{const xs=new Set(bots.filter(x=>x.tn).map(x=>x.srvEx||TN.ex||'bybit'));if(bots.some(x=>x.g.fut))xs.add(TN.ex||'bybit');for(const ex of xs)xRules(ex).then(m=>{if(m&&(CUR==='bots'||CUR==='ov'))lst()}).catch(()=>{})}sloc();lst();favs();if(CUR==='bd')pv();if(CUR==='mk')mkt();
 cloudStart();setTimeout(()=>topJob(0),400);setInterval(()=>topJob(0),60000);
 if(MD.mode==='live'){setInterval(poll,15000);setInterval(()=>{if(CUR==='mk')tkRefresh().then(mkt)},30000)}else setInterval(tick,1500)}
 /* дані пари довантажились після запиту «наперед» — оновити видимий екран */
